@@ -62,11 +62,11 @@ func startCage(cmd *cobra.Command, name string, ports []string) error {
 
 	client := libvirt.NewClient()
 
-	// Start virtiofsd if shares are configured and not user-network mode
+	// Start virtiofsd if shares are configured and using bridge network
 	var virtiofsDaemon *virtiofs.Daemon
 	var virtiofsSocket string
 
-	if len(cfg.Shares) > 0 && cfg.Security.VirtiofsSandbox && !state.UserNetwork {
+	if len(cfg.Shares) > 0 && cfg.Security.VirtiofsSandbox && state.NetworkMode == cage.NetworkBridge {
 		// virtiofsd requires root (uses setgroups() on startup)
 		if os.Getuid() != 0 {
 			fmt.Fprintln(cmd.OutOrStdout(), "  File sharing requires root (virtiofsd limitation)")
@@ -101,9 +101,9 @@ func startCage(cmd *cobra.Command, name string, ports []string) error {
 		return fmt.Errorf("failed to start VM: %w", err)
 	}
 
-	// Wait for VM to get an IP (skip for user-mode networking)
+	// Wait for VM to get an IP (only for bridge networking)
 	var ip string
-	if !state.UserNetwork {
+	if state.NetworkMode == cage.NetworkBridge {
 		fmt.Fprint(cmd.OutOrStdout(), "  Waiting for IP address...")
 		for i := 0; i < 30; i++ {
 			time.Sleep(2 * time.Second)
@@ -121,7 +121,7 @@ func startCage(cmd *cobra.Command, name string, ports []string) error {
 			fmt.Fprintf(cmd.OutOrStdout(), "  IP: %s\n", ip)
 		}
 	} else {
-		fmt.Fprintln(cmd.OutOrStdout(), "  User-mode networking: use 'cage console' to access")
+		fmt.Fprintf(cmd.OutOrStdout(), "  %s networking: use 'cage console' to access\n", state.NetworkMode)
 	}
 
 	// Update state
@@ -189,7 +189,7 @@ func startCage(cmd *cobra.Command, name string, ports []string) error {
 
 	if ip != "" {
 		fmt.Fprintf(cmd.OutOrStdout(), "  Use 'cage ssh %s' to connect\n", name)
-	} else if state.UserNetwork {
+	} else if state.NetworkMode != cage.NetworkBridge {
 		fmt.Fprintf(cmd.OutOrStdout(), "  Use 'cage console %s' to connect\n", name)
 	}
 

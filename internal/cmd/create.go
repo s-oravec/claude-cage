@@ -20,7 +20,7 @@ func NewCreateCmd() *cobra.Command {
 	var name string
 	var profile string
 	var image string
-	var userNetwork bool
+	var networkMode string
 
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -28,26 +28,39 @@ func NewCreateCmd() *cobra.Command {
 		Long: `Create a new cage VM without starting it.
 
 This creates the disk overlay, network, SSH keys, and VM definition.
-Use 'cage start' to start the cage after creation.`,
+Use 'cage start' to start the cage after creation.
+
+Network modes:
+  bridge  Libvirt bridge with firewall isolation (default, requires root)
+  slirp   QEMU SLIRP user-mode networking (no root, slower)
+  passt   Passt with restrictions (no root, fast, secure)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return createCage(cmd, name, profile, image, userNetwork)
+			return createCage(cmd, name, profile, image, networkMode)
 		},
 	}
 
 	cmd.Flags().StringVarP(&name, "name", "n", "", "Name for the cage (required)")
 	cmd.Flags().StringVarP(&profile, "profile", "p", "default", "Resource profile (default, heavy, light)")
 	cmd.Flags().StringVarP(&image, "image", "i", "", "Base image (defaults to config default)")
-	cmd.Flags().BoolVar(&userNetwork, "user-network", false, "Use user-mode networking (no root required, limited features)")
+	cmd.Flags().StringVar(&networkMode, "network", cage.NetworkBridge, "Network mode: bridge, slirp, passt")
 
 	cmd.MarkFlagRequired("name")
 
 	return cmd
 }
 
-func createCage(cmd *cobra.Command, name, profileName, imageName string, userNetwork bool) error {
+func createCage(cmd *cobra.Command, name, profileName, imageName, networkMode string) error {
 	// Check if cage already exists
 	if cage.Exists(name) {
 		return fmt.Errorf("cage '%s' already exists", name)
+	}
+
+	// Validate network mode
+	switch networkMode {
+	case cage.NetworkBridge, cage.NetworkSlirp, cage.NetworkPasst:
+		// valid
+	default:
+		return fmt.Errorf("invalid network mode '%s', must be: bridge, slirp, passt", networkMode)
 	}
 
 	// Load config
@@ -80,10 +93,11 @@ func createCage(cmd *cobra.Command, name, profileName, imageName string, userNet
 		return fmt.Errorf("failed to create cage directory: %w", err)
 	}
 
-	// Create network (unless user-network mode)
+	// Create network based on mode
 	var networkName string
-	if !userNetwork {
-		fmt.Fprintln(cmd.OutOrStdout(), "  Creating network...")
+	switch networkMode {
+	case cage.NetworkBridge:
+		fmt.Fprintln(cmd.OutOrStdout(), "  Creating bridge network...")
 		if err := network.CreateNetwork(name); err != nil {
 			cage.DeleteState(name)
 			return fmt.Errorf("failed to create network: %w", err)
@@ -110,8 +124,10 @@ func createCage(cmd *cobra.Command, name, profileName, imageName string, userNet
 				fmt.Fprintf(cmd.OutOrStdout(), "  Warning: DNS DNAT setup failed: %v\n", err)
 			}
 		}
-	} else {
-		fmt.Fprintln(cmd.OutOrStdout(), "  Using user-mode networking (SLIRP)...")
+	case cage.NetworkSlirp:
+		fmt.Fprintln(cmd.OutOrStdout(), "  Using SLIRP user-mode networking...")
+	case cage.NetworkPasst:
+		fmt.Fprintln(cmd.OutOrStdout(), "  Using passt networking...")
 	}
 
 	// Create qcow2 overlay with specified disk size
@@ -183,7 +199,7 @@ func createCage(cmd *cobra.Command, name, profileName, imageName string, userNet
 		Status:      cage.StatusStopped,
 		Image:       imageName,
 		Profile:     profileName,
-		UserNetwork: userNetwork,
+		NetworkMode: networkMode,
 	}
 
 	if err := cage.SaveState(state); err != nil {

@@ -14,18 +14,26 @@ const (
 	StatusStopped = "stopped"
 )
 
+// Network modes
+const (
+	NetworkBridge = "bridge" // libvirt bridge with firewall (default, requires root)
+	NetworkSlirp  = "slirp"  // QEMU SLIRP user-mode (no root, slow)
+	NetworkPasst  = "passt"  // passt with restrictions (no root, fast, secure)
+)
+
 // State holds the runtime state of a cage
 type State struct {
 	Name         string    `json:"name"`
 	Status       string    `json:"status"`
 	Image        string    `json:"image"`
 	Profile      string    `json:"profile"`
-	UserNetwork  bool      `json:"user_network,omitempty"`
+	NetworkMode  string    `json:"network_mode,omitempty"`
 	IP           string    `json:"ip,omitempty"`
 	Ports        []Port    `json:"ports,omitempty"`
 	StartedAt    time.Time `json:"started_at"`
 	VirtiofsPID  int       `json:"virtiofs_pid,omitempty"`
 	ForwarderPID int       `json:"forwarder_pid,omitempty"`
+	PasstPID     int       `json:"passt_pid,omitempty"`
 }
 
 // Port represents a port forwarding rule

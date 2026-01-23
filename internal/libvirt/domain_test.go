@@ -56,20 +56,20 @@ func TestGenerateDomainXML_BridgeNetwork(t *testing.T) {
 	assert.NotContains(t, xml, "<interface type='user'>")
 }
 
-func TestGenerateDomainXML_UserNetwork(t *testing.T) {
+func TestGenerateDomainXML_SlirpNetwork(t *testing.T) {
 	cfg := &DomainConfig{
 		Name:         "test",
 		MemoryMB:     2048,
 		VCPU:         2,
 		DiskPath:     "/tmp/disk.qcow2",
 		CloudInitISO: "/tmp/cloud-init.iso",
-		NetworkName:  "", // Empty = user-mode networking
+		NetworkName:  "", // Empty = SLIRP user-mode networking
 	}
 
 	xml, err := GenerateDomainXML(cfg)
 	require.NoError(t, err)
 
-	// User-mode networking should use user interface
+	// SLIRP networking should use user interface
 	assert.Contains(t, xml, "<interface type='user'>")
 	assert.NotContains(t, xml, "<interface type='network'>")
 	assert.NotContains(t, xml, "<source network=")
@@ -247,21 +247,21 @@ func TestGenerateDomainXML_SpecialCharactersInPaths(t *testing.T) {
 	assert.Contains(t, xml, cfg.CloudInitISO)
 }
 
-func TestGenerateDomainXML_CombinedUserNetworkAndVirtiofs(t *testing.T) {
+func TestGenerateDomainXML_CombinedSlirpNetworkAndVirtiofs(t *testing.T) {
 	cfg := &DomainConfig{
 		Name:           "test",
 		MemoryMB:       4096,
 		VCPU:           4,
 		DiskPath:       "/tmp/disk.qcow2",
 		CloudInitISO:   "/tmp/cloud-init.iso",
-		NetworkName:    "", // User-mode networking
+		NetworkName:    "", // SLIRP user-mode networking
 		VirtiofsSocket: "/run/virtiofs.sock",
 	}
 
 	xml, err := GenerateDomainXML(cfg)
 	require.NoError(t, err)
 
-	// Should have user network
+	// Should have SLIRP network
 	assert.Contains(t, xml, "<interface type='user'>")
 
 	// Should have virtiofs

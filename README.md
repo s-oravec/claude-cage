@@ -114,18 +114,28 @@ cage create -n <name> [options]
 | `-n, --name` | Name for the cage (required) |
 | `-i, --image` | Base image (defaults to config default) |
 | `-p, --profile` | Resource profile: `default`, `heavy`, `light` (default: `default`) |
-| `--user-network` | Use user-mode networking (no root required, limited features) |
+| `--network` | Network mode: `bridge`, `slirp`, `passt` (default: `bridge`) |
+
+**Network Modes:**
+| Mode | Root? | Speed | Security | Description |
+|------|-------|-------|----------|-------------|
+| `bridge` | Yes | Fast | High | Libvirt bridge with firewall isolation (default) |
+| `slirp` | No | Slow | Medium | QEMU SLIRP user-mode networking |
+| `passt` | No | Fast | High | Passt with network restrictions |
 
 **Examples:**
 ```bash
-# Create with default settings
+# Create with default settings (bridge network, requires root)
 cage create -n myproject
 
 # Create with specific image and profile
 cage create -n heavy-workload -i ubuntu-24.04 -p heavy
 
-# Create without root (user-mode networking)
-cage create -n test --user-network
+# Create without root (SLIRP networking)
+cage create -n test --network slirp
+
+# Create without root (passt networking, faster)
+cage create -n test --network passt
 ```
 
 ---

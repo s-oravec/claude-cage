@@ -35,11 +35,12 @@ func TestCreateCmd_HasImageFlag(t *testing.T) {
 	assert.NotNil(t, flag)
 }
 
-func TestCreateCmd_HasUserNetworkFlag(t *testing.T) {
+func TestCreateCmd_HasNetworkFlag(t *testing.T) {
 	cmd := NewCreateCmd()
 
-	flag := cmd.Flag("user-network")
+	flag := cmd.Flag("network")
 	assert.NotNil(t, flag)
+	assert.Equal(t, "bridge", flag.DefValue)
 }
 
 func TestCreateCmd_RequiresName(t *testing.T) {

@@ -116,8 +116,8 @@ func removeCage(cmd *cobra.Command, name string, force bool) error {
 	fmt.Fprintln(cmd.OutOrStdout(), "  Removing SSH keys...")
 	ssh.DeleteKeys(name)
 
-	// Cleanup firewall and network (only if not user-network mode)
-	if !state.UserNetwork {
+	// Cleanup firewall and network (only for bridge mode)
+	if state.NetworkMode == cage.NetworkBridge {
 		fmt.Fprintln(cmd.OutOrStdout(), "  Cleaning up firewall...")
 		cfg, _ := config.Load()
 		dnsServer := "1.1.1.1"
