@@ -50,14 +50,17 @@ cage config init
 # Download a base image (alpine is default)
 cage setup
 
-# Create a cage
-cage create -n myvm
+# Create a cage with SSH access
+cage create -n myvm --ssh auto
 
 # Start the cage
 cage start myvm
 
 # Connect via SSH
 cage ssh myvm
+
+# Or connect via serial console (no --ssh needed)
+# cage console myvm
 
 # Stop the cage (preserves resources)
 cage stop myvm
