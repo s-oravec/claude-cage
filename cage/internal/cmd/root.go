@@ -17,6 +17,9 @@ for running Claude Code in a secure sandbox with full Docker support.`,
 	rootCmd.AddCommand(NewDoctorCmd())
 	rootCmd.AddCommand(NewConfigCmd())
 	rootCmd.AddCommand(NewSetupCmd())
+	rootCmd.AddCommand(NewStartCmd())
+	rootCmd.AddCommand(NewStopCmd())
+	rootCmd.AddCommand(NewListCmd())
 
 	return rootCmd
 }

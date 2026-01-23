@@ -224,15 +224,15 @@ func List() ([]CageState, error) {
 
 ## Deliverables
 
-- [ ] Libvirt client wrapper
-- [ ] Domain XML generation
-- [ ] qcow2 overlay creation
-- [ ] `cage start --name <name>`
-- [ ] `cage start --profile <profile>`
-- [ ] `cage start --image <image>`
-- [ ] `cage stop <name>`
-- [ ] `cage stop --force`
-- [ ] `cage stop --all`
-- [ ] `cage list`
-- [ ] `cage list --json`
-- [ ] Cage state persistence
+- [x] Libvirt client wrapper (using virsh CLI)
+- [x] Domain XML generation
+- [x] qcow2 overlay creation
+- [x] `cage start --name <name>`
+- [x] `cage start --profile <profile>`
+- [x] `cage start --image <image>`
+- [x] `cage stop <name>`
+- [x] `cage stop --force`
+- [x] `cage stop --all`
+- [x] `cage list`
+- [x] `cage list --json`
+- [x] Cage state persistence
