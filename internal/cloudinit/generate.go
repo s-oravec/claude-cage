@@ -43,8 +43,8 @@ mounts:
 users:
   - name: cage
     sudo: ALL=(ALL) NOPASSWD:ALL
-    shell: /bin/bash
-    groups: docker
+    shell: /bin/sh
+    groups: wheel,docker
     lock_passwd: false
     # password: cage
     passwd: $6$jPpNVOdPlZdiMeW.$tGs/Xy0/9wH7CtN9pMaGFnDFmK0THolDE5SALY.rIcwezfG7WU0syq7xov9ZFy.8GI5K03j/LcvK2vr3pf2pp1
@@ -57,8 +57,19 @@ package_update: false
 package_upgrade: false
 %s
 runcmd:
+  # Install sudo on Alpine (apk) or ensure it exists on other distros
+  - which apk && apk add --no-cache sudo doas || true
+  # Configure doas for Alpine (wheel group)
+  - echo "permit nopass :wheel" > /etc/doas.d/wheel.conf 2>/dev/null || true
+  # Ensure sudoers is configured (for distros with sudo)
+  - echo "cage ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/cage 2>/dev/null || true
+  - chmod 440 /etc/sudoers.d/cage 2>/dev/null || true
+  # Docker setup (systemd-based distros)
   - systemctl enable docker || true
-  - systemctl start docker || true%s
+  - systemctl start docker || true
+  # Docker setup (OpenRC-based distros like Alpine)
+  - which rc-update && rc-update add docker default || true
+  - which rc-service && rc-service docker start || true%s
 `, cfg.PubKey, virtiofsMounts, virtiofsRuncmd)
 }
 
