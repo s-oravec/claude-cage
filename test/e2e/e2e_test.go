@@ -14,7 +14,7 @@ import (
 var (
 	cageBin     string
 	testImage   = "alpine-3.21"
-	userNetwork = false
+	networkMode = "" // empty = default (auto), or "bridge"
 )
 
 func init() {
@@ -30,10 +30,8 @@ func init() {
 		testImage = img
 	}
 
-	// Check for user-network mode
-	if os.Getenv("CAGE_USER_NETWORK") == "1" {
-		userNetwork = true
-	}
+	// Network mode: default is auto (user-mode), set CAGE_NETWORK=bridge for bridge mode
+	networkMode = os.Getenv("CAGE_NETWORK")
 }
 
 // runCage executes the cage CLI with given arguments
@@ -159,17 +157,17 @@ func TestCageLifecycle(t *testing.T) {
 	// Create cage
 	var createFailed bool
 	t.Run("Create", func(t *testing.T) {
-		args := []string{"create", "-n", name, "-i", testImage, "-p", "light"}
-		if userNetwork {
-			args = append(args, "--user-network")
+		args := []string{"create", "-n", name, "-i", testImage, "-p", "light", "--ssh", "auto"}
+		if networkMode == "bridge" {
+			args = append(args, "--network", "bridge")
 		}
 
-		stdout, stderr, err := runCageWithTimeout(30*time.Second, args...)
+		stdout, stderr, err := runCageWithTimeout(60*time.Second, args...)
 		if err != nil {
 			createFailed = true
 			// Check if it's a permissions issue
 			if strings.Contains(stderr, "Operation not permitted") {
-				t.Skipf("skipping: network creation requires root (use CAGE_USER_NETWORK=1 or run as root)")
+				t.Skipf("skipping: network creation requires root (use CAGE_NETWORK=bridge and run as root)")
 			}
 			t.Fatalf("cage create failed: %v\nstdout: %s\nstderr: %s", err, stdout, stderr)
 		}
@@ -236,50 +234,46 @@ func TestCageLifecycle(t *testing.T) {
 		}
 	})
 
-	// SSH tests (skip for user-network mode)
-	if !userNetwork {
-		t.Run("SSH", func(t *testing.T) {
-			// Wait for SSH with retries
-			var sshOK bool
-			for i := 0; i < 30; i++ {
-				stdout, _, err := runCageWithTimeout(10*time.Second, "ssh", name, "echo", "SSH_OK")
-				if err == nil && strings.Contains(stdout, "SSH_OK") {
-					sshOK = true
-					break
-				}
-				t.Logf("Waiting for SSH... (%d/30)", i+1)
-				time.Sleep(5 * time.Second)
+	// SSH tests (--ssh auto enables SSH in all network modes)
+	t.Run("SSH", func(t *testing.T) {
+		// Wait for SSH with retries (cloud-init needs time to install openssh on Alpine)
+		var sshOK bool
+		for i := 0; i < 30; i++ {
+			stdout, _, err := runCageWithTimeout(10*time.Second, "ssh", name, "echo SSH_OK")
+			if err == nil && strings.Contains(stdout, "SSH_OK") {
+				sshOK = true
+				break
 			}
+			t.Logf("Waiting for SSH... (%d/30)", i+1)
+			time.Sleep(5 * time.Second)
+		}
 
-			if !sshOK {
-				t.Fatal("SSH connection failed after 150s")
-			}
-			t.Log("SSH connection successful")
-		})
+		if !sshOK {
+			t.Fatal("SSH connection failed after 150s")
+		}
+		t.Log("SSH connection successful")
+	})
 
-		t.Run("Exec", func(t *testing.T) {
-			stdout, _, err := runCageWithTimeout(30*time.Second, "exec", name, "--", "uname", "-a")
-			if err != nil {
-				t.Fatalf("cage exec failed: %v", err)
-			}
-			if !strings.Contains(strings.ToLower(stdout), "linux") {
-				t.Errorf("expected linux in uname output: %s", stdout)
-			}
-		})
+	t.Run("Exec", func(t *testing.T) {
+		stdout, _, err := runCageWithTimeout(30*time.Second, "exec", name, "--", "uname", "-a")
+		if err != nil {
+			t.Fatalf("cage exec failed: %v", err)
+		}
+		if !strings.Contains(strings.ToLower(stdout), "linux") {
+			t.Errorf("expected linux in uname output: %s", stdout)
+		}
+	})
 
-		t.Run("SSHCommand", func(t *testing.T) {
-			stdout, _, err := runCageWithTimeout(30*time.Second, "ssh", name, "hostname")
-			if err != nil {
-				t.Fatalf("cage ssh hostname failed: %v", err)
-			}
-			if strings.TrimSpace(stdout) == "" {
-				t.Error("expected hostname output")
-			}
-			t.Logf("Hostname: %s", strings.TrimSpace(stdout))
-		})
-	} else {
-		t.Log("Skipping SSH tests (user-network mode)")
-	}
+	t.Run("SSHCommand", func(t *testing.T) {
+		stdout, _, err := runCageWithTimeout(30*time.Second, "ssh", name, "hostname")
+		if err != nil {
+			t.Fatalf("cage ssh hostname failed: %v", err)
+		}
+		if strings.TrimSpace(stdout) == "" {
+			t.Error("expected hostname output")
+		}
+		t.Logf("Hostname: %s", strings.TrimSpace(stdout))
+	})
 
 	// Port list
 	t.Run("PortList", func(t *testing.T) {
@@ -364,12 +358,12 @@ func TestCageCreateDuplicate(t *testing.T) {
 	})
 
 	args := []string{"create", "-n", name, "-i", testImage, "-p", "light"}
-	if userNetwork {
-		args = append(args, "--user-network")
+	if networkMode == "bridge" {
+		args = append(args, "--network", "bridge")
 	}
 
 	// First create should succeed
-	_, stderr, err := runCageWithTimeout(30*time.Second, args...)
+	_, stderr, err := runCageWithTimeout(60*time.Second, args...)
 	if err != nil {
 		if strings.Contains(stderr, "Operation not permitted") {
 			t.Skipf("skipping: network creation requires root")

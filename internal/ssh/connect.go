@@ -63,19 +63,14 @@ func SSHExecWithPort(cageName, host string, port int, command string, interactiv
 	}
 
 	cmd := exec.Command("ssh", args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
 	if interactive {
 		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		return cmd.Run()
 	}
 
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%s: %s", err, string(out))
-	}
-	return nil
+	return cmd.Run()
 }
 
 // WaitForSSH waits for SSH to become available

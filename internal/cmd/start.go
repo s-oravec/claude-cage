@@ -48,8 +48,24 @@ func startCage(cmd *cobra.Command, name string, ports []string) error {
 		return err
 	}
 
-	if state.Status == cage.StatusRunning {
+	client := libvirt.NewClient()
+
+	// Check if domain is already active in libvirt (state might be out of sync)
+	isActive, _ := client.IsDomainActive(name)
+	if isActive {
+		// Domain is running, update state to match
+		if state.Status != cage.StatusRunning {
+			state.Status = cage.StatusRunning
+			state.StartedAt = time.Now()
+			cage.SaveState(state)
+		}
 		return fmt.Errorf("cage '%s' is already running", name)
+	}
+
+	if state.Status == cage.StatusRunning {
+		// State says running but libvirt says not active - fix state
+		state.Status = cage.StatusStopped
+		cage.SaveState(state)
 	}
 
 	// Load config
@@ -59,8 +75,6 @@ func startCage(cmd *cobra.Command, name string, ports []string) error {
 	}
 
 	fmt.Fprintf(cmd.OutOrStdout(), "Starting cage '%s'...\n", name)
-
-	client := libvirt.NewClient()
 
 	// Start virtiofsd if shares are configured and using bridge network
 	// (virtiofsd requires root, which is only available with bridge mode)

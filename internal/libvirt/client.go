@@ -42,6 +42,17 @@ func (c *Client) DefineDomain(xml string) error {
 	return nil
 }
 
+// IsDomainActive checks if a domain is currently running
+func (c *Client) IsDomainActive(name string) (bool, error) {
+	out, err := c.virsh("domstate", "cage-"+name)
+	if err != nil {
+		// Domain might not exist
+		return false, err
+	}
+	state := strings.TrimSpace(out)
+	return state == "running", nil
+}
+
 // StartDomain starts a defined domain
 func (c *Client) StartDomain(name string) error {
 	out, err := c.virsh("start", "cage-"+name)

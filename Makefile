@@ -73,16 +73,16 @@ coverage-check:
 	fi
 
 e2e: build
-	@echo "Running E2E tests (requires KVM, libvirt)..."
-	CAGE_BIN=$(PWD)/cage go test -v -timeout 10m ./test/e2e/...
+	@echo "Running E2E tests with bridge networking (requires root)..."
+	CAGE_BIN=$(PWD)/cage CAGE_NETWORK=bridge go test -v -timeout 10m ./test/e2e/...
 
 e2e-short: build
 	@echo "Running E2E tests (short mode)..."
 	CAGE_BIN=$(PWD)/cage go test -v -short ./test/e2e/...
 
 e2e-user: build
-	@echo "Running E2E tests with user-mode networking..."
-	CAGE_BIN=$(PWD)/cage CAGE_USER_NETWORK=1 go test -v -timeout 10m ./test/e2e/...
+	@echo "Running E2E tests with user-mode networking (no root)..."
+	CAGE_BIN=$(PWD)/cage go test -v -timeout 10m ./test/e2e/...
 
 e2e-ubuntu: build
 	@echo "Running E2E tests with Ubuntu..."

@@ -61,8 +61,20 @@ func execInCage(cmd *cobra.Command, name string, command []string) error {
 		return fmt.Errorf("cage '%s' is not running", name)
 	}
 
-	if state.IP == "" {
-		return fmt.Errorf("cage '%s' has no IP address yet", name)
+	// Determine SSH target
+	var host string
+	var port int
+
+	if state.SSHPort > 0 {
+		// User-mode networking with port forwarding
+		host = "127.0.0.1"
+		port = state.SSHPort
+	} else if state.IP != "" {
+		// Bridge networking with direct IP
+		host = state.IP
+		port = 22
+	} else {
+		return fmt.Errorf("cage '%s' has no SSH access configured (use --ssh when creating or use bridge network)", name)
 	}
 
 	// Check SSH key exists
@@ -81,7 +93,8 @@ func execInCage(cmd *cobra.Command, name string, command []string) error {
 		"-o", fmt.Sprintf("UserKnownHostsFile=%s", knownHostsPath),
 		"-o", "LogLevel=ERROR",
 		"-o", "ConnectTimeout=10",
-		fmt.Sprintf("cage@%s", state.IP),
+		"-p", fmt.Sprintf("%d", port),
+		fmt.Sprintf("cage@%s", host),
 	}
 
 	// Add the command
