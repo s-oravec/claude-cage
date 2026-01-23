@@ -11,7 +11,7 @@ import (
 
 func TestConfig_Structure(t *testing.T) {
 	cfg := Config{
-		Images: ImagesConfig{Default: "ubuntu-24.04"},
+		Images: ImagesConfig{Default: "alpine"},
 		Profiles: map[string]Profile{
 			"default": {VCPU: 4, MemoryMB: 4096},
 		},
@@ -30,7 +30,7 @@ func TestConfig_Structure(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, "ubuntu-24.04", cfg.Images.Default)
+	assert.Equal(t, "alpine", cfg.Images.Default)
 	assert.Equal(t, 4, cfg.Profiles["default"].VCPU)
 	assert.Equal(t, "tun+", cfg.Network.BlockedInterfaces[0])
 	assert.Equal(t, "/workspace", cfg.Shares[0].Guest)
@@ -41,7 +41,7 @@ func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
 
 	// Images
-	assert.Equal(t, "ubuntu-24.04", cfg.Images.Default)
+	assert.Equal(t, "alpine", cfg.Images.Default)
 
 	// Profiles
 	assert.Contains(t, cfg.Profiles, "default")
@@ -126,7 +126,7 @@ func TestCreateDefault(t *testing.T) {
 	// Should be loadable
 	cfg, err := Load()
 	require.NoError(t, err)
-	assert.Equal(t, "ubuntu-24.04", cfg.Images.Default)
+	assert.Equal(t, "alpine", cfg.Images.Default)
 }
 
 func TestCreateDefault_AlreadyExists(t *testing.T) {

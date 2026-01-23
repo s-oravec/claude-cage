@@ -5,10 +5,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/s-oravec/claude-cage/internal/cage"
-	"github.com/s-oravec/claude-cage/internal/config"
 	"github.com/s-oravec/claude-cage/internal/libvirt"
 	"github.com/s-oravec/claude-cage/internal/network"
-	"github.com/s-oravec/claude-cage/internal/ssh"
 	"github.com/s-oravec/claude-cage/internal/virtiofs"
 )
 
@@ -20,10 +18,12 @@ func NewStopCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "stop [name]",
 		Short: "Stop a cage VM",
-		Long: `Stop a cage VM and clean up its resources.
+		Long: `Stop a running cage VM.
 
 By default, performs a graceful shutdown. Use --force for immediate termination.
-The cage's overlay disk is deleted - changes are lost.`,
+The cage's resources (disk, network, keys) are preserved and can be restarted.
+
+To remove a cage and all its resources, use 'cage remove'.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if all {
@@ -50,6 +50,16 @@ func stopCage(cmd *cobra.Command, name string, force bool) error {
 		return fmt.Errorf("cage '%s' not found", name)
 	}
 
+	// Load state
+	state, err := cage.LoadState(name)
+	if err != nil {
+		return err
+	}
+
+	if state.Status != cage.StatusRunning {
+		return fmt.Errorf("cage '%s' is not running", name)
+	}
+
 	fmt.Fprintf(cmd.OutOrStdout(), "Stopping cage '%s'...\n", name)
 
 	client := libvirt.NewClient()
@@ -58,7 +68,6 @@ func stopCage(cmd *cobra.Command, name string, force bool) error {
 	if force {
 		fmt.Fprintln(cmd.OutOrStdout(), "  Force stopping VM...")
 		if err := client.DestroyDomain(name); err != nil {
-			// Ignore error if domain not running
 			fmt.Fprintf(cmd.OutOrStdout(), "  Warning: %v\n", err)
 		}
 	} else {
@@ -68,24 +77,14 @@ func stopCage(cmd *cobra.Command, name string, force bool) error {
 		}
 	}
 
-	// Undefine the domain
-	fmt.Fprintln(cmd.OutOrStdout(), "  Removing VM definition...")
-	if err := client.UndefineDomain(name); err != nil {
-		fmt.Fprintf(cmd.OutOrStdout(), "  Warning: %v\n", err)
-	}
-
 	// Stop virtiofsd if running
-	state, _ := cage.LoadState(name)
-	if state != nil && state.VirtiofsPID > 0 {
+	if state.VirtiofsPID > 0 {
 		fmt.Fprintln(cmd.OutOrStdout(), "  Stopping virtiofsd...")
 		virtiofs.StopByPID(name, state.VirtiofsPID)
-	} else {
-		// Cleanup socket dir anyway
-		virtiofs.CleanupSocket(name)
 	}
 
 	// Stop port forwarders
-	if state != nil && len(state.Ports) > 0 {
+	if len(state.Ports) > 0 {
 		fmt.Fprintln(cmd.OutOrStdout(), "  Stopping port forwarders...")
 		seenPIDs := make(map[int]bool)
 		for _, p := range state.Ports {
@@ -96,29 +95,17 @@ func stopCage(cmd *cobra.Command, name string, force bool) error {
 		}
 	}
 
-	// Delete SSH keys
-	ssh.DeleteKeys(name)
-
-	// Cleanup firewall rules
-	fmt.Fprintln(cmd.OutOrStdout(), "  Cleaning up firewall...")
-	cfg, _ := config.Load()
-	dnsServer := "1.1.1.1"
-	if cfg != nil && len(cfg.Network.DNS) > 0 {
-		dnsServer = cfg.Network.DNS[0]
-	}
-	network.CleanupFirewall(name, dnsServer)
-
-	// Destroy network
-	fmt.Fprintln(cmd.OutOrStdout(), "  Destroying network...")
-	network.DestroyNetwork(name)
-
-	// Delete cage state and files
-	fmt.Fprintln(cmd.OutOrStdout(), "  Cleaning up...")
-	if err := cage.DeleteState(name); err != nil {
-		return fmt.Errorf("failed to cleanup: %w", err)
+	// Update state to stopped
+	state.Status = cage.StatusStopped
+	state.VirtiofsPID = 0
+	state.Ports = nil // Clear port forwarders
+	if err := cage.SaveState(state); err != nil {
+		return fmt.Errorf("failed to save state: %w", err)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "✓ Cage '%s' stopped\n", name)
+	fmt.Fprintf(cmd.OutOrStdout(), "Cage '%s' stopped\n", name)
+	fmt.Fprintf(cmd.OutOrStdout(), "  Use 'cage start %s' to restart\n", name)
+	fmt.Fprintf(cmd.OutOrStdout(), "  Use 'cage remove %s' to delete\n", name)
 	return nil
 }
 
@@ -128,15 +115,23 @@ func stopAllCages(cmd *cobra.Command, force bool) error {
 		return err
 	}
 
-	if len(cages) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No cages running")
+	// Filter to only running cages
+	var running []*cage.State
+	for _, c := range cages {
+		if c.Status == cage.StatusRunning {
+			running = append(running, c)
+		}
+	}
+
+	if len(running) == 0 {
+		fmt.Fprintln(cmd.OutOrStdout(), "No running cages")
 		return nil
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "Stopping %d cage(s)...\n", len(cages))
+	fmt.Fprintf(cmd.OutOrStdout(), "Stopping %d cage(s)...\n", len(running))
 
 	var errors []error
-	for _, c := range cages {
+	for _, c := range running {
 		if err := stopCage(cmd, c.Name, force); err != nil {
 			errors = append(errors, err)
 		}

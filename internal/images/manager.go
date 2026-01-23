@@ -28,8 +28,9 @@ func SetDir(dir string) {
 	imagesDir = dir
 }
 
-// ImagePath returns the full path to an image file
+// ImagePath returns the full path to an image file (supports aliases)
 func ImagePath(name string) string {
+	name = ResolveAlias(name)
 	return filepath.Join(Dir(), name+".qcow2")
 }
 
@@ -38,8 +39,9 @@ func EnsureDir() error {
 	return os.MkdirAll(Dir(), 0755)
 }
 
-// IsDownloaded checks if an image is already downloaded
+// IsDownloaded checks if an image is already downloaded (supports aliases)
 func IsDownloaded(name string) bool {
+	name = ResolveAlias(name)
 	_, err := os.Stat(ImagePath(name))
 	return err == nil
 }

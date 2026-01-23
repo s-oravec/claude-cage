@@ -78,7 +78,7 @@ func Exists() bool {
 func DefaultConfig() *Config {
 	return &Config{
 		Images: ImagesConfig{
-			Default: "ubuntu-24.04",
+			Default: "alpine",
 		},
 		Profiles: map[string]Profile{
 			"default": {VCPU: 4, MemoryMB: 4096, IOWeight: 500, MaxProcesses: 4096},

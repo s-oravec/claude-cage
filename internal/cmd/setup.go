@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/spf13/cobra"
 	"github.com/s-oravec/claude-cage/internal/images"
@@ -18,7 +19,7 @@ func NewSetupCmd() *cobra.Command {
 		Short: "Download and prepare base images",
 		Long: `Download and prepare base images for cage VMs.
 
-Without arguments, downloads the default image (ubuntu-24.04).
+Without arguments, downloads the default image (alpine).
 Use --base to specify a different image.
 Use --list to see available images.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -27,7 +28,7 @@ Use --list to see available images.`,
 			}
 
 			if base == "" {
-				base = "ubuntu-24.04" // default
+				base = "alpine" // default
 			}
 
 			return setupImage(cmd, base)
@@ -50,15 +51,24 @@ func listImages(cmd *cobra.Command) error {
 		downloaded[name] = true
 	}
 
-	for name, src := range sources {
+	// Sort image names for consistent output
+	names := make([]string, 0, len(sources))
+	for name := range sources {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		src := sources[name]
 		status := "  "
 		if downloaded[name] {
 			status = "✓ "
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "  %s%-15s %s\n", status, name, src.Description)
+		fmt.Fprintf(cmd.OutOrStdout(), "  %s%-18s %s\n", status, name, src.Description)
 	}
 
 	fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintln(cmd.OutOrStdout(), "Aliases: alpine, ubuntu, debian, rocky, alma, fedora, opensuse, centos")
 	fmt.Fprintln(cmd.OutOrStdout(), "Use 'cage setup --base <name>' to download an image")
 	return nil
 }
