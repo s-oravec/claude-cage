@@ -607,7 +607,44 @@ cage verify myproject
 
 ## Configuration
 
-Configuration file: `~/.claude-cage/config.yaml`
+### Global Configuration
+
+Global config file: `~/.claude-cage/config.yaml`
+
+### Project Configuration
+
+You can create a `.claude-cage.yml` file in your project directory to override global settings. This is useful for project-specific environment variables, resource profiles, or port mappings.
+
+**Lookup order:** `./.claude-cage.yml` → `~/.claude-cage/config.yaml`
+
+**Merge behavior:**
+- Scalar values (image, profile): project wins
+- Maps (env, profiles): merged, project wins on conflicts
+- Arrays (shares, dns, blocked_subnets): project replaces entirely
+
+**Example `.claude-cage.yml`:**
+```yaml
+# Override default profile
+profiles:
+  default:
+    vcpu: 8
+    memory_mb: 8192
+    disk_gb: 50
+
+# Project-specific environment
+env:
+  NODE_ENV: development
+  DATABASE_URL: postgres://localhost/myapp
+  API_KEY: secret
+
+# Custom shares for this project
+shares:
+  - host: .
+    guest: /app
+    mode: rw
+```
+
+### Full Configuration Reference
 
 ```yaml
 images:

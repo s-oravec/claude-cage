@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -70,6 +71,42 @@ func Path() string {
 	return filepath.Join(Dir(), "config.yaml")
 }
 
+// ProjectConfigName is the name of the project-level config file
+const ProjectConfigName = ".claude-cage.yml"
+
+// FindProjectConfig looks for .claude-cage.yml in the current directory
+func FindProjectConfig() string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	path := filepath.Join(cwd, ProjectConfigName)
+	if _, err := os.Stat(path); err == nil {
+		return path
+	}
+	return ""
+}
+
+// LoadProjectConfig loads the project-level config if it exists
+func LoadProjectConfig() (*Config, error) {
+	path := FindProjectConfig()
+	if path == "" {
+		return nil, nil
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var cfg Config
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, err
+	}
+
+	return &cfg, nil
+}
+
 // Exists returns true if config file exists
 func Exists() bool {
 	_, err := os.Stat(Path())
@@ -103,7 +140,7 @@ func DefaultConfig() *Config {
 	}
 }
 
-// Load reads config from file
+// Load reads config from file and merges with project config if present
 func Load() (*Config, error) {
 	data, err := os.ReadFile(Path())
 	if err != nil {
@@ -115,7 +152,88 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	// Try to load and merge project config
+	projectCfg, err := LoadProjectConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load project config: %w", err)
+	}
+	if projectCfg != nil {
+		cfg.Merge(projectCfg)
+	}
+
 	return &cfg, nil
+}
+
+// LoadGlobal reads only the global config without project config merge
+func LoadGlobal() (*Config, error) {
+	data, err := os.ReadFile(Path())
+	if err != nil {
+		return nil, err
+	}
+
+	var cfg Config
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, err
+	}
+
+	return &cfg, nil
+}
+
+// Merge merges another config into this one (other wins on conflicts)
+func (c *Config) Merge(other *Config) {
+	// Images - scalar, other wins if set
+	if other.Images.Default != "" {
+		c.Images.Default = other.Images.Default
+	}
+
+	// Profiles - merge map, other wins on key conflicts
+	if other.Profiles != nil {
+		if c.Profiles == nil {
+			c.Profiles = make(map[string]Profile)
+		}
+		for k, v := range other.Profiles {
+			c.Profiles[k] = v
+		}
+	}
+
+	// Network - merge fields
+	if len(other.Network.BlockedInterfaces) > 0 {
+		c.Network.BlockedInterfaces = other.Network.BlockedInterfaces
+	}
+	if len(other.Network.BlockedSubnets) > 0 {
+		c.Network.BlockedSubnets = other.Network.BlockedSubnets
+	}
+	if len(other.Network.DNS) > 0 {
+		c.Network.DNS = other.Network.DNS
+	}
+	if other.Network.PortBind != "" {
+		c.Network.PortBind = other.Network.PortBind
+	}
+
+	// Shares - array, other replaces
+	if len(other.Shares) > 0 {
+		c.Shares = other.Shares
+	}
+
+	// Security - scalars
+	if other.Security.MaxCages > 0 {
+		c.Security.MaxCages = other.Security.MaxCages
+	}
+	// VirtiofsSandbox is tricky - false is valid, so we always take other if Security was set
+	// We'll use a simple heuristic: if MaxCages is set, assume Security section was specified
+	if other.Security.MaxCages > 0 {
+		c.Security.VirtiofsSandbox = other.Security.VirtiofsSandbox
+	}
+
+	// Env - merge map, other wins on key conflicts
+	if other.Env != nil {
+		if c.Env == nil {
+			c.Env = make(map[string]string)
+		}
+		for k, v := range other.Env {
+			c.Env[k] = v
+		}
+	}
 }
 
 // Save writes config to file
