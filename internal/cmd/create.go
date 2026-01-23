@@ -114,13 +114,14 @@ func createCage(cmd *cobra.Command, name, profileName, imageName string, userNet
 		fmt.Fprintln(cmd.OutOrStdout(), "  Using user-mode networking (SLIRP)...")
 	}
 
-	// Create qcow2 overlay
+	// Create qcow2 overlay with specified disk size
 	baseImage := images.ImagePath(imageName)
 	overlayPath := filepath.Join(cageDir, "disk.qcow2")
+	diskSize := fmt.Sprintf("%dG", profile.DiskGB)
 
-	fmt.Fprintln(cmd.OutOrStdout(), "  Creating disk overlay...")
+	fmt.Fprintf(cmd.OutOrStdout(), "  Creating disk overlay (%s)...\n", diskSize)
 	createCmd := exec.Command("qemu-img", "create", "-f", "qcow2",
-		"-b", baseImage, "-F", "qcow2", overlayPath)
+		"-b", baseImage, "-F", "qcow2", overlayPath, diskSize)
 	if out, err := createCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to create overlay: %s", string(out))
 	}

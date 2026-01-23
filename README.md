@@ -617,12 +617,15 @@ profiles:
   default:
     vcpu: 4
     memory_mb: 4096
+    disk_gb: 20
   light:
     vcpu: 2
     memory_mb: 2048
+    disk_gb: 10
   heavy:
     vcpu: 8
     memory_mb: 8192
+    disk_gb: 50
 
 shares:
   - host: ~/projects

@@ -29,6 +29,7 @@ type ImagesConfig struct {
 type Profile struct {
 	VCPU         int `yaml:"vcpu"`
 	MemoryMB     int `yaml:"memory_mb"`
+	DiskGB       int `yaml:"disk_gb"`
 	IOWeight     int `yaml:"io_weight"`
 	MaxProcesses int `yaml:"max_processes"`
 }
@@ -81,9 +82,9 @@ func DefaultConfig() *Config {
 			Default: "alpine",
 		},
 		Profiles: map[string]Profile{
-			"default": {VCPU: 4, MemoryMB: 4096, IOWeight: 500, MaxProcesses: 4096},
-			"heavy":   {VCPU: 8, MemoryMB: 8192, IOWeight: 750, MaxProcesses: 8192},
-			"light":   {VCPU: 2, MemoryMB: 2048, IOWeight: 250, MaxProcesses: 2048},
+			"default": {VCPU: 4, MemoryMB: 4096, DiskGB: 20, IOWeight: 500, MaxProcesses: 4096},
+			"heavy":   {VCPU: 8, MemoryMB: 8192, DiskGB: 50, IOWeight: 750, MaxProcesses: 8192},
+			"light":   {VCPU: 2, MemoryMB: 2048, DiskGB: 10, IOWeight: 250, MaxProcesses: 2048},
 		},
 		Network: NetworkConfig{
 			BlockedInterfaces: []string{"tun+", "tailscale+", "wg+"},
