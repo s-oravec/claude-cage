@@ -173,11 +173,11 @@ func initConfig(cmd *cobra.Command, args []string) error {
 
 ## Deliverables
 
-- [ ] Config struct with all fields
-- [ ] YAML loading/saving
-- [ ] Default config generation
-- [ ] `cage config show`
-- [ ] `cage config edit`
-- [ ] `cage config path`
-- [ ] `cage config init`
-- [ ] Config validation
+- [x] Config struct with all fields
+- [x] YAML loading/saving
+- [x] Default config generation
+- [x] `cage config show`
+- [x] `cage config edit`
+- [x] `cage config path`
+- [x] `cage config init`
+- [ ] Config validation (deferred - not critical for MVP)
