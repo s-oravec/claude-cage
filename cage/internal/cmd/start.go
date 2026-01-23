@@ -251,11 +251,40 @@ func startCage(cmd *cobra.Command, name, profileName, imageName string, ports []
 		state.VirtiofsPID = virtiofsDaemon.PID
 	}
 
-	// Parse ports
-	for _, p := range ports {
-		// TODO: Parse port spec in Phase 09
-		_ = p
+	// Parse and setup port forwarding
+	var forwardedPorts []cage.Port
+	if len(ports) > 0 {
+		defaultBind := cfg.Network.PortBind
+		if defaultBind == "" {
+			defaultBind = "127.0.0.1"
+		}
+
+		parsedPorts, err := network.ParsePortSpecs(ports, defaultBind)
+		if err != nil {
+			return fmt.Errorf("invalid port specification: %w", err)
+		}
+
+		// Only setup forwarding if we have an IP
+		if ip != "" {
+			fmt.Fprintln(cmd.OutOrStdout(), "  Setting up port forwarding...")
+			forwarder, err := network.StartForwarding(name, ip, parsedPorts)
+			if err != nil {
+				fmt.Fprintf(cmd.OutOrStdout(), "  Warning: port forwarding failed: %v\n", err)
+			} else {
+				// Store ports with forwarder PID
+				for _, p := range parsedPorts {
+					forwardedPorts = append(forwardedPorts, cage.Port{
+						Host:         p.HostPort,
+						Guest:        p.GuestPort,
+						Protocol:     p.Protocol,
+						Bind:         p.Bind,
+						ForwarderPID: forwarder.PID,
+					})
+				}
+			}
+		}
 	}
+	state.Ports = forwardedPorts
 
 	if err := cage.SaveState(state); err != nil {
 		return fmt.Errorf("failed to save state: %w", err)

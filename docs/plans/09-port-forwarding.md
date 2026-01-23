@@ -243,13 +243,13 @@ curl http://localhost:8080
 
 ## Deliverables
 
-- [ ] Port spec parser (`8080:80`, `127.0.0.1:8080:80/tcp`)
-- [ ] SSH-based port forwarding
-- [ ] `--port` flag on `cage start`
-- [ ] Multiple `--port` flags support
-- [ ] `cage port list <name>`
-- [ ] `cage port add <name> <spec>`
-- [ ] `cage port remove <name> <hostPort>`
-- [ ] Default bind from config
-- [ ] Port conflict detection
-- [ ] Cleanup on stop
+- [x] Port spec parser (`8080:80`, `127.0.0.1:8080:80/tcp`)
+- [x] SSH-based port forwarding
+- [x] `--port` flag on `cage start`
+- [x] Multiple `--port` flags support
+- [x] `cage port list <name>`
+- [x] `cage port add <name> <spec>`
+- [x] `cage port remove <name> <hostPort>`
+- [x] Default bind from config
+- [x] Port conflict detection
+- [x] Cleanup on stop

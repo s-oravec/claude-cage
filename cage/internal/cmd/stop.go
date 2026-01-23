@@ -84,6 +84,18 @@ func stopCage(cmd *cobra.Command, name string, force bool) error {
 		virtiofs.CleanupSocket(name)
 	}
 
+	// Stop port forwarders
+	if state != nil && len(state.Ports) > 0 {
+		fmt.Fprintln(cmd.OutOrStdout(), "  Stopping port forwarders...")
+		seenPIDs := make(map[int]bool)
+		for _, p := range state.Ports {
+			if p.ForwarderPID > 0 && !seenPIDs[p.ForwarderPID] {
+				seenPIDs[p.ForwarderPID] = true
+				network.StopForwarderByPID(p.ForwarderPID)
+			}
+		}
+	}
+
 	// Delete SSH keys
 	ssh.DeleteKeys(name)
 
