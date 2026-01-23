@@ -136,10 +136,6 @@ func Download(name string, progress func(written, total int64)) error {
 
 // Setup downloads and prepares a base image with customization
 func Setup(name string, progress func(written, total int64), status func(msg string)) error {
-	if status != nil {
-		status(fmt.Sprintf("Downloading %s...", name))
-	}
-
 	if err := Download(name, progress); err != nil {
 		return err
 	}
@@ -148,7 +144,7 @@ func Setup(name string, progress func(written, total int64), status func(msg str
 	// For now, we rely on cloud-init to configure the VM at boot
 
 	if status != nil {
-		status(fmt.Sprintf("✓ Base image ready: %s", name))
+		status(fmt.Sprintf("✓ Image ready: %s", name))
 	}
 
 	return nil

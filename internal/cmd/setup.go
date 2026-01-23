@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/s-oravec/claude-cage/internal/images"
+	"github.com/s-oravec/claude-cage/internal/progress"
 )
 
 // NewSetupCmd creates the setup command
@@ -69,29 +70,32 @@ func setupImage(cmd *cobra.Command, name string) error {
 		return nil
 	}
 
-	// Validate image name
-	if _, err := images.GetSource(name); err != nil {
+	// Validate image name and get size info
+	src, err := images.GetSource(name)
+	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "Downloading %s...\n", name)
+	fmt.Fprintf(cmd.OutOrStdout(), "Downloading %s (%s)...\n", name, src.Description)
 
-	var lastPercent int
-	progress := func(written, total int64) {
-		if total <= 0 {
-			return
+	// Create progress bar (size will be set from HTTP response)
+	var bar *progress.Bar
+
+	progressFn := func(written, total int64) {
+		if bar == nil && total > 0 {
+			bar = progress.NewBar(total, name, cmd.OutOrStdout())
 		}
-		percent := int(written * 100 / total)
-		if percent > lastPercent && percent%10 == 0 {
-			fmt.Fprintf(cmd.OutOrStdout(), "  %d%% (%d MB / %d MB)\n",
-				percent, written/1024/1024, total/1024/1024)
-			lastPercent = percent
+		if bar != nil {
+			bar.Update(written)
 		}
 	}
 
 	status := func(msg string) {
+		if bar != nil {
+			bar.Finish()
+		}
 		fmt.Fprintln(cmd.OutOrStdout(), msg)
 	}
 
-	return images.Setup(name, progress, status)
+	return images.Setup(name, progressFn, status)
 }
