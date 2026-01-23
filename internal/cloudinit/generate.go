@@ -45,10 +45,13 @@ users:
     sudo: ALL=(ALL) NOPASSWD:ALL
     shell: /bin/bash
     groups: docker
+    lock_passwd: false
+    # password: cage
+    passwd: $6$jPpNVOdPlZdiMeW.$tGs/Xy0/9wH7CtN9pMaGFnDFmK0THolDE5SALY.rIcwezfG7WU0syq7xov9ZFy.8GI5K03j/LcvK2vr3pf2pp1
     ssh_authorized_keys:
       - %s
 
-ssh_pwauth: false
+ssh_pwauth: true
 
 package_update: false
 package_upgrade: false
