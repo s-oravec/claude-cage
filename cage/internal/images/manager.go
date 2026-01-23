@@ -23,6 +23,11 @@ func Dir() string {
 	return filepath.Join(config.Dir(), "images")
 }
 
+// SetDir sets the images directory (for testing)
+func SetDir(dir string) {
+	imagesDir = dir
+}
+
 // ImagePath returns the full path to an image file
 func ImagePath(name string) string {
 	return filepath.Join(Dir(), name+".qcow2")

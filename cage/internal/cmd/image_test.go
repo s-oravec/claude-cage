@@ -18,6 +18,9 @@ func TestImageCmd(t *testing.T) {
 	// Override images dir
 	imagesDir := filepath.Join(tmpDir, "images")
 	os.MkdirAll(imagesDir, 0755)
+	oldImagesDir := images.Dir()
+	images.SetDir(imagesDir)
+	defer images.SetDir(oldImagesDir)
 
 	// Override cages dir
 	oldCagesDir := cage.CagesDir()

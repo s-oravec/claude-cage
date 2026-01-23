@@ -1,4 +1,4 @@
-.PHONY: build test test-short coverage coverage-html coverage-check e2e e2e-short e2e-user e2e-ubuntu install clean
+.PHONY: build test test-quick test-verbose coverage coverage-html coverage-check e2e e2e-short e2e-user e2e-ubuntu install clean
 
 VERSION := 0.1.0
 LDFLAGS := -ldflags "-X github.com/stiivo/cage/internal/cmd.Version=$(VERSION)"
@@ -9,12 +9,31 @@ COVERAGE_THRESHOLD := 40
 build:
 	go build $(LDFLAGS) -o cage ./cmd/cage
 
+# Default test target includes coverage
 test:
-	go test ./... -v
+	@echo "Running tests with coverage..."
+	@go test ./... -coverprofile=$(COVERAGE_FILE) -covermode=atomic -race 2>&1 | tee /tmp/test-output.txt
+	@echo ""
+	@echo "=== Coverage Summary ==="
+	@total=$$(go tool cover -func=$(COVERAGE_FILE) 2>/dev/null | grep total | awk '{print $$3}' || echo "0%"); \
+	threshold_int=$$(echo "$(COVERAGE_THRESHOLD)" | cut -d. -f1); \
+	total_int=$$(echo "$$total" | tr -d '%' | cut -d. -f1); \
+	if [ "$$total_int" -lt "$$threshold_int" ]; then \
+		echo "⚠️  Coverage: $$total (threshold: $(COVERAGE_THRESHOLD)%)"; \
+	else \
+		echo "✓ Coverage: $$total (threshold: $(COVERAGE_THRESHOLD)%)"; \
+	fi
 
-test-short:
+# Quick test without coverage (faster)
+test-quick:
 	go test ./...
 
+# Verbose test with coverage
+test-verbose:
+	@echo "Running tests with coverage (verbose)..."
+	@go test ./... -v -coverprofile=$(COVERAGE_FILE) -covermode=atomic -race
+
+# Detailed coverage report
 coverage:
 	@echo "Running tests with coverage..."
 	@go test ./... -coverprofile=$(COVERAGE_FILE) -covermode=atomic 2>&1 | tee /tmp/coverage-run.txt
@@ -28,7 +47,9 @@ coverage:
 	@go tool cover -func=$(COVERAGE_FILE) | grep total | awk '{print $$3}'
 	@echo ""
 	@total=$$(go tool cover -func=$(COVERAGE_FILE) | grep total | awk '{print $$3}' | tr -d '%'); \
-	if [ $$(echo "$$total < $(COVERAGE_THRESHOLD)" | bc -l) -eq 1 ]; then \
+	threshold_int=$$(echo "$(COVERAGE_THRESHOLD)" | cut -d. -f1); \
+	total_int=$$(echo "$$total" | cut -d. -f1); \
+	if [ "$$total_int" -lt "$$threshold_int" ]; then \
 		echo "⚠️  Coverage ($$total%) is below threshold ($(COVERAGE_THRESHOLD)%)"; \
 	else \
 		echo "✓ Coverage ($$total%) meets threshold ($(COVERAGE_THRESHOLD)%)"; \
@@ -38,10 +59,13 @@ coverage-html: coverage
 	@go tool cover -html=$(COVERAGE_FILE) -o $(COVERAGE_HTML)
 	@echo "Coverage report generated: $(COVERAGE_HTML)"
 
+# CI-friendly coverage check (fails if below threshold)
 coverage-check:
 	@go test ./... -coverprofile=$(COVERAGE_FILE) -covermode=atomic > /dev/null 2>&1
 	@total=$$(go tool cover -func=$(COVERAGE_FILE) | grep total | awk '{print $$3}' | tr -d '%'); \
-	if [ $$(echo "$$total < $(COVERAGE_THRESHOLD)" | bc -l) -eq 1 ]; then \
+	threshold_int=$$(echo "$(COVERAGE_THRESHOLD)" | cut -d. -f1); \
+	total_int=$$(echo "$$total" | cut -d. -f1); \
+	if [ "$$total_int" -lt "$$threshold_int" ]; then \
 		echo "❌ Coverage check failed: $$total% < $(COVERAGE_THRESHOLD)%"; \
 		exit 1; \
 	else \
