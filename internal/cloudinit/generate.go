@@ -15,6 +15,7 @@ type CloudInitConfig struct {
 	PubKey        string
 	MountVirtiofs bool
 	Env           map[string]string
+	InstallSSH    bool
 }
 
 // GenerateUserData generates cloud-init user-data content
@@ -77,6 +78,16 @@ mounts:
   - chown cage:cage /workspace || true`
 	}
 
+	sshRuncmd := ""
+	if cfg.InstallSSH {
+		sshRuncmd = `
+  # Install and enable SSH server
+  - which apk && apk add --no-cache openssh && rc-update add sshd default && rc-service sshd start || true
+  - which apt-get && apt-get update && apt-get install -y openssh-server && systemctl enable ssh && systemctl start ssh || true
+  - which dnf && dnf install -y openssh-server && systemctl enable sshd && systemctl start sshd || true
+  - which zypper && zypper install -y openssh && systemctl enable sshd && systemctl start sshd || true`
+	}
+
 	envRuncmd := generateEnvRuncmd(cfg.Env)
 
 	return fmt.Sprintf(`#cloud-config
@@ -117,8 +128,8 @@ runcmd:
   - systemctl start docker || true
   # Docker setup (OpenRC-based distros like Alpine)
   - which rc-update && rc-update add docker default || true
-  - which rc-service && rc-service docker start || true%s%s
-`, cfg.PubKey, virtiofsMounts, virtiofsRuncmd, envRuncmd)
+  - which rc-service && rc-service docker start || true%s%s%s
+`, cfg.PubKey, virtiofsMounts, virtiofsRuncmd, sshRuncmd, envRuncmd)
 }
 
 // GenerateMetaData generates cloud-init meta-data content

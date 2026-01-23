@@ -192,6 +192,7 @@ func createCage(cmd *cobra.Command, name, profileName, imageName, networkMode, s
 		PubKey:        pubKey,
 		MountVirtiofs: false, // Will be set at start time if virtiofsd is available
 		Env:           cfg.Env,
+		InstallSSH:    sshPort > 0,
 	})
 	if err != nil {
 		cage.DeleteState(name)
