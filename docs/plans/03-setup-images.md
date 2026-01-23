@@ -142,11 +142,11 @@ ls ~/.claude-cage/images/
 
 ## Deliverables
 
-- [ ] Image download with progress
-- [ ] Checksum verification
-- [ ] qcow2 conversion
-- [ ] Image customization (Docker, SSH)
-- [ ] Interactive image selection
-- [ ] `cage setup` command
-- [ ] `cage setup --base <name>`
-- [ ] `cage setup --all`
+- [x] Image download with progress
+- [ ] Checksum verification (deferred)
+- [x] qcow2 conversion
+- [ ] Image customization (Docker, SSH) - using cloud-init at boot instead
+- [x] Interactive image selection (`--list`)
+- [x] `cage setup` command
+- [x] `cage setup --base <name>`
+- [ ] `cage setup --all` (deferred)
