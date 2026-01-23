@@ -13,6 +13,7 @@ import (
 	"github.com/stiivo/cage/internal/images"
 	"github.com/stiivo/cage/internal/libvirt"
 	"github.com/stiivo/cage/internal/ssh"
+	"github.com/stiivo/cage/internal/virtiofs"
 )
 
 // NewStartCmd creates the start command
@@ -104,22 +105,56 @@ func startCage(cmd *cobra.Command, name, profileName, imageName string, ports []
 		return fmt.Errorf("failed to read public key: %w", err)
 	}
 
-	// Create cloud-init ISO with SSH key
+	// Start virtiofsd if shares are configured
+	var virtiofsDaemon *virtiofs.Daemon
+	var virtiofsSocket string
+
+	if len(cfg.Shares) > 0 && cfg.Security.VirtiofsSandbox {
+		share := cfg.Shares[0] // Use first share
+		sharedDir := virtiofs.ExpandPath(share.Host)
+
+		fmt.Fprintf(cmd.OutOrStdout(), "  Starting virtiofsd (%s)...\n", sharedDir)
+
+		virtiofsDaemon, err = virtiofs.Start(&virtiofs.DaemonConfig{
+			CageName:  name,
+			SharedDir: sharedDir,
+			Sandbox:   true,
+			Seccomp:   true,
+		})
+		if err != nil {
+			fmt.Fprintf(cmd.OutOrStdout(), "  Warning: virtiofsd failed: %v\n", err)
+			fmt.Fprintln(cmd.OutOrStdout(), "  Continuing without file sharing...")
+		} else {
+			virtiofsSocket = virtiofsDaemon.SocketPath
+			// Give virtiofsd time to create socket
+			time.Sleep(500 * time.Millisecond)
+		}
+	}
+
+	// Create cloud-init ISO with SSH key and virtiofs mount
 	fmt.Fprintln(cmd.OutOrStdout(), "  Creating cloud-init...")
-	cloudInitPath, err := cloudinit.GenerateISO(cageDir, name, pubKey)
+	cloudInitPath, err := cloudinit.GenerateISOWithConfig(cageDir, &cloudinit.CloudInitConfig{
+		CageName:      name,
+		PubKey:        pubKey,
+		MountVirtiofs: virtiofsSocket != "",
+	})
 	if err != nil {
+		if virtiofsDaemon != nil {
+			virtiofsDaemon.Stop()
+		}
 		cage.DeleteState(name)
 		return fmt.Errorf("failed to create cloud-init: %w", err)
 	}
 
 	// Generate domain XML
 	domainCfg := &libvirt.DomainConfig{
-		Name:         name,
-		MemoryMB:     profile.MemoryMB,
-		VCPU:         profile.VCPU,
-		DiskPath:     overlayPath,
-		CloudInitISO: cloudInitPath,
-		NetworkName:  "default", // Use libvirt default network for now
+		Name:           name,
+		MemoryMB:       profile.MemoryMB,
+		VCPU:           profile.VCPU,
+		DiskPath:       overlayPath,
+		CloudInitISO:   cloudInitPath,
+		NetworkName:    "default", // Use libvirt default network for now
+		VirtiofsSocket: virtiofsSocket,
 	}
 
 	xml, err := libvirt.GenerateDomainXML(domainCfg)
@@ -133,6 +168,9 @@ func startCage(cmd *cobra.Command, name, profileName, imageName string, ports []
 	// Define and start domain
 	fmt.Fprintln(cmd.OutOrStdout(), "  Creating VM...")
 	if err := client.DefineDomain(xml); err != nil {
+		if virtiofsDaemon != nil {
+			virtiofsDaemon.Stop()
+		}
 		cage.DeleteState(name) // cleanup
 		return err
 	}
@@ -140,6 +178,9 @@ func startCage(cmd *cobra.Command, name, profileName, imageName string, ports []
 	fmt.Fprintln(cmd.OutOrStdout(), "  Starting VM...")
 	if err := client.StartDomain(name); err != nil {
 		client.UndefineDomain(name) // cleanup
+		if virtiofsDaemon != nil {
+			virtiofsDaemon.Stop()
+		}
 		ssh.DeleteKeys(name)
 		cage.DeleteState(name)
 		return err
@@ -172,6 +213,11 @@ func startCage(cmd *cobra.Command, name, profileName, imageName string, ports []
 		Profile:   profileName,
 		IP:        ip,
 		StartedAt: time.Now(),
+	}
+
+	// Save virtiofsd PID if running
+	if virtiofsDaemon != nil {
+		state.VirtiofsPID = virtiofsDaemon.PID
 	}
 
 	// Parse ports

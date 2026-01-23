@@ -207,12 +207,12 @@ cat ~/projects/testproject/fromvm.txt
 
 ## Deliverables
 
-- [ ] Virtiofsd process management
-- [ ] Socket handling
-- [ ] Hardened virtiofsd flags (--sandbox, --seccomp)
-- [ ] Domain XML with virtiofs
-- [ ] Cloud-init mount configuration
-- [ ] Automatic mount on VM boot
-- [ ] Cleanup on stop
-- [ ] Share path validation
-- [ ] Permission handling
+- [x] Virtiofsd process management
+- [x] Socket handling
+- [x] Hardened virtiofsd flags (--sandbox, --seccomp)
+- [x] Domain XML with virtiofs
+- [x] Cloud-init mount configuration
+- [x] Automatic mount on VM boot
+- [x] Cleanup on stop
+- [x] Share path validation
+- [x] Permission handling

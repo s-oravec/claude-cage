@@ -7,6 +7,7 @@ import (
 	"github.com/stiivo/cage/internal/cage"
 	"github.com/stiivo/cage/internal/libvirt"
 	"github.com/stiivo/cage/internal/ssh"
+	"github.com/stiivo/cage/internal/virtiofs"
 )
 
 // NewStopCmd creates the stop command
@@ -69,6 +70,16 @@ func stopCage(cmd *cobra.Command, name string, force bool) error {
 	fmt.Fprintln(cmd.OutOrStdout(), "  Removing VM definition...")
 	if err := client.UndefineDomain(name); err != nil {
 		fmt.Fprintf(cmd.OutOrStdout(), "  Warning: %v\n", err)
+	}
+
+	// Stop virtiofsd if running
+	state, _ := cage.LoadState(name)
+	if state != nil && state.VirtiofsPID > 0 {
+		fmt.Fprintln(cmd.OutOrStdout(), "  Stopping virtiofsd...")
+		virtiofs.StopByPID(name, state.VirtiofsPID)
+	} else {
+		// Cleanup socket dir anyway
+		virtiofs.CleanupSocket(name)
 	}
 
 	// Delete SSH keys

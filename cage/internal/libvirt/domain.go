@@ -7,12 +7,13 @@ import (
 
 // DomainConfig holds configuration for a libvirt domain
 type DomainConfig struct {
-	Name         string
-	MemoryMB     int
-	VCPU         int
-	DiskPath     string
-	CloudInitISO string
-	NetworkName  string
+	Name           string
+	MemoryMB       int
+	VCPU           int
+	DiskPath       string
+	CloudInitISO   string
+	NetworkName    string
+	VirtiofsSocket string // optional: path to virtiofsd socket
 }
 
 const domainXMLTemplate = `<domain type='kvm'>
@@ -31,7 +32,12 @@ const domainXMLTemplate = `<domain type='kvm'>
   </features>
 
   <cpu mode='host-passthrough'/>
-
+{{if .VirtiofsSocket}}
+  <memoryBacking>
+    <source type='memfd'/>
+    <access mode='shared'/>
+  </memoryBacking>
+{{end}}
   <devices>
     <!-- Disk (qcow2 overlay) -->
     <disk type='file' device='disk'>
@@ -52,7 +58,14 @@ const domainXMLTemplate = `<domain type='kvm'>
       <source network='{{.NetworkName}}'/>
       <model type='virtio'/>
     </interface>
-
+{{if .VirtiofsSocket}}
+    <!-- Virtio-fs shared directory -->
+    <filesystem type='mount' accessmode='passthrough'>
+      <driver type='virtiofs' queue='1024'/>
+      <source socket='{{.VirtiofsSocket}}'/>
+      <target dir='workspace'/>
+    </filesystem>
+{{end}}
     <!-- Console -->
     <serial type='pty'>
       <target port='0'/>
