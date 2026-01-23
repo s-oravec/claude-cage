@@ -1,9 +1,0 @@
-# Binary (only at root, not internal/cage/)
-/cage
-
-# IDE
-.idea/
-.vscode/
-
-# Test coverage
-coverage.out
