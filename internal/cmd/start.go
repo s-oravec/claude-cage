@@ -63,6 +63,7 @@ func startCage(cmd *cobra.Command, name string, ports []string) error {
 	client := libvirt.NewClient()
 
 	// Start virtiofsd if shares are configured and using bridge network
+	// (virtiofsd requires root, which is only available with bridge mode)
 	var virtiofsDaemon *virtiofs.Daemon
 	var virtiofsSocket string
 
@@ -121,7 +122,8 @@ func startCage(cmd *cobra.Command, name string, ports []string) error {
 			fmt.Fprintf(cmd.OutOrStdout(), "  IP: %s\n", ip)
 		}
 	} else {
-		fmt.Fprintf(cmd.OutOrStdout(), "  %s networking: use 'cage console' to access\n", state.NetworkMode)
+		// Auto mode (passt/slirp) - no IP from libvirt
+		fmt.Fprintln(cmd.OutOrStdout(), "  User-mode networking: use 'cage console' to access")
 	}
 
 	// Update state

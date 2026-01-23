@@ -16,9 +16,8 @@ const (
 
 // Network modes
 const (
-	NetworkBridge = "bridge" // libvirt bridge with firewall (default, requires root)
-	NetworkSlirp  = "slirp"  // QEMU SLIRP user-mode (no root, slow)
-	NetworkPasst  = "passt"  // passt with restrictions (no root, fast, secure)
+	NetworkAuto   = "auto"   // auto-detect: passt > slirp (default, no root)
+	NetworkBridge = "bridge" // libvirt bridge with firewall (requires root)
 )
 
 // State holds the runtime state of a cage

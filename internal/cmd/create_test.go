@@ -40,7 +40,7 @@ func TestCreateCmd_HasNetworkFlag(t *testing.T) {
 
 	flag := cmd.Flag("network")
 	assert.NotNil(t, flag)
-	assert.Equal(t, "bridge", flag.DefValue)
+	assert.Equal(t, "auto", flag.DefValue)
 }
 
 func TestCreateCmd_RequiresName(t *testing.T) {

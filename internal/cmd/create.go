@@ -31,9 +31,8 @@ This creates the disk overlay, network, SSH keys, and VM definition.
 Use 'cage start' to start the cage after creation.
 
 Network modes:
-  bridge  Libvirt bridge with firewall isolation (default, requires root)
-  slirp   QEMU SLIRP user-mode networking (no root, slower)
-  passt   Passt with restrictions (no root, fast, secure)`,
+  auto    Auto-detect: passt > slirp (default, no root required)
+  bridge  Libvirt bridge with firewall isolation (requires root)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return createCage(cmd, name, profile, image, networkMode)
 		},
@@ -42,7 +41,7 @@ Network modes:
 	cmd.Flags().StringVarP(&name, "name", "n", "", "Name for the cage (required)")
 	cmd.Flags().StringVarP(&profile, "profile", "p", "default", "Resource profile (default, heavy, light)")
 	cmd.Flags().StringVarP(&image, "image", "i", "", "Base image (defaults to config default)")
-	cmd.Flags().StringVar(&networkMode, "network", cage.NetworkBridge, "Network mode: bridge, slirp, passt")
+	cmd.Flags().StringVar(&networkMode, "network", cage.NetworkAuto, "Network mode: auto, bridge")
 
 	cmd.MarkFlagRequired("name")
 
@@ -57,10 +56,10 @@ func createCage(cmd *cobra.Command, name, profileName, imageName, networkMode st
 
 	// Validate network mode
 	switch networkMode {
-	case cage.NetworkBridge, cage.NetworkSlirp, cage.NetworkPasst:
+	case cage.NetworkAuto, cage.NetworkBridge:
 		// valid
 	default:
-		return fmt.Errorf("invalid network mode '%s', must be: bridge, slirp, passt", networkMode)
+		return fmt.Errorf("invalid network mode '%s', must be: auto, bridge", networkMode)
 	}
 
 	// Load config
@@ -124,10 +123,13 @@ func createCage(cmd *cobra.Command, name, profileName, imageName, networkMode st
 				fmt.Fprintf(cmd.OutOrStdout(), "  Warning: DNS DNAT setup failed: %v\n", err)
 			}
 		}
-	case cage.NetworkSlirp:
-		fmt.Fprintln(cmd.OutOrStdout(), "  Using SLIRP user-mode networking...")
-	case cage.NetworkPasst:
-		fmt.Fprintln(cmd.OutOrStdout(), "  Using passt networking...")
+	case cage.NetworkAuto:
+		// Auto mode: passt > slirp (detection happens at start time)
+		if network.HasPasst() {
+			fmt.Fprintln(cmd.OutOrStdout(), "  Using passt networking (auto-detected)...")
+		} else {
+			fmt.Fprintln(cmd.OutOrStdout(), "  Using SLIRP networking (passt not found)...")
+		}
 	}
 
 	// Create qcow2 overlay with specified disk size

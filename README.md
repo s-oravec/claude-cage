@@ -114,28 +114,26 @@ cage create -n <name> [options]
 | `-n, --name` | Name for the cage (required) |
 | `-i, --image` | Base image (defaults to config default) |
 | `-p, --profile` | Resource profile: `default`, `heavy`, `light` (default: `default`) |
-| `--network` | Network mode: `bridge`, `slirp`, `passt` (default: `bridge`) |
+| `--network` | Network mode: `auto`, `bridge` (default: `auto`) |
 
 **Network Modes:**
-| Mode | Root? | Speed | Security | Description |
-|------|-------|-------|----------|-------------|
-| `bridge` | Yes | Fast | High | Libvirt bridge with firewall isolation (default) |
-| `slirp` | No | Slow | Medium | QEMU SLIRP user-mode networking |
-| `passt` | No | Fast | High | Passt with network restrictions (WIP) |
+| Mode | Root? | Speed | SSH | Description |
+|------|-------|-------|-----|-------------|
+| `auto` | No | Fast* | Console only | Auto-detect: passt > slirp (default) |
+| `bridge` | Yes | Fast | Yes | Libvirt bridge with firewall isolation |
+
+\* passt is fast, slirp fallback is slower
 
 **Examples:**
 ```bash
-# Create with default settings (bridge network, requires root)
+# Create with default settings (auto network, no root needed)
 cage create -n myproject
 
 # Create with specific image and profile
 cage create -n heavy-workload -i ubuntu-24.04 -p heavy
 
-# Create without root (SLIRP networking)
-cage create -n test --network slirp
-
-# Create without root (passt networking, faster)
-cage create -n test --network passt
+# Create with bridge network (requires root, enables SSH)
+cage create -n isolated --network bridge
 ```
 
 ---
@@ -292,7 +290,7 @@ cage exec myproject -- /workspace/build.sh
 
 ### cage console
 
-Connect to the cage VM's serial console. Useful when SSH is not available (e.g., with `--network slirp` or `--network passt` modes).
+Connect to the cage VM's serial console. This is the primary way to access cages using `--network auto` (default). Also useful for debugging boot issues.
 
 ```bash
 cage console <name>
