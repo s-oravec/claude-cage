@@ -109,6 +109,52 @@ func DeleteState(name string) error {
 	return os.RemoveAll(Dir(name))
 }
 
+// RestartConfig holds configuration needed to restart a cage
+type RestartConfig struct {
+	Image   string `json:"image"`
+	Profile string `json:"profile"`
+	Ports   []Port `json:"ports,omitempty"`
+}
+
+// RestartConfigPath returns the path to a cage's restart config file
+func RestartConfigPath(name string) string {
+	return filepath.Join(Dir(name), "restart.json")
+}
+
+// SaveRestartConfig saves restart configuration for a cage
+func SaveRestartConfig(name string, cfg *RestartConfig) error {
+	if err := EnsureDir(name); err != nil {
+		return err
+	}
+
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(RestartConfigPath(name), data, 0644)
+}
+
+// LoadRestartConfig loads restart configuration for a cage
+func LoadRestartConfig(name string) (*RestartConfig, error) {
+	data, err := os.ReadFile(RestartConfigPath(name))
+	if err != nil {
+		return nil, err
+	}
+
+	var cfg RestartConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return nil, err
+	}
+
+	return &cfg, nil
+}
+
+// DeleteRestartConfig removes restart configuration for a cage
+func DeleteRestartConfig(name string) error {
+	return os.Remove(RestartConfigPath(name))
+}
+
 // List returns all cages (from state files)
 func List() ([]*State, error) {
 	entries, err := os.ReadDir(CagesDir())

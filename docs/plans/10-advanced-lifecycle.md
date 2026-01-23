@@ -277,12 +277,12 @@ cmd := &cobra.Command{
 
 ## Deliverables
 
-- [ ] `cage restart <name>`
-- [ ] `cage restart <name> --force`
-- [ ] `cage snapshot create <name> --name <snapshot>`
-- [ ] `cage snapshot create <name> --name <snapshot> --description <desc>`
-- [ ] `cage snapshot list <name>`
-- [ ] `cage snapshot restore <name> --name <snapshot>`
-- [ ] `cage snapshot delete <name> --name <snapshot>`
-- [ ] Snapshot metadata storage
-- [ ] Validation (cage must be stopped for restore)
+- [x] `cage restart <name>`
+- [x] `cage restart <name> --force`
+- [x] `cage snapshot create <name> --name <snapshot>`
+- [x] `cage snapshot create <name> --name <snapshot> --description <desc>`
+- [x] `cage snapshot list <name>`
+- [x] `cage snapshot restore <name> --name <snapshot>`
+- [x] `cage snapshot delete <name> --name <snapshot>`
+- [x] Snapshot metadata storage (via libvirt)
+- [x] RestartConfig for preserving settings during restart
