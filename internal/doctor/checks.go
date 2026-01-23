@@ -8,6 +8,44 @@ import (
 	"strings"
 )
 
+// Distro represents the detected Linux distribution
+type Distro string
+
+const (
+	DistroDebian  Distro = "debian"  // Debian, Ubuntu, etc.
+	DistroFedora  Distro = "fedora"  // Fedora, RHEL, Rocky, Alma
+	DistroArch    Distro = "arch"    // Arch Linux
+	DistroOpenSUSE Distro = "opensuse"
+	DistroUnknown Distro = "unknown"
+)
+
+// DetectDistro detects the current Linux distribution
+func DetectDistro() Distro {
+	// Check /etc/os-release
+	data, err := os.ReadFile("/etc/os-release")
+	if err != nil {
+		return DistroUnknown
+	}
+	content := strings.ToLower(string(data))
+
+	if strings.Contains(content, "ubuntu") || strings.Contains(content, "debian") ||
+		strings.Contains(content, "mint") || strings.Contains(content, "pop!_os") {
+		return DistroDebian
+	}
+	if strings.Contains(content, "fedora") || strings.Contains(content, "rhel") ||
+		strings.Contains(content, "rocky") || strings.Contains(content, "alma") ||
+		strings.Contains(content, "centos") {
+		return DistroFedora
+	}
+	if strings.Contains(content, "arch") || strings.Contains(content, "manjaro") {
+		return DistroArch
+	}
+	if strings.Contains(content, "opensuse") || strings.Contains(content, "suse") {
+		return DistroOpenSUSE
+	}
+	return DistroUnknown
+}
+
 // Check represents a single system check
 type Check struct {
 	Name      string
@@ -49,18 +87,20 @@ func AllRequiredPassed(results []CheckResult) bool {
 
 // DefaultChecks returns the standard set of checks
 func DefaultChecks() []Check {
+	distro := DetectDistro()
+
 	return []Check{
 		{
 			Name:      "KVM available",
 			CheckFunc: checkKVM,
 			Required:  true,
-			FixHint:   "Enable virtualization in BIOS/UEFI, or install: sudo apt install qemu-kvm",
+			FixHint:   fixHintKVM(distro),
 		},
 		{
 			Name:      "libvirtd running",
 			CheckFunc: checkLibvirtd,
 			Required:  true,
-			FixHint:   "sudo apt install libvirt-daemon-system && sudo systemctl enable --now libvirtd",
+			FixHint:   fixHintLibvirtd(distro),
 		},
 		{
 			Name:      "User in kvm group",
@@ -77,27 +117,135 @@ func DefaultChecks() []Check {
 		{
 			Name:      "virtiofsd installed",
 			CheckFunc: checkVirtiofsd,
-			Required:  true,
-			FixHint:   "sudo apt install virtiofsd",
+			Required:  false, // Optional - only needed for bridge mode file sharing
+			FixHint:   fixHintVirtiofsd(distro),
 		},
 		{
 			Name:      "qemu-img installed",
 			CheckFunc: checkQemuImg,
 			Required:  true,
-			FixHint:   "sudo apt install qemu-utils",
+			FixHint:   fixHintQemuImg(distro),
 		},
 		{
 			Name:      "cloud-localds installed",
 			CheckFunc: checkCloudLocalds,
-			Required:  false,
-			FixHint:   "sudo apt install cloud-image-utils",
+			Required:  false, // Optional - genisoimage/mkisofs can be used instead
+			FixHint:   fixHintCloudLocalds(distro),
 		},
+		{
+			Name:      "passt installed",
+			CheckFunc: checkPasst,
+			Required:  false, // Optional - provides faster user-mode networking, falls back to SLIRP
+			FixHint:   fixHintPasst(distro),
+		},
+	}
+}
+
+func fixHintKVM(d Distro) string {
+	switch d {
+	case DistroDebian:
+		return "Enable virtualization in BIOS/UEFI, or install: sudo apt install qemu-kvm"
+	case DistroFedora:
+		return "Enable virtualization in BIOS/UEFI, or install: sudo dnf install qemu-kvm"
+	case DistroArch:
+		return "Enable virtualization in BIOS/UEFI, or install: sudo pacman -S qemu-base"
+	case DistroOpenSUSE:
+		return "Enable virtualization in BIOS/UEFI, or install: sudo zypper install qemu-kvm"
+	default:
+		return "Enable virtualization in BIOS/UEFI and install QEMU/KVM"
+	}
+}
+
+func fixHintLibvirtd(d Distro) string {
+	switch d {
+	case DistroDebian:
+		return "sudo apt install libvirt-daemon-system && sudo systemctl enable --now libvirtd"
+	case DistroFedora:
+		return "sudo dnf install libvirt-daemon && sudo systemctl enable --now libvirtd"
+	case DistroArch:
+		return "sudo pacman -S libvirt && sudo systemctl enable --now libvirtd"
+	case DistroOpenSUSE:
+		return "sudo zypper install libvirt-daemon && sudo systemctl enable --now libvirtd"
+	default:
+		return "Install libvirt and enable libvirtd service"
+	}
+}
+
+func fixHintVirtiofsd(d Distro) string {
+	switch d {
+	case DistroDebian:
+		return "sudo apt install virtiofsd"
+	case DistroFedora:
+		return "sudo dnf install virtiofsd"
+	case DistroArch:
+		return "sudo pacman -S virtiofsd"
+	case DistroOpenSUSE:
+		return "sudo zypper install virtiofsd"
+	default:
+		return "Install virtiofsd (part of QEMU)"
+	}
+}
+
+func fixHintQemuImg(d Distro) string {
+	switch d {
+	case DistroDebian:
+		return "sudo apt install qemu-utils"
+	case DistroFedora:
+		return "sudo dnf install qemu-img"
+	case DistroArch:
+		return "sudo pacman -S qemu-img"
+	case DistroOpenSUSE:
+		return "sudo zypper install qemu-tools"
+	default:
+		return "Install qemu-img (part of QEMU)"
+	}
+}
+
+func fixHintCloudLocalds(d Distro) string {
+	switch d {
+	case DistroDebian:
+		return "sudo apt install cloud-image-utils"
+	case DistroFedora:
+		return "sudo dnf install cloud-utils"
+	case DistroArch:
+		return "yay -S cloud-image-utils (from AUR)"
+	case DistroOpenSUSE:
+		return "sudo zypper install cloud-utils"
+	default:
+		return "Install cloud-localds (part of cloud-image-utils)"
+	}
+}
+
+func fixHintPasst(d Distro) string {
+	switch d {
+	case DistroDebian:
+		return "sudo apt install passt"
+	case DistroFedora:
+		return "sudo dnf install passt"
+	case DistroArch:
+		return "sudo pacman -S passt"
+	case DistroOpenSUSE:
+		return "sudo zypper install passt"
+	default:
+		return "Install passt for faster user-mode networking"
 	}
 }
 
 // InstallAllHint returns a single command to install all required packages
 func InstallAllHint() string {
-	return "sudo apt install -y qemu-kvm libvirt-daemon-system libvirt-clients virtiofsd qemu-utils cloud-image-utils && sudo usermod -aG kvm,libvirt $USER && sudo systemctl enable --now libvirtd"
+	distro := DetectDistro()
+	switch distro {
+	case DistroDebian:
+		return "sudo apt install -y qemu-kvm libvirt-daemon-system libvirt-clients virtiofsd qemu-utils cloud-image-utils passt && sudo usermod -aG kvm,libvirt $USER && sudo systemctl enable --now libvirtd"
+	case DistroFedora:
+		return "sudo dnf install -y qemu-kvm libvirt-daemon libvirt-client virtiofsd qemu-img cloud-utils passt && sudo usermod -aG kvm,libvirt $USER && sudo systemctl enable --now libvirtd"
+	case DistroArch:
+		return "sudo pacman -S qemu-base libvirt virtiofsd qemu-img passt && sudo usermod -aG kvm,libvirt $USER && sudo systemctl enable --now libvirtd"
+	case DistroOpenSUSE:
+		return "sudo zypper install qemu-kvm libvirt-daemon virtiofsd qemu-tools cloud-utils passt && sudo usermod -aG kvm,libvirt $USER && sudo systemctl enable --now libvirtd"
+	default:
+		return "Install: qemu-kvm, libvirt, virtiofsd, qemu-img, cloud-image-utils, passt\nAdd user to groups: sudo usermod -aG kvm,libvirt $USER\nEnable libvirtd: sudo systemctl enable --now libvirtd"
+	}
 }
 
 func checkKVM() error {
@@ -190,6 +338,14 @@ func checkCloudLocalds() error {
 	_, err := exec.LookPath("cloud-localds")
 	if err != nil {
 		return errors.New("cloud-localds not found in PATH")
+	}
+	return nil
+}
+
+func checkPasst() error {
+	_, err := exec.LookPath("passt")
+	if err != nil {
+		return errors.New("passt not found (SLIRP will be used as fallback)")
 	}
 	return nil
 }

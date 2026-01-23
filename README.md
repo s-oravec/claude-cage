@@ -729,3 +729,7 @@ make clean
 ## License
 
 MIT
+
+---
+
+Made with [Claude](https://claude.ai)
