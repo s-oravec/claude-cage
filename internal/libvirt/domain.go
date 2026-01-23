@@ -14,9 +14,10 @@ type DomainConfig struct {
 	CloudInitISO   string
 	NetworkName    string // if empty, uses user-mode networking (SLIRP)
 	VirtiofsSocket string // optional: path to virtiofsd socket
+	SSHPort        int    // optional: host port for SSH forwarding (user-mode only)
 }
 
-const domainXMLTemplate = `<domain type='kvm'>
+const domainXMLTemplate = `<domain type='kvm'{{if and (not .NetworkName) (gt .SSHPort 0)}} xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'{{end}}>
   <name>cage-{{.Name}}</name>
   <memory unit='MiB'>{{.MemoryMB}}</memory>
   <vcpu>{{.VCPU}}</vcpu>
@@ -59,11 +60,13 @@ const domainXMLTemplate = `<domain type='kvm'>
       <source network='{{.NetworkName}}'/>
       <model type='virtio'/>
     </interface>
+{{else}}{{if gt .SSHPort 0}}
+    <!-- User-mode network with port forwarding handled via qemu:commandline -->
 {{else}}
     <interface type='user'>
       <model type='virtio'/>
     </interface>
-{{end}}
+{{end}}{{end}}
 {{if .VirtiofsSocket}}
     <!-- Virtio-fs shared directory -->
     <filesystem type='mount' accessmode='passthrough'>
@@ -85,6 +88,14 @@ const domainXMLTemplate = `<domain type='kvm'>
       <backend model='random'>/dev/urandom</backend>
     </rng>
   </devices>
+{{if and (not .NetworkName) (gt .SSHPort 0)}}
+  <qemu:commandline>
+    <qemu:arg value='-netdev'/>
+    <qemu:arg value='user,id=net0,hostfwd=tcp:127.0.0.1:{{.SSHPort}}-:22'/>
+    <qemu:arg value='-device'/>
+    <qemu:arg value='virtio-net-pci,netdev=net0'/>
+  </qemu:commandline>
+{{end}}
 </domain>`
 
 // GenerateDomainXML generates libvirt domain XML from config

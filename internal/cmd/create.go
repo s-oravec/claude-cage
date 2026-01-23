@@ -21,6 +21,7 @@ func NewCreateCmd() *cobra.Command {
 	var profile string
 	var image string
 	var networkMode string
+	var sshPort string
 
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -32,9 +33,13 @@ Use 'cage start' to start the cage after creation.
 
 Network modes:
   auto    Auto-detect: passt > slirp (default, no root required)
-  bridge  Libvirt bridge with firewall isolation (requires root)`,
+  bridge  Libvirt bridge with firewall isolation (requires root)
+
+SSH access (for auto network mode):
+  --ssh auto    Automatically find a free port
+  --ssh <port>  Use specific port (e.g., --ssh 2222)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return createCage(cmd, name, profile, image, networkMode)
+			return createCage(cmd, name, profile, image, networkMode, sshPort)
 		},
 	}
 
@@ -42,13 +47,14 @@ Network modes:
 	cmd.Flags().StringVarP(&profile, "profile", "p", "default", "Resource profile (default, heavy, light)")
 	cmd.Flags().StringVarP(&image, "image", "i", "", "Base image (defaults to config default)")
 	cmd.Flags().StringVar(&networkMode, "network", cage.NetworkAuto, "Network mode: auto, bridge")
+	cmd.Flags().StringVar(&sshPort, "ssh", "", "SSH port forwarding: 'auto' or specific port (e.g., 2222)")
 
 	cmd.MarkFlagRequired("name")
 
 	return cmd
 }
 
-func createCage(cmd *cobra.Command, name, profileName, imageName, networkMode string) error {
+func createCage(cmd *cobra.Command, name, profileName, imageName, networkMode, sshPortSpec string) error {
 	// Check if cage already exists
 	if cage.Exists(name) {
 		return fmt.Errorf("cage '%s' already exists", name)
@@ -60,6 +66,27 @@ func createCage(cmd *cobra.Command, name, profileName, imageName, networkMode st
 		// valid
 	default:
 		return fmt.Errorf("invalid network mode '%s', must be: auto, bridge", networkMode)
+	}
+
+	// Parse SSH port
+	var sshPort int
+	if sshPortSpec != "" {
+		if networkMode == cage.NetworkBridge {
+			fmt.Fprintln(cmd.OutOrStdout(), "  Note: --ssh is ignored for bridge network (SSH works via VM IP)")
+		} else {
+			if sshPortSpec == "auto" {
+				port, err := network.FindFreePort()
+				if err != nil {
+					return fmt.Errorf("failed to find free port: %w", err)
+				}
+				sshPort = port
+			} else {
+				port, err := fmt.Sscanf(sshPortSpec, "%d", &sshPort)
+				if err != nil || port != 1 || sshPort < 1 || sshPort > 65535 {
+					return fmt.Errorf("invalid SSH port '%s', must be 'auto' or a port number (1-65535)", sshPortSpec)
+				}
+			}
+		}
 	}
 
 	// Load config
@@ -74,10 +101,11 @@ func createCage(cmd *cobra.Command, name, profileName, imageName, networkMode st
 		return err
 	}
 
-	// Determine image
+	// Determine image (resolve alias to canonical name)
 	if imageName == "" {
 		imageName = cfg.Images.Default
 	}
+	imageName = images.ResolveAlias(imageName)
 
 	// Check image exists
 	if !images.IsDownloaded(imageName) {
@@ -179,6 +207,7 @@ func createCage(cmd *cobra.Command, name, profileName, imageName, networkMode st
 		CloudInitISO:   cloudInitPath,
 		NetworkName:    networkName, // Empty for user-mode networking
 		VirtiofsSocket: "",          // Set at start time
+		SSHPort:        sshPort,     // Port forwarding for user-mode networking
 	}
 
 	xml, err := libvirt.GenerateDomainXML(domainCfg)
@@ -202,6 +231,7 @@ func createCage(cmd *cobra.Command, name, profileName, imageName, networkMode st
 		Image:       imageName,
 		Profile:     profileName,
 		NetworkMode: networkMode,
+		SSHPort:     sshPort,
 	}
 
 	if err := cage.SaveState(state); err != nil {
@@ -211,6 +241,9 @@ func createCage(cmd *cobra.Command, name, profileName, imageName, networkMode st
 	fmt.Fprintf(cmd.OutOrStdout(), "✓ Cage '%s' created\n", name)
 	fmt.Fprintf(cmd.OutOrStdout(), "  Image: %s, Profile: %s (%d vCPU, %d MB RAM)\n",
 		imageName, profileName, profile.VCPU, profile.MemoryMB)
+	if sshPort > 0 {
+		fmt.Fprintf(cmd.OutOrStdout(), "  SSH: localhost:%d\n", sshPort)
+	}
 	fmt.Fprintf(cmd.OutOrStdout(), "  Use 'cage start %s' to start\n", name)
 
 	return nil

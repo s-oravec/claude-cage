@@ -48,15 +48,27 @@ func sshToCage(cmd *cobra.Command, name, command string) error {
 		return fmt.Errorf("cage '%s' is not running", name)
 	}
 
-	if state.IP == "" {
-		return fmt.Errorf("cage '%s' has no IP address yet", name)
-	}
-
 	// Check SSH key exists
 	if !ssh.KeyExists(name) {
 		return fmt.Errorf("SSH key not found for cage '%s'", name)
 	}
 
+	// Determine SSH target
+	var host string
+	var port int
+
+	if state.SSHPort > 0 {
+		// User-mode networking with port forwarding
+		host = "127.0.0.1"
+		port = state.SSHPort
+	} else if state.IP != "" {
+		// Bridge networking with direct IP
+		host = state.IP
+		port = 22
+	} else {
+		return fmt.Errorf("cage '%s' has no SSH access configured (use --ssh when creating or use bridge network)", name)
+	}
+
 	// Connect
-	return ssh.SSHExec(name, state.IP, command, command == "")
+	return ssh.SSHExecWithPort(name, host, port, command, command == "")
 }

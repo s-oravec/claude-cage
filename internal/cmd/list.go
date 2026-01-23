@@ -48,16 +48,27 @@ func listCages(cmd *cobra.Command, jsonOutput bool) error {
 	}
 
 	// Table header
-	fmt.Fprintf(cmd.OutOrStdout(), "%-15s %-10s %-15s %-10s %s\n",
-		"NAME", "STATUS", "IMAGE", "PROFILE", "UPTIME")
+	fmt.Fprintf(cmd.OutOrStdout(), "%-15s %-10s %-18s %-10s %-20s %s\n",
+		"NAME", "STATUS", "IMAGE", "PROFILE", "SSH", "UPTIME")
 
 	for _, c := range cages {
 		uptime := formatUptime(c.StartedAt)
-		fmt.Fprintf(cmd.OutOrStdout(), "%-15s %-10s %-15s %-10s %s\n",
-			c.Name, c.Status, c.Image, c.Profile, uptime)
+		sshInfo := formatSSH(c)
+		fmt.Fprintf(cmd.OutOrStdout(), "%-15s %-10s %-18s %-10s %-20s %s\n",
+			c.Name, c.Status, c.Image, c.Profile, sshInfo, uptime)
 	}
 
 	return nil
+}
+
+func formatSSH(c *cage.State) string {
+	if c.SSHPort > 0 {
+		return fmt.Sprintf("localhost:%d", c.SSHPort)
+	}
+	if c.IP != "" {
+		return c.IP
+	}
+	return "-"
 }
 
 func formatUptime(startedAt time.Time) string {

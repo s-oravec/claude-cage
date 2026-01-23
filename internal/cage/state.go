@@ -27,6 +27,7 @@ type State struct {
 	Image        string    `json:"image"`
 	Profile      string    `json:"profile"`
 	NetworkMode  string    `json:"network_mode,omitempty"`
+	SSHPort      int       `json:"ssh_port,omitempty"`
 	IP           string    `json:"ip,omitempty"`
 	Ports        []Port    `json:"ports,omitempty"`
 	StartedAt    time.Time `json:"started_at"`

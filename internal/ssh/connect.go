@@ -33,8 +33,13 @@ func Connect(cageName string, command string) error {
 	return SSHExec(cageName, state.IP, command, true)
 }
 
-// SSHExec executes SSH with the given parameters
+// SSHExec executes SSH with the given parameters (default port 22)
 func SSHExec(cageName, ip, command string, interactive bool) error {
+	return SSHExecWithPort(cageName, ip, 22, command, interactive)
+}
+
+// SSHExecWithPort executes SSH with explicit port
+func SSHExecWithPort(cageName, host string, port int, command string, interactive bool) error {
 	keyPath := KeyPath(cageName)
 	knownHostsPath := KnownHostsPath()
 
@@ -44,13 +49,14 @@ func SSHExec(cageName, ip, command string, interactive bool) error {
 		"-o", fmt.Sprintf("UserKnownHostsFile=%s", knownHostsPath),
 		"-o", "LogLevel=ERROR",
 		"-o", "ConnectTimeout=5",
+		"-p", fmt.Sprintf("%d", port),
 	}
 
 	if !interactive {
 		args = append(args, "-o", "BatchMode=yes")
 	}
 
-	args = append(args, fmt.Sprintf("cage@%s", ip))
+	args = append(args, fmt.Sprintf("cage@%s", host))
 
 	if command != "" {
 		args = append(args, command)

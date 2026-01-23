@@ -115,24 +115,31 @@ cage create -n <name> [options]
 | `-i, --image` | Base image (defaults to config default) |
 | `-p, --profile` | Resource profile: `default`, `heavy`, `light` (default: `default`) |
 | `--network` | Network mode: `auto`, `bridge` (default: `auto`) |
+| `--ssh` | SSH port forwarding: `auto` or specific port (e.g., `2222`) |
 
 **Network Modes:**
 | Mode | Root? | Speed | SSH | Description |
 |------|-------|-------|-----|-------------|
-| `auto` | No | Fast* | Console only | Auto-detect: passt > slirp (default) |
-| `bridge` | Yes | Fast | Yes | Libvirt bridge with firewall isolation |
+| `auto` | No | Fast* | Via `--ssh` | Auto-detect: passt > slirp (default) |
+| `bridge` | Yes | Fast | Direct IP | Libvirt bridge with firewall isolation |
 
 \* passt is fast, slirp fallback is slower
 
 **Examples:**
 ```bash
-# Create with default settings (auto network, no root needed)
+# Create with default settings (auto network, console access only)
 cage create -n myproject
 
-# Create with specific image and profile
-cage create -n heavy-workload -i ubuntu-24.04 -p heavy
+# Create with SSH access (auto port)
+cage create -n myproject --ssh auto
 
-# Create with bridge network (requires root, enables SSH)
+# Create with SSH on specific port
+cage create -n myproject --ssh 2222
+
+# Create with specific image and profile
+cage create -n heavy-workload -i ubuntu -p heavy --ssh auto
+
+# Create with bridge network (requires root, SSH via direct IP)
 cage create -n isolated --network bridge
 ```
 
