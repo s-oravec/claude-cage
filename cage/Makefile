@@ -1,4 +1,4 @@
-.PHONY: build test test-short coverage coverage-html install clean
+.PHONY: build test test-short coverage coverage-html e2e install clean
 
 VERSION := 0.1.0
 LDFLAGS := -ldflags "-X github.com/stiivo/cage/internal/cmd.Version=$(VERSION)"
@@ -47,6 +47,14 @@ coverage-check:
 	else \
 		echo "✓ Coverage check passed: $$total% >= $(COVERAGE_THRESHOLD)%"; \
 	fi
+
+e2e: build
+	@echo "Running E2E tests (requires KVM, libvirt)..."
+	./test/e2e/e2e_test.sh
+
+e2e-ubuntu: build
+	@echo "Running E2E tests with Ubuntu..."
+	./test/e2e/e2e_test.sh --image ubuntu-24.04
 
 install: build
 	install -m 755 cage ~/.local/bin/cage

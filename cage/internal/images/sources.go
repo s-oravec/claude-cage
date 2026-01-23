@@ -27,6 +27,11 @@ func BaseImages() map[string]ImageSource {
 			URL:         "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2",
 			Description: "Debian 12 (Bookworm)",
 		},
+		"alpine-3.20": {
+			Name:        "alpine-3.20",
+			URL:         "https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/cloud/nocloud_alpine-3.20.6-x86_64-bios-cloudinit-r0.qcow2",
+			Description: "Alpine Linux 3.20 (minimal, ~50MB)",
+		},
 	}
 }
 
