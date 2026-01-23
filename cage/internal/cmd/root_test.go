@@ -22,6 +22,7 @@ func TestRootCmd_HasSubcommands(t *testing.T) {
 	assert.Contains(t, names, "start")
 	assert.Contains(t, names, "stop")
 	assert.Contains(t, names, "list")
+	assert.Contains(t, names, "ssh")
 }
 
 func TestRootCmd_Name(t *testing.T) {

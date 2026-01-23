@@ -196,12 +196,12 @@ func Start(name string, opts StartOptions) error {
 
 ## Deliverables
 
-- [ ] Ed25519 key generation
-- [ ] Per-cage key storage
-- [ ] Cloud-init user-data generation
-- [ ] Cloud-init ISO creation
-- [ ] SSH connection wrapper
-- [ ] Known hosts management
-- [ ] SSH ready detection
-- [ ] `cage ssh <name>` (interactive)
-- [ ] `cage ssh <name> "<command>"` (run command)
+- [x] Ed25519 key generation
+- [x] Per-cage key storage
+- [x] Cloud-init user-data generation
+- [x] Cloud-init ISO creation
+- [x] SSH connection wrapper
+- [x] Known hosts management
+- [x] SSH ready detection
+- [x] `cage ssh <name>` (interactive)
+- [x] `cage ssh <name> "<command>"` (run command)

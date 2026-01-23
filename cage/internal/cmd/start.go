@@ -8,9 +8,11 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/stiivo/cage/internal/cage"
+	"github.com/stiivo/cage/internal/cloudinit"
 	"github.com/stiivo/cage/internal/config"
 	"github.com/stiivo/cage/internal/images"
 	"github.com/stiivo/cage/internal/libvirt"
+	"github.com/stiivo/cage/internal/ssh"
 )
 
 // NewStartCmd creates the start command
@@ -89,10 +91,24 @@ func startCage(cmd *cobra.Command, name, profileName, imageName string, ports []
 		return fmt.Errorf("failed to create overlay: %s", string(out))
 	}
 
-	// Create minimal cloud-init ISO (for now, just a placeholder)
-	// Full cloud-init with SSH keys will be in Phase 05
-	cloudInitPath := filepath.Join(cageDir, "cloud-init.iso")
-	if err := createMinimalCloudInit(cloudInitPath); err != nil {
+	// Generate SSH keys
+	fmt.Fprintln(cmd.OutOrStdout(), "  Generating SSH keys...")
+	if err := ssh.GenerateKeyPair(name); err != nil {
+		cage.DeleteState(name)
+		return fmt.Errorf("failed to generate SSH keys: %w", err)
+	}
+
+	pubKey, err := ssh.GetPublicKey(name)
+	if err != nil {
+		cage.DeleteState(name)
+		return fmt.Errorf("failed to read public key: %w", err)
+	}
+
+	// Create cloud-init ISO with SSH key
+	fmt.Fprintln(cmd.OutOrStdout(), "  Creating cloud-init...")
+	cloudInitPath, err := cloudinit.GenerateISO(cageDir, name, pubKey)
+	if err != nil {
+		cage.DeleteState(name)
 		return fmt.Errorf("failed to create cloud-init: %w", err)
 	}
 
@@ -124,8 +140,28 @@ func startCage(cmd *cobra.Command, name, profileName, imageName string, ports []
 	fmt.Fprintln(cmd.OutOrStdout(), "  Starting VM...")
 	if err := client.StartDomain(name); err != nil {
 		client.UndefineDomain(name) // cleanup
+		ssh.DeleteKeys(name)
 		cage.DeleteState(name)
 		return err
+	}
+
+	// Wait for VM to get an IP
+	fmt.Fprint(cmd.OutOrStdout(), "  Waiting for IP address...")
+	var ip string
+	for i := 0; i < 30; i++ {
+		time.Sleep(2 * time.Second)
+		ip, _ = client.GetDomainIP(name)
+		if ip != "" {
+			break
+		}
+		fmt.Fprint(cmd.OutOrStdout(), ".")
+	}
+	fmt.Fprintln(cmd.OutOrStdout())
+
+	if ip == "" {
+		fmt.Fprintln(cmd.OutOrStdout(), "  Warning: Could not get IP address")
+	} else {
+		fmt.Fprintf(cmd.OutOrStdout(), "  IP: %s\n", ip)
 	}
 
 	// Save state
@@ -134,6 +170,7 @@ func startCage(cmd *cobra.Command, name, profileName, imageName string, ports []
 		Status:    cage.StatusRunning,
 		Image:     imageName,
 		Profile:   profileName,
+		IP:        ip,
 		StartedAt: time.Now(),
 	}
 
@@ -147,31 +184,23 @@ func startCage(cmd *cobra.Command, name, profileName, imageName string, ports []
 		return fmt.Errorf("failed to save state: %w", err)
 	}
 
+	// Wait for SSH if we have an IP
+	if ip != "" {
+		fmt.Fprint(cmd.OutOrStdout(), "  Waiting for SSH...")
+		if err := ssh.WaitForSSH(name, ip, 60*time.Second); err != nil {
+			fmt.Fprintln(cmd.OutOrStdout(), " timeout (VM may still be booting)")
+		} else {
+			fmt.Fprintln(cmd.OutOrStdout(), " ready")
+		}
+	}
+
 	fmt.Fprintf(cmd.OutOrStdout(), "✓ Cage '%s' started\n", name)
 	fmt.Fprintf(cmd.OutOrStdout(), "  Image: %s, Profile: %s (%d vCPU, %d MB RAM)\n",
 		imageName, profileName, profile.VCPU, profile.MemoryMB)
 
-	return nil
-}
-
-// createMinimalCloudInit creates a minimal cloud-init ISO
-// This is a placeholder - full implementation in Phase 05
-func createMinimalCloudInit(path string) error {
-	// For now, create an empty ISO using genisoimage or mkisofs
-	// This allows the VM to boot without cloud-init errors
-
-	// Check which tool is available
-	var cmd *exec.Cmd
-	if _, err := exec.LookPath("genisoimage"); err == nil {
-		cmd = exec.Command("genisoimage", "-output", path, "-volid", "cidata",
-			"-joliet", "-rock", "/dev/null")
-	} else if _, err := exec.LookPath("mkisofs"); err == nil {
-		cmd = exec.Command("mkisofs", "-output", path, "-volid", "cidata",
-			"-joliet", "-rock", "/dev/null")
-	} else {
-		// Create empty file as fallback
-		return exec.Command("touch", path).Run()
+	if ip != "" {
+		fmt.Fprintf(cmd.OutOrStdout(), "  Use 'cage ssh %s' to connect\n", name)
 	}
 
-	return cmd.Run()
+	return nil
 }

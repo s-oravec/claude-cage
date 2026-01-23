@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stiivo/cage/internal/cage"
 	"github.com/stiivo/cage/internal/libvirt"
+	"github.com/stiivo/cage/internal/ssh"
 )
 
 // NewStopCmd creates the stop command
@@ -69,6 +70,9 @@ func stopCage(cmd *cobra.Command, name string, force bool) error {
 	if err := client.UndefineDomain(name); err != nil {
 		fmt.Fprintf(cmd.OutOrStdout(), "  Warning: %v\n", err)
 	}
+
+	// Delete SSH keys
+	ssh.DeleteKeys(name)
 
 	// Delete cage state and files
 	fmt.Fprintln(cmd.OutOrStdout(), "  Cleaning up...")
