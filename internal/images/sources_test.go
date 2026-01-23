@@ -43,3 +43,123 @@ func TestGetSource_NotExists(t *testing.T) {
 
 	assert.Error(t, err)
 }
+
+func TestResolveAlias_KnownAliases(t *testing.T) {
+	tests := []struct {
+		alias    string
+		expected string
+	}{
+		{"alpine", "alpine-3.21"},
+		{"ubuntu", "ubuntu-24.04"},
+		{"debian", "debian-12"},
+		{"rocky", "rocky-9"},
+		{"alma", "alma-9"},
+		{"fedora", "fedora-41"},
+		{"opensuse", "opensuse-15.6"},
+		{"centos", "centos-stream-9"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.alias, func(t *testing.T) {
+			resolved := ResolveAlias(tt.alias)
+			assert.Equal(t, tt.expected, resolved)
+		})
+	}
+}
+
+func TestResolveAlias_UnknownReturnsInput(t *testing.T) {
+	// Non-alias names should be returned as-is
+	result := ResolveAlias("ubuntu-24.04")
+	assert.Equal(t, "ubuntu-24.04", result)
+
+	result = ResolveAlias("custom-image")
+	assert.Equal(t, "custom-image", result)
+}
+
+func TestGetSource_WithAlias(t *testing.T) {
+	// Getting source with alias should work
+	src, err := GetSource("alpine")
+	assert.NoError(t, err)
+	assert.Equal(t, "alpine-3.21", src.Name)
+}
+
+func TestBaseImages_AllDistros(t *testing.T) {
+	sources := BaseImages()
+
+	// Alpine
+	assert.Contains(t, sources, "alpine-3.21")
+	assert.Contains(t, sources, "alpine-3.20")
+
+	// Ubuntu
+	assert.Contains(t, sources, "ubuntu-24.04")
+	assert.Contains(t, sources, "ubuntu-22.04")
+	assert.Contains(t, sources, "ubuntu-20.04")
+
+	// Debian
+	assert.Contains(t, sources, "debian-12")
+	assert.Contains(t, sources, "debian-11")
+
+	// Rocky
+	assert.Contains(t, sources, "rocky-9")
+	assert.Contains(t, sources, "rocky-8")
+
+	// Alma
+	assert.Contains(t, sources, "alma-9")
+	assert.Contains(t, sources, "alma-8")
+
+	// Fedora
+	assert.Contains(t, sources, "fedora-41")
+	assert.Contains(t, sources, "fedora-40")
+
+	// openSUSE
+	assert.Contains(t, sources, "opensuse-15.6")
+	assert.Contains(t, sources, "opensuse-15.5")
+
+	// CentOS
+	assert.Contains(t, sources, "centos-stream-9")
+}
+
+func TestBaseImages_AllHaveValidURLs(t *testing.T) {
+	sources := BaseImages()
+
+	for name, src := range sources {
+		t.Run(name, func(t *testing.T) {
+			assert.NotEmpty(t, src.URL, "image %s should have URL", name)
+			assert.Contains(t, src.URL, "https://", "image %s URL should be HTTPS", name)
+			assert.NotEmpty(t, src.Description, "image %s should have description", name)
+		})
+	}
+}
+
+func TestBaseImages_AllHaveMatchingName(t *testing.T) {
+	sources := BaseImages()
+
+	for key, src := range sources {
+		assert.Equal(t, key, src.Name, "image key %s should match source name", key)
+	}
+}
+
+func TestListAvailable_IncludesAllImages(t *testing.T) {
+	names := ListAvailable()
+	sources := BaseImages()
+
+	// Should have same count
+	assert.Len(t, names, len(sources))
+
+	// All keys should be present
+	for key := range sources {
+		assert.Contains(t, names, key)
+	}
+}
+
+func TestImageSource_Structure(t *testing.T) {
+	src := ImageSource{
+		Name:        "test-image",
+		URL:         "https://example.com/image.qcow2",
+		Description: "Test image description",
+	}
+
+	assert.Equal(t, "test-image", src.Name)
+	assert.Equal(t, "https://example.com/image.qcow2", src.URL)
+	assert.Equal(t, "Test image description", src.Description)
+}

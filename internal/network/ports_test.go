@@ -249,3 +249,92 @@ func TestParsePortSpecs(t *testing.T) {
 		}
 	})
 }
+
+func TestPortConflict(t *testing.T) {
+	// Test with a port that's likely available
+	// Use a high port number that's unlikely to be in use
+	available := PortConflict(59999, "127.0.0.1")
+	// We can't reliably test the result since it depends on system state
+	_ = available
+}
+
+func TestPortForward_Struct(t *testing.T) {
+	fwd := PortForward{
+		HostPort:  8080,
+		GuestPort: 80,
+		Protocol:  "tcp",
+		Bind:      "127.0.0.1",
+	}
+
+	if fwd.HostPort != 8080 {
+		t.Errorf("expected HostPort 8080, got %d", fwd.HostPort)
+	}
+	if fwd.GuestPort != 80 {
+		t.Errorf("expected GuestPort 80, got %d", fwd.GuestPort)
+	}
+	if fwd.Protocol != "tcp" {
+		t.Errorf("expected Protocol tcp, got %s", fwd.Protocol)
+	}
+	if fwd.Bind != "127.0.0.1" {
+		t.Errorf("expected Bind 127.0.0.1, got %s", fwd.Bind)
+	}
+}
+
+func TestParsePortSpec_TCPExplicit(t *testing.T) {
+	fwd, err := ParsePortSpec("8080:80/tcp", "127.0.0.1")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if fwd.Protocol != "tcp" {
+		t.Errorf("expected tcp protocol, got %s", fwd.Protocol)
+	}
+}
+
+func TestParsePortSpec_UppercaseProtocol(t *testing.T) {
+	fwd, err := ParsePortSpec("8080:80/TCP", "127.0.0.1")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if fwd.Protocol != "tcp" {
+		t.Errorf("expected tcp protocol (lowercase), got %s", fwd.Protocol)
+	}
+}
+
+func TestParsePortSpec_GuestPortOutOfRange(t *testing.T) {
+	_, err := ParsePortSpec("8080:70000", "127.0.0.1")
+	if err == nil {
+		t.Error("expected error for out of range guest port")
+	}
+}
+
+func TestParsePortSpec_InvalidHostPortWithBind(t *testing.T) {
+	_, err := ParsePortSpec("127.0.0.1:abc:80", "")
+	if err == nil {
+		t.Error("expected error for invalid host port")
+	}
+}
+
+func TestParsePortSpec_InvalidGuestPortWithBind(t *testing.T) {
+	_, err := ParsePortSpec("127.0.0.1:8080:abc", "")
+	if err == nil {
+		t.Error("expected error for invalid guest port")
+	}
+}
+
+func TestErrors_Messages(t *testing.T) {
+	tests := []struct {
+		err  error
+		want string
+	}{
+		{ErrInvalidPortSpec, "invalid port specification"},
+		{ErrPortOutOfRange, "port number out of range (1-65535)"},
+		{ErrInvalidProtocol, "invalid protocol (must be tcp or udp)"},
+		{ErrInvalidBindAddr, "invalid bind address"},
+	}
+
+	for _, tt := range tests {
+		if tt.err.Error() != tt.want {
+			t.Errorf("error message = %q, want %q", tt.err.Error(), tt.want)
+		}
+	}
+}

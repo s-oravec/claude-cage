@@ -97,3 +97,65 @@ func TestDeleteKeys(t *testing.T) {
 
 	assert.False(t, KeyExists("test-cage"))
 }
+
+func TestPubKeyPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	oldDir := keysDir
+	keysDir = tmpDir
+	defer func() { keysDir = oldDir }()
+
+	path := PubKeyPath("myproject")
+	assert.Contains(t, path, "myproject")
+	assert.Contains(t, path, "id_ed25519.pub")
+	assert.True(t, len(path) > len("id_ed25519.pub"))
+}
+
+func TestKnownHostsPath(t *testing.T) {
+	path := KnownHostsPath()
+	assert.Contains(t, path, ".claude-cage")
+	assert.Contains(t, path, "known_hosts")
+}
+
+func TestDeleteKeys_NonExistent(t *testing.T) {
+	tmpDir := t.TempDir()
+	oldDir := keysDir
+	keysDir = tmpDir
+	defer func() { keysDir = oldDir }()
+
+	// Should not error when deleting non-existent keys
+	err := DeleteKeys("nonexistent-cage")
+	assert.NoError(t, err)
+}
+
+func TestGenerateKeyPair_OverwritesExisting(t *testing.T) {
+	tmpDir := t.TempDir()
+	oldDir := keysDir
+	keysDir = tmpDir
+	defer func() { keysDir = oldDir }()
+
+	// Generate first key
+	err := GenerateKeyPair("test-cage")
+	require.NoError(t, err)
+
+	firstKey, err := GetPublicKey("test-cage")
+	require.NoError(t, err)
+
+	// Generate again - should create new key
+	err = GenerateKeyPair("test-cage")
+	require.NoError(t, err)
+
+	secondKey, err := GetPublicKey("test-cage")
+	require.NoError(t, err)
+
+	// Keys should be different (new key generated)
+	assert.NotEqual(t, firstKey, secondKey)
+}
+
+func TestKeyPath_DifferentCages(t *testing.T) {
+	path1 := KeyPath("cage1")
+	path2 := KeyPath("cage2")
+
+	assert.NotEqual(t, path1, path2)
+	assert.Contains(t, path1, "cage1")
+	assert.Contains(t, path2, "cage2")
+}

@@ -3,6 +3,7 @@ package virtiofs
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -135,4 +136,104 @@ func TestCleanupSocket(t *testing.T) {
 
 	_, err = os.Stat(socketDir)
 	assert.True(t, os.IsNotExist(err))
+}
+
+func TestStopByPID_InvalidPID(t *testing.T) {
+	tmpDir := t.TempDir()
+	oldBase := socketBaseDir
+	socketBaseDir = tmpDir
+	defer func() { socketBaseDir = oldBase }()
+
+	// Create socket dir to cleanup
+	socketDir := filepath.Join(tmpDir, "testcage")
+	os.MkdirAll(socketDir, 0755)
+
+	// Using PID 0 or -1 will fail to send signal, but function should handle it
+	err := StopByPID("testcage", 0)
+	assert.NoError(t, err) // Should not error
+
+	// Socket dir should be cleaned up
+	_, err = os.Stat(socketDir)
+	assert.True(t, os.IsNotExist(err))
+}
+
+func TestStopByPID_NonExistentPID(t *testing.T) {
+	tmpDir := t.TempDir()
+	oldBase := socketBaseDir
+	socketBaseDir = tmpDir
+	defer func() { socketBaseDir = oldBase }()
+
+	// Using a very high PID that likely doesn't exist
+	err := StopByPID("testcage", 999999999)
+	assert.NoError(t, err) // Should not error, just ignores non-existent process
+}
+
+func TestExpandPath_RelativePath(t *testing.T) {
+	result := ExpandPath("relative/path")
+	assert.Equal(t, "relative/path", result)
+}
+
+func TestExpandPath_TildeOnly(t *testing.T) {
+	home, _ := os.UserHomeDir()
+	result := ExpandPath("~/")
+	// ExpandPath joins home with empty string after ~/, resulting in just home
+	assert.Equal(t, home, result)
+}
+
+func TestSocketPath_ContainsSocketFilename(t *testing.T) {
+	path := SocketPath("test")
+	assert.True(t, filepath.Base(path) == "virtiofs.sock")
+}
+
+func TestDaemonConfig_DefaultValues(t *testing.T) {
+	cfg := &DaemonConfig{}
+	assert.Empty(t, cfg.CageName)
+	assert.Empty(t, cfg.SharedDir)
+	assert.False(t, cfg.Sandbox)
+	assert.False(t, cfg.Seccomp)
+}
+
+func TestBuildArgs_ContainsSocketPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	oldBase := socketBaseDir
+	socketBaseDir = tmpDir
+	defer func() { socketBaseDir = oldBase }()
+
+	cfg := &DaemonConfig{
+		CageName:  "mytest",
+		SharedDir: "/tmp/share",
+	}
+
+	args := BuildArgs(cfg)
+
+	// Find the socket path argument
+	var socketArg string
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "--socket-path=") {
+			socketArg = arg
+			break
+		}
+	}
+
+	assert.NotEmpty(t, socketArg)
+	assert.Contains(t, socketArg, "mytest")
+	assert.Contains(t, socketArg, "virtiofs.sock")
+}
+
+func TestCleanupSocket_NonExistent(t *testing.T) {
+	tmpDir := t.TempDir()
+	oldBase := socketBaseDir
+	socketBaseDir = tmpDir
+	defer func() { socketBaseDir = oldBase }()
+
+	// Should not error when cleaning up non-existent socket
+	err := CleanupSocket("nonexistent")
+	assert.NoError(t, err)
+}
+
+func TestFindVirtiofsd_ReturnsPath(t *testing.T) {
+	// This test verifies the function runs without error
+	// Actual result depends on system configuration
+	path := FindVirtiofsd()
+	_ = path // Result depends on whether virtiofsd is installed
 }

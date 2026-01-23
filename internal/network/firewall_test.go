@@ -174,3 +174,69 @@ func TestDefaultBlockedSubnets(t *testing.T) {
 		}
 	}
 }
+
+func TestDefaultAllowedDNS(t *testing.T) {
+	dns := DefaultAllowedDNS()
+
+	if len(dns) < 2 {
+		t.Error("should have at least 2 DNS servers")
+	}
+
+	// Check that common public DNS servers are included
+	found := make(map[string]bool)
+	for _, server := range dns {
+		found[server] = true
+	}
+
+	// Should include Cloudflare or Google DNS
+	if !found["1.1.1.1"] {
+		t.Error("should include Cloudflare DNS (1.1.1.1)")
+	}
+	if !found["8.8.8.8"] {
+		t.Error("should include Google DNS (8.8.8.8)")
+	}
+}
+
+func TestFirewallConfig_Structure(t *testing.T) {
+	cfg := FirewallConfig{
+		BridgeName:        "cage-test",
+		BlockedInterfaces: []string{"tun+"},
+		BlockedSubnets:    []string{"10.0.0.0/8"},
+		AllowedDNS:        []string{"1.1.1.1"},
+	}
+
+	if cfg.BridgeName != "cage-test" {
+		t.Errorf("BridgeName = %q, want %q", cfg.BridgeName, "cage-test")
+	}
+	if len(cfg.BlockedInterfaces) != 1 {
+		t.Errorf("BlockedInterfaces length = %d, want 1", len(cfg.BlockedInterfaces))
+	}
+	if len(cfg.BlockedSubnets) != 1 {
+		t.Errorf("BlockedSubnets length = %d, want 1", len(cfg.BlockedSubnets))
+	}
+	if len(cfg.AllowedDNS) != 1 {
+		t.Errorf("AllowedDNS length = %d, want 1", len(cfg.AllowedDNS))
+	}
+}
+
+func TestGenerateFirewallRules_EmptyConfig(t *testing.T) {
+	cfg := &FirewallConfig{
+		BridgeName:        "cage-test",
+		BlockedInterfaces: []string{},
+		BlockedSubnets:    []string{},
+		AllowedDNS:        []string{},
+	}
+
+	rules := GenerateFirewallRules(cfg)
+
+	// Should still have basic rules
+	if len(rules) < 4 {
+		t.Errorf("expected at least 4 rules, got %d", len(rules))
+	}
+
+	// Should still create chain
+	assertContainsRule(t, rules, []string{"-N", "CAGE-FILTER"})
+
+	// Should still allow established connections
+	assertContainsRule(t, rules, []string{"-A", "CAGE-FILTER", "-m", "state", "--state", "ESTABLISHED,RELATED", "-j", "ACCEPT"})
+}

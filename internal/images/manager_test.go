@@ -81,3 +81,114 @@ func TestEnsureDir(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, info.IsDir())
 }
+
+func TestSetDir(t *testing.T) {
+	oldDir := imagesDir
+	defer func() { imagesDir = oldDir }()
+
+	SetDir("/custom/images/path")
+	assert.Equal(t, "/custom/images/path", Dir())
+
+	SetDir("")
+	// When empty, Dir() should return config default
+	assert.Contains(t, Dir(), "images")
+}
+
+func TestProgressWriter(t *testing.T) {
+	var lastWritten, lastTotal int64
+	progressFn := func(written, total int64) {
+		lastWritten = written
+		lastTotal = total
+	}
+
+	pw := &ProgressWriter{
+		Total:      100,
+		OnProgress: progressFn,
+	}
+
+	n, err := pw.Write([]byte("hello"))
+	require.NoError(t, err)
+	assert.Equal(t, 5, n)
+	assert.Equal(t, int64(5), pw.Written)
+	assert.Equal(t, int64(5), lastWritten)
+	assert.Equal(t, int64(100), lastTotal)
+
+	n, err = pw.Write([]byte("world"))
+	require.NoError(t, err)
+	assert.Equal(t, 5, n)
+	assert.Equal(t, int64(10), pw.Written)
+	assert.Equal(t, int64(10), lastWritten)
+}
+
+func TestProgressWriter_NoCallback(t *testing.T) {
+	pw := &ProgressWriter{
+		Total:      100,
+		OnProgress: nil,
+	}
+
+	n, err := pw.Write([]byte("test"))
+	require.NoError(t, err)
+	assert.Equal(t, 4, n)
+	assert.Equal(t, int64(4), pw.Written)
+}
+
+func TestImagePath_WithAlias(t *testing.T) {
+	tmpDir := t.TempDir()
+	oldDir := imagesDir
+	imagesDir = tmpDir
+	defer func() { imagesDir = oldDir }()
+
+	// "alpine" alias should resolve to "alpine-3.21"
+	path := ImagePath("alpine")
+	assert.Contains(t, path, "alpine-3.21.qcow2")
+}
+
+func TestIsDownloaded_WithAlias(t *testing.T) {
+	tmpDir := t.TempDir()
+	oldDir := imagesDir
+	imagesDir = tmpDir
+	defer func() { imagesDir = oldDir }()
+
+	// Create file with resolved name
+	os.WriteFile(filepath.Join(tmpDir, "alpine-3.21.qcow2"), []byte("fake"), 0644)
+
+	// Should find it via alias
+	assert.True(t, IsDownloaded("alpine"))
+}
+
+func TestDownload_UnknownImage(t *testing.T) {
+	tmpDir := t.TempDir()
+	oldDir := imagesDir
+	imagesDir = tmpDir
+	defer func() { imagesDir = oldDir }()
+
+	err := Download("nonexistent-image-xyz", nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown image")
+}
+
+func TestListDownloaded_NonExistentDir(t *testing.T) {
+	oldDir := imagesDir
+	imagesDir = "/nonexistent/path/12345"
+	defer func() { imagesDir = oldDir }()
+
+	// Should not panic, just return empty list
+	list := ListDownloaded()
+	assert.Empty(t, list)
+}
+
+func TestListDownloaded_IgnoresNonQcow2(t *testing.T) {
+	tmpDir := t.TempDir()
+	oldDir := imagesDir
+	imagesDir = tmpDir
+	defer func() { imagesDir = oldDir }()
+
+	// Create qcow2 and non-qcow2 files
+	os.WriteFile(filepath.Join(tmpDir, "ubuntu.qcow2"), []byte("fake"), 0644)
+	os.WriteFile(filepath.Join(tmpDir, "readme.txt"), []byte("text"), 0644)
+	os.WriteFile(filepath.Join(tmpDir, "image.raw"), []byte("raw"), 0644)
+
+	list := ListDownloaded()
+	assert.Len(t, list, 1)
+	assert.Contains(t, list, "ubuntu")
+}
