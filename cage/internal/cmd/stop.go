@@ -5,7 +5,9 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/stiivo/cage/internal/cage"
+	"github.com/stiivo/cage/internal/config"
 	"github.com/stiivo/cage/internal/libvirt"
+	"github.com/stiivo/cage/internal/network"
 	"github.com/stiivo/cage/internal/ssh"
 	"github.com/stiivo/cage/internal/virtiofs"
 )
@@ -84,6 +86,19 @@ func stopCage(cmd *cobra.Command, name string, force bool) error {
 
 	// Delete SSH keys
 	ssh.DeleteKeys(name)
+
+	// Cleanup firewall rules
+	fmt.Fprintln(cmd.OutOrStdout(), "  Cleaning up firewall...")
+	cfg, _ := config.Load()
+	dnsServer := "1.1.1.1"
+	if cfg != nil && len(cfg.Network.DNS) > 0 {
+		dnsServer = cfg.Network.DNS[0]
+	}
+	network.CleanupFirewall(name, dnsServer)
+
+	// Destroy network
+	fmt.Fprintln(cmd.OutOrStdout(), "  Destroying network...")
+	network.DestroyNetwork(name)
 
 	// Delete cage state and files
 	fmt.Fprintln(cmd.OutOrStdout(), "  Cleaning up...")

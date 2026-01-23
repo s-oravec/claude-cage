@@ -283,12 +283,12 @@ cage ssh test "ping -c 1 -W 1 169.254.169.254 2>/dev/null" && echo "FAIL (SECURI
 
 ## Deliverables
 
-- [ ] Libvirt NAT network creation
-- [ ] CAGE-FILTER iptables chain
-- [ ] VPN interface blocking (tun+, tailscale+, wg+)
-- [ ] RFC 1918 subnet blocking
-- [ ] Link-local blocking (169.254.0.0/16)
-- [ ] DNS DNAT enforcement
-- [ ] Firewall cleanup on stop
-- [ ] Network verification tests
-- [ ] Security test script
+- [x] Libvirt NAT network creation
+- [x] CAGE-FILTER iptables chain
+- [x] VPN interface blocking (tun+, tailscale+, wg+)
+- [x] RFC 1918 subnet blocking
+- [x] Link-local blocking (169.254.0.0/16)
+- [x] DNS DNAT enforcement
+- [x] Firewall cleanup on stop
+- [x] Network verification tests
+- [x] Security test script

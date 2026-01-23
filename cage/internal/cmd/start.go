@@ -12,6 +12,7 @@ import (
 	"github.com/stiivo/cage/internal/config"
 	"github.com/stiivo/cage/internal/images"
 	"github.com/stiivo/cage/internal/libvirt"
+	"github.com/stiivo/cage/internal/network"
 	"github.com/stiivo/cage/internal/ssh"
 	"github.com/stiivo/cage/internal/virtiofs"
 )
@@ -79,6 +80,36 @@ func startCage(cmd *cobra.Command, name, profileName, imageName string, ports []
 	cageDir := cage.Dir(name)
 	if err := cage.EnsureDir(name); err != nil {
 		return fmt.Errorf("failed to create cage directory: %w", err)
+	}
+
+	// Create cage-specific network
+	fmt.Fprintln(cmd.OutOrStdout(), "  Creating network...")
+	if err := network.CreateNetwork(name); err != nil {
+		cage.DeleteState(name)
+		return fmt.Errorf("failed to create network: %w", err)
+	}
+
+	// Setup firewall rules
+	fmt.Fprintln(cmd.OutOrStdout(), "  Setting up firewall...")
+	bridgeName := network.BridgeName(name)
+	firewallCfg := &network.FirewallConfig{
+		BridgeName:        bridgeName,
+		BlockedInterfaces: cfg.Network.BlockedInterfaces,
+		BlockedSubnets:    cfg.Network.BlockedSubnets,
+		AllowedDNS:        cfg.Network.DNS,
+	}
+	if err := network.SetupFirewall(name, firewallCfg); err != nil {
+		network.DestroyNetwork(name)
+		cage.DeleteState(name)
+		return fmt.Errorf("failed to setup firewall: %w", err)
+	}
+
+	// Setup DNS DNAT
+	if len(cfg.Network.DNS) > 0 {
+		if err := network.SetupDNAT(name, cfg.Network.DNS[0]); err != nil {
+			// Non-fatal - log warning but continue
+			fmt.Fprintf(cmd.OutOrStdout(), "  Warning: DNS DNAT setup failed: %v\n", err)
+		}
 	}
 
 	// Create qcow2 overlay
@@ -153,7 +184,7 @@ func startCage(cmd *cobra.Command, name, profileName, imageName string, ports []
 		VCPU:           profile.VCPU,
 		DiskPath:       overlayPath,
 		CloudInitISO:   cloudInitPath,
-		NetworkName:    "default", // Use libvirt default network for now
+		NetworkName:    network.BridgeName(name), // Use cage-specific network
 		VirtiofsSocket: virtiofsSocket,
 	}
 
