@@ -1,4 +1,4 @@
-.PHONY: build test test-short coverage coverage-html e2e install clean
+.PHONY: build test test-short coverage coverage-html coverage-check e2e e2e-short e2e-user e2e-ubuntu install clean
 
 VERSION := 0.1.0
 LDFLAGS := -ldflags "-X github.com/stiivo/cage/internal/cmd.Version=$(VERSION)"
@@ -50,11 +50,19 @@ coverage-check:
 
 e2e: build
 	@echo "Running E2E tests (requires KVM, libvirt)..."
-	./test/e2e/e2e_test.sh
+	CAGE_BIN=$(PWD)/cage go test -v -timeout 10m ./test/e2e/...
+
+e2e-short: build
+	@echo "Running E2E tests (short mode)..."
+	CAGE_BIN=$(PWD)/cage go test -v -short ./test/e2e/...
+
+e2e-user: build
+	@echo "Running E2E tests with user-mode networking..."
+	CAGE_BIN=$(PWD)/cage CAGE_USER_NETWORK=1 go test -v -timeout 10m ./test/e2e/...
 
 e2e-ubuntu: build
 	@echo "Running E2E tests with Ubuntu..."
-	./test/e2e/e2e_test.sh --image ubuntu-24.04
+	CAGE_BIN=$(PWD)/cage CAGE_TEST_IMAGE=ubuntu-24.04 go test -v -timeout 15m ./test/e2e/...
 
 install: build
 	install -m 755 cage ~/.local/bin/cage

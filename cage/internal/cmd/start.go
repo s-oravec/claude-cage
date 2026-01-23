@@ -23,6 +23,7 @@ func NewStartCmd() *cobra.Command {
 	var profile string
 	var image string
 	var ports []string
+	var userNetwork bool
 
 	cmd := &cobra.Command{
 		Use:   "start",
@@ -32,7 +33,7 @@ func NewStartCmd() *cobra.Command {
 The VM is created with a copy-on-write overlay of the base image,
 so changes inside the VM don't affect the base image.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return startCage(cmd, name, profile, image, ports)
+			return startCage(cmd, name, profile, image, ports, userNetwork)
 		},
 	}
 
@@ -40,13 +41,14 @@ so changes inside the VM don't affect the base image.`,
 	cmd.Flags().StringVarP(&profile, "profile", "p", "default", "Resource profile (default, heavy, light)")
 	cmd.Flags().StringVarP(&image, "image", "i", "", "Base image (defaults to config default)")
 	cmd.Flags().StringArrayVar(&ports, "port", nil, "Port forwarding (e.g., 8080:80)")
+	cmd.Flags().BoolVar(&userNetwork, "user-network", false, "Use user-mode networking (no root required, limited features)")
 
 	cmd.MarkFlagRequired("name")
 
 	return cmd
 }
 
-func startCage(cmd *cobra.Command, name, profileName, imageName string, ports []string) error {
+func startCage(cmd *cobra.Command, name, profileName, imageName string, ports []string, userNetwork bool) error {
 	// Check if cage already exists
 	if cage.Exists(name) {
 		return fmt.Errorf("cage '%s' already exists", name)
@@ -82,34 +84,39 @@ func startCage(cmd *cobra.Command, name, profileName, imageName string, ports []
 		return fmt.Errorf("failed to create cage directory: %w", err)
 	}
 
-	// Create cage-specific network
-	fmt.Fprintln(cmd.OutOrStdout(), "  Creating network...")
-	if err := network.CreateNetwork(name); err != nil {
-		cage.DeleteState(name)
-		return fmt.Errorf("failed to create network: %w", err)
-	}
-
-	// Setup firewall rules
-	fmt.Fprintln(cmd.OutOrStdout(), "  Setting up firewall...")
-	bridgeName := network.BridgeName(name)
-	firewallCfg := &network.FirewallConfig{
-		BridgeName:        bridgeName,
-		BlockedInterfaces: cfg.Network.BlockedInterfaces,
-		BlockedSubnets:    cfg.Network.BlockedSubnets,
-		AllowedDNS:        cfg.Network.DNS,
-	}
-	if err := network.SetupFirewall(name, firewallCfg); err != nil {
-		network.DestroyNetwork(name)
-		cage.DeleteState(name)
-		return fmt.Errorf("failed to setup firewall: %w", err)
-	}
-
-	// Setup DNS DNAT
-	if len(cfg.Network.DNS) > 0 {
-		if err := network.SetupDNAT(name, cfg.Network.DNS[0]); err != nil {
-			// Non-fatal - log warning but continue
-			fmt.Fprintf(cmd.OutOrStdout(), "  Warning: DNS DNAT setup failed: %v\n", err)
+	var networkName string
+	if !userNetwork {
+		// Create cage-specific network
+		fmt.Fprintln(cmd.OutOrStdout(), "  Creating network...")
+		if err := network.CreateNetwork(name); err != nil {
+			cage.DeleteState(name)
+			return fmt.Errorf("failed to create network: %w", err)
 		}
+		networkName = network.BridgeName(name)
+
+		// Setup firewall rules
+		fmt.Fprintln(cmd.OutOrStdout(), "  Setting up firewall...")
+		firewallCfg := &network.FirewallConfig{
+			BridgeName:        networkName,
+			BlockedInterfaces: cfg.Network.BlockedInterfaces,
+			BlockedSubnets:    cfg.Network.BlockedSubnets,
+			AllowedDNS:        cfg.Network.DNS,
+		}
+		if err := network.SetupFirewall(name, firewallCfg); err != nil {
+			network.DestroyNetwork(name)
+			cage.DeleteState(name)
+			return fmt.Errorf("failed to setup firewall: %w", err)
+		}
+
+		// Setup DNS DNAT
+		if len(cfg.Network.DNS) > 0 {
+			if err := network.SetupDNAT(name, cfg.Network.DNS[0]); err != nil {
+				// Non-fatal - log warning but continue
+				fmt.Fprintf(cmd.OutOrStdout(), "  Warning: DNS DNAT setup failed: %v\n", err)
+			}
+		}
+	} else {
+		fmt.Fprintln(cmd.OutOrStdout(), "  Using user-mode networking (SLIRP)...")
 	}
 
 	// Create qcow2 overlay
@@ -184,7 +191,7 @@ func startCage(cmd *cobra.Command, name, profileName, imageName string, ports []
 		VCPU:           profile.VCPU,
 		DiskPath:       overlayPath,
 		CloudInitISO:   cloudInitPath,
-		NetworkName:    network.BridgeName(name), // Use cage-specific network
+		NetworkName:    networkName, // Empty for user-mode networking
 		VirtiofsSocket: virtiofsSocket,
 	}
 
@@ -217,23 +224,27 @@ func startCage(cmd *cobra.Command, name, profileName, imageName string, ports []
 		return err
 	}
 
-	// Wait for VM to get an IP
-	fmt.Fprint(cmd.OutOrStdout(), "  Waiting for IP address...")
+	// Wait for VM to get an IP (skip for user-mode networking)
 	var ip string
-	for i := 0; i < 30; i++ {
-		time.Sleep(2 * time.Second)
-		ip, _ = client.GetDomainIP(name)
-		if ip != "" {
-			break
+	if !userNetwork {
+		fmt.Fprint(cmd.OutOrStdout(), "  Waiting for IP address...")
+		for i := 0; i < 30; i++ {
+			time.Sleep(2 * time.Second)
+			ip, _ = client.GetDomainIP(name)
+			if ip != "" {
+				break
+			}
+			fmt.Fprint(cmd.OutOrStdout(), ".")
 		}
-		fmt.Fprint(cmd.OutOrStdout(), ".")
-	}
-	fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintln(cmd.OutOrStdout())
 
-	if ip == "" {
-		fmt.Fprintln(cmd.OutOrStdout(), "  Warning: Could not get IP address")
+		if ip == "" {
+			fmt.Fprintln(cmd.OutOrStdout(), "  Warning: Could not get IP address")
+		} else {
+			fmt.Fprintf(cmd.OutOrStdout(), "  IP: %s\n", ip)
+		}
 	} else {
-		fmt.Fprintf(cmd.OutOrStdout(), "  IP: %s\n", ip)
+		fmt.Fprintln(cmd.OutOrStdout(), "  User-mode networking: SSH not available (no routable IP)")
 	}
 
 	// Save state

@@ -29,8 +29,8 @@ func BaseImages() map[string]ImageSource {
 		},
 		"alpine-3.20": {
 			Name:        "alpine-3.20",
-			URL:         "https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/cloud/nocloud_alpine-3.20.6-x86_64-bios-cloudinit-r0.qcow2",
-			Description: "Alpine Linux 3.20 (minimal, ~50MB)",
+			URL:         "https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/cloud/generic_alpine-3.20.0-x86_64-bios-cloudinit-r0.qcow2",
+			Description: "Alpine Linux 3.20 (minimal, ~250MB)",
 		},
 	}
 }

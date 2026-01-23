@@ -8,6 +8,15 @@ import (
 	"text/template"
 )
 
+// libvirtURI is the connection URI for libvirt
+const libvirtURI = "qemu:///session"
+
+// virsh runs a virsh command with the session connection
+func virsh(args ...string) *exec.Cmd {
+	fullArgs := append([]string{"-c", libvirtURI}, args...)
+	return exec.Command("virsh", fullArgs...)
+}
+
 // NetworkConfig holds configuration for a libvirt network
 type NetworkConfig struct {
 	CageName   string
@@ -84,17 +93,17 @@ func CreateNetwork(cageName string) error {
 	xml := GenerateNetworkXML(cfg)
 
 	// Define network
-	cmd := exec.Command("virsh", "net-define", "/dev/stdin")
+	cmd := virsh("net-define", "/dev/stdin")
 	cmd.Stdin = bytes.NewBufferString(xml)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to define network: %s", string(output))
 	}
 
 	// Start network
-	cmd = exec.Command("virsh", "net-start", cfg.BridgeName)
+	cmd = virsh("net-start", cfg.BridgeName)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		// Cleanup on failure
-		exec.Command("virsh", "net-undefine", cfg.BridgeName).Run()
+		virsh("net-undefine", cfg.BridgeName).Run()
 		return fmt.Errorf("failed to start network: %s", string(output))
 	}
 
@@ -106,12 +115,10 @@ func DestroyNetwork(cageName string) error {
 	bridgeName := BridgeName(cageName)
 
 	// Destroy (stop) network
-	cmd := exec.Command("virsh", "net-destroy", bridgeName)
-	cmd.Run() // Ignore errors (may not be running)
+	virsh("net-destroy", bridgeName).Run() // Ignore errors (may not be running)
 
 	// Undefine network
-	cmd = exec.Command("virsh", "net-undefine", bridgeName)
-	cmd.Run() // Ignore errors (may not exist)
+	virsh("net-undefine", bridgeName).Run() // Ignore errors (may not exist)
 
 	return nil
 }
@@ -119,6 +126,5 @@ func DestroyNetwork(cageName string) error {
 // NetworkExists checks if a network exists
 func NetworkExists(cageName string) bool {
 	bridgeName := BridgeName(cageName)
-	cmd := exec.Command("virsh", "net-info", bridgeName)
-	return cmd.Run() == nil
+	return virsh("net-info", bridgeName).Run() == nil
 }

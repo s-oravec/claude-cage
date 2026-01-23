@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 )
 
 // socketBaseDir can be overridden in tests
@@ -149,13 +150,40 @@ func Start(cfg *DaemonConfig) (*Daemon, error) {
 		return nil, fmt.Errorf("failed to start virtiofsd: %w", err)
 	}
 
-	return &Daemon{
+	socketPath := SocketPath(cfg.CageName)
+	daemon := &Daemon{
 		CageName:   cfg.CageName,
-		SocketPath: SocketPath(cfg.CageName),
+		SocketPath: socketPath,
 		SharedDir:  sharedDir,
 		PID:        cmd.Process.Pid,
 		cmd:        cmd,
-	}, nil
+	}
+
+	// Wait for socket to be created (virtiofsd may crash immediately)
+	if err := waitForSocket(socketPath, cmd, 3); err != nil {
+		daemon.Stop()
+		return nil, fmt.Errorf("virtiofsd failed to start: %w", err)
+	}
+
+	return daemon, nil
+}
+
+// waitForSocket waits for the socket file to be created
+func waitForSocket(socketPath string, cmd *exec.Cmd, timeoutSec int) error {
+	for i := 0; i < timeoutSec*10; i++ {
+		// Check if process is still running
+		if cmd.ProcessState != nil {
+			return fmt.Errorf("process exited prematurely")
+		}
+
+		// Check if socket exists
+		if _, err := os.Stat(socketPath); err == nil {
+			return nil
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
+	return fmt.Errorf("socket not created within %ds", timeoutSec)
 }
 
 // Stop stops the virtiofsd daemon

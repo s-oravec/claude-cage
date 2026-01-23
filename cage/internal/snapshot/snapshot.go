@@ -10,6 +10,15 @@ import (
 	"time"
 )
 
+// libvirtURI is the connection URI for libvirt
+const libvirtURI = "qemu:///session"
+
+// virsh runs a virsh command with the session connection
+func virsh(args ...string) *exec.Cmd {
+	fullArgs := append([]string{"-c", libvirtURI}, args...)
+	return exec.Command("virsh", fullArgs...)
+}
+
 var (
 	ErrCageNotFound     = errors.New("cage not found")
 	ErrSnapshotNotFound = errors.New("snapshot not found")
@@ -40,13 +49,13 @@ func Create(cageName, snapshotName, description string) error {
 	domainName := "cage-" + cageName
 
 	// Check if domain exists
-	cmd := exec.Command("virsh", "dominfo", domainName)
+	cmd := virsh("dominfo", domainName)
 	if err := cmd.Run(); err != nil {
 		return ErrCageNotFound
 	}
 
 	// Check if snapshot already exists
-	cmd = exec.Command("virsh", "snapshot-info", domainName, snapshotName)
+	cmd = virsh("snapshot-info", domainName, snapshotName)
 	if cmd.Run() == nil {
 		return ErrSnapshotExists
 	}
@@ -58,7 +67,7 @@ func Create(cageName, snapshotName, description string) error {
 </domainsnapshot>`, snapshotName, description)
 
 	// Create snapshot
-	cmd = exec.Command("virsh", "snapshot-create", domainName, "--xmldesc", "/dev/stdin")
+	cmd = virsh("snapshot-create", domainName, "--xmldesc", "/dev/stdin")
 	cmd.Stdin = bytes.NewBufferString(snapXML)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -73,13 +82,13 @@ func List(cageName string) ([]Snapshot, error) {
 	domainName := "cage-" + cageName
 
 	// Check if domain exists
-	cmd := exec.Command("virsh", "dominfo", domainName)
+	cmd := virsh("dominfo", domainName)
 	if err := cmd.Run(); err != nil {
 		return nil, ErrCageNotFound
 	}
 
 	// List snapshot names
-	cmd = exec.Command("virsh", "snapshot-list", domainName, "--name")
+	cmd = virsh("snapshot-list", domainName, "--name")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list snapshots: %w", err)
@@ -108,7 +117,7 @@ func List(cageName string) ([]Snapshot, error) {
 
 // getSnapshotInfo retrieves detailed information about a snapshot
 func getSnapshotInfo(domainName, snapshotName string) (*Snapshot, error) {
-	cmd := exec.Command("virsh", "snapshot-dumpxml", domainName, snapshotName)
+	cmd := virsh("snapshot-dumpxml", domainName, snapshotName)
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, err
@@ -137,19 +146,19 @@ func Restore(cageName, snapshotName string) error {
 	domainName := "cage-" + cageName
 
 	// Check if domain exists
-	cmd := exec.Command("virsh", "dominfo", domainName)
+	cmd := virsh("dominfo", domainName)
 	if err := cmd.Run(); err != nil {
 		return ErrCageNotFound
 	}
 
 	// Check if snapshot exists
-	cmd = exec.Command("virsh", "snapshot-info", domainName, snapshotName)
+	cmd = virsh("snapshot-info", domainName, snapshotName)
 	if err := cmd.Run(); err != nil {
 		return ErrSnapshotNotFound
 	}
 
 	// Revert to snapshot
-	cmd = exec.Command("virsh", "snapshot-revert", domainName, snapshotName)
+	cmd = virsh("snapshot-revert", domainName, snapshotName)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to restore snapshot: %s", strings.TrimSpace(string(output)))
@@ -163,19 +172,19 @@ func Delete(cageName, snapshotName string) error {
 	domainName := "cage-" + cageName
 
 	// Check if domain exists
-	cmd := exec.Command("virsh", "dominfo", domainName)
+	cmd := virsh("dominfo", domainName)
 	if err := cmd.Run(); err != nil {
 		return ErrCageNotFound
 	}
 
 	// Check if snapshot exists
-	cmd = exec.Command("virsh", "snapshot-info", domainName, snapshotName)
+	cmd = virsh("snapshot-info", domainName, snapshotName)
 	if err := cmd.Run(); err != nil {
 		return ErrSnapshotNotFound
 	}
 
 	// Delete snapshot
-	cmd = exec.Command("virsh", "snapshot-delete", domainName, snapshotName)
+	cmd = virsh("snapshot-delete", domainName, snapshotName)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to delete snapshot: %s", strings.TrimSpace(string(output)))
@@ -187,6 +196,6 @@ func Delete(cageName, snapshotName string) error {
 // Exists checks if a snapshot exists
 func Exists(cageName, snapshotName string) bool {
 	domainName := "cage-" + cageName
-	cmd := exec.Command("virsh", "snapshot-info", domainName, snapshotName)
+	cmd := virsh("snapshot-info", domainName, snapshotName)
 	return cmd.Run() == nil
 }

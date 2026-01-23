@@ -12,7 +12,7 @@ type DomainConfig struct {
 	VCPU           int
 	DiskPath       string
 	CloudInitISO   string
-	NetworkName    string
+	NetworkName    string // if empty, uses user-mode networking (SLIRP)
 	VirtiofsSocket string // optional: path to virtiofsd socket
 }
 
@@ -54,10 +54,16 @@ const domainXMLTemplate = `<domain type='kvm'>
     </disk>
 
     <!-- Network -->
+{{if .NetworkName}}
     <interface type='network'>
       <source network='{{.NetworkName}}'/>
       <model type='virtio'/>
     </interface>
+{{else}}
+    <interface type='user'>
+      <model type='virtio'/>
+    </interface>
+{{end}}
 {{if .VirtiofsSocket}}
     <!-- Virtio-fs shared directory -->
     <filesystem type='mount' accessmode='passthrough'>
