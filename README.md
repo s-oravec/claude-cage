@@ -44,6 +44,9 @@ go install github.com/s-oravec/claude-cage/cmd/cage@latest
 ## Quick Start
 
 ```bash
+# Check system requirements
+cage doctor
+
 # Initialize configuration
 cage config init
 
