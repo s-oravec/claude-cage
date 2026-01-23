@@ -194,6 +194,68 @@ func TestGenerateUserData_SudoNoPassword(t *testing.T) {
 	assert.Contains(t, userData, "NOPASSWD:ALL")
 }
 
+func TestGenerateUserDataWithConfig_WithEnv(t *testing.T) {
+	cfg := &CloudInitConfig{
+		CageName: "testcage",
+		PubKey:   "ssh-ed25519 AAAA... test@key",
+		Env: map[string]string{
+			"MY_VAR":      "hello",
+			"ANOTHER_VAR": "world",
+		},
+	}
+
+	userData := GenerateUserDataWithConfig(cfg)
+
+	// Should have env setup commands
+	assert.Contains(t, userData, "/etc/profile.d/cage-env.sh")
+	assert.Contains(t, userData, "export MY_VAR='hello'")
+	assert.Contains(t, userData, "export ANOTHER_VAR='world'")
+}
+
+func TestGenerateUserDataWithConfig_EnvWithSpecialChars(t *testing.T) {
+	cfg := &CloudInitConfig{
+		CageName: "testcage",
+		PubKey:   "ssh-ed25519 AAAA... test@key",
+		Env: map[string]string{
+			"PATH_VAR":  "/usr/local/bin:/usr/bin",
+			"QUOTE_VAR": "it's working",
+		},
+	}
+
+	userData := GenerateUserDataWithConfig(cfg)
+
+	// Should handle special characters
+	assert.Contains(t, userData, "export PATH_VAR='/usr/local/bin:/usr/bin'")
+	// Single quotes should be escaped
+	assert.Contains(t, userData, "export QUOTE_VAR='it'\\''s working'")
+}
+
+func TestGenerateUserDataWithConfig_EmptyEnv(t *testing.T) {
+	cfg := &CloudInitConfig{
+		CageName: "testcage",
+		PubKey:   "ssh-ed25519 AAAA... test@key",
+		Env:      map[string]string{},
+	}
+
+	userData := GenerateUserDataWithConfig(cfg)
+
+	// Should not have env setup when empty
+	assert.NotContains(t, userData, "/etc/profile.d/cage-env.sh")
+}
+
+func TestGenerateUserDataWithConfig_NilEnv(t *testing.T) {
+	cfg := &CloudInitConfig{
+		CageName: "testcage",
+		PubKey:   "ssh-ed25519 AAAA... test@key",
+		Env:      nil,
+	}
+
+	userData := GenerateUserDataWithConfig(cfg)
+
+	// Should not have env setup when nil
+	assert.NotContains(t, userData, "/etc/profile.d/cage-env.sh")
+}
+
 func TestGenerateUserData_AlpineSupport(t *testing.T) {
 	userData := GenerateUserData("test", "ssh-ed25519 key")
 

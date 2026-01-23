@@ -18,6 +18,7 @@ type Config struct {
 	Network  NetworkConfig      `yaml:"network"`
 	Shares   []ShareConfig      `yaml:"shares"`
 	Security SecurityConfig     `yaml:"security"`
+	Env      map[string]string  `yaml:"env,omitempty"`
 }
 
 // ImagesConfig holds image settings

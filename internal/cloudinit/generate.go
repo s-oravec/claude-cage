@@ -5,13 +5,16 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
+	"strings"
 )
 
 // CloudInitConfig holds configuration for cloud-init generation
 type CloudInitConfig struct {
-	CageName     string
-	PubKey       string
+	CageName      string
+	PubKey        string
 	MountVirtiofs bool
+	Env           map[string]string
 }
 
 // GenerateUserData generates cloud-init user-data content
@@ -21,6 +24,41 @@ func GenerateUserData(cageName, pubKey string) string {
 		PubKey:       pubKey,
 		MountVirtiofs: false,
 	})
+}
+
+// generateEnvRuncmd generates runcmd lines for environment variables
+func generateEnvRuncmd(env map[string]string) string {
+	if len(env) == 0 {
+		return ""
+	}
+
+	// Sort keys for deterministic output
+	keys := make([]string, 0, len(env))
+	for k := range env {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	var lines []string
+	lines = append(lines, "  # Setup environment variables")
+	lines = append(lines, "  - mkdir -p /etc/profile.d")
+
+	// Build the content for cage-env.sh
+	var envLines []string
+	envLines = append(envLines, "# Cage environment variables")
+	for _, k := range keys {
+		v := env[k]
+		// Escape single quotes in value by replacing ' with '\''
+		escaped := strings.ReplaceAll(v, "'", "'\\''")
+		envLines = append(envLines, fmt.Sprintf("export %s='%s'", k, escaped))
+	}
+
+	// Write all env vars to /etc/profile.d/cage-env.sh using cat heredoc
+	content := strings.Join(envLines, "\n")
+	lines = append(lines, fmt.Sprintf("  - |\n    cat > /etc/profile.d/cage-env.sh << 'CAGEENV'\n    %s\n    CAGEENV", strings.ReplaceAll(content, "\n", "\n    ")))
+	lines = append(lines, "  - chmod 644 /etc/profile.d/cage-env.sh")
+
+	return "\n" + strings.Join(lines, "\n")
 }
 
 // GenerateUserDataWithConfig generates cloud-init user-data with full config
@@ -38,6 +76,8 @@ mounts:
   - mount -t virtiofs workspace /workspace || true
   - chown cage:cage /workspace || true`
 	}
+
+	envRuncmd := generateEnvRuncmd(cfg.Env)
 
 	return fmt.Sprintf(`#cloud-config
 users:
@@ -69,8 +109,8 @@ runcmd:
   - systemctl start docker || true
   # Docker setup (OpenRC-based distros like Alpine)
   - which rc-update && rc-update add docker default || true
-  - which rc-service && rc-service docker start || true%s
-`, cfg.PubKey, virtiofsMounts, virtiofsRuncmd)
+  - which rc-service && rc-service docker start || true%s%s
+`, cfg.PubKey, virtiofsMounts, virtiofsRuncmd, envRuncmd)
 }
 
 // GenerateMetaData generates cloud-init meta-data content

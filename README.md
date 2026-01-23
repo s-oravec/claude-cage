@@ -645,7 +645,14 @@ network:
 security:
   max_cages: 10
   virtiofsd_sandbox: true
+
+env:
+  MY_API_KEY: "secret-key"
+  NODE_ENV: "development"
+  PATH_EXTRA: "/opt/custom/bin"
 ```
+
+The `env` section defines environment variables that are injected into `/etc/profile.d/cage-env.sh` and available to all login shells in the cage.
 
 ## Development
 

@@ -145,6 +145,7 @@ func createCage(cmd *cobra.Command, name, profileName, imageName string, userNet
 		CageName:      name,
 		PubKey:        pubKey,
 		MountVirtiofs: false, // Will be set at start time if virtiofsd is available
+		Env:           cfg.Env,
 	})
 	if err != nil {
 		cage.DeleteState(name)
