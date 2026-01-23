@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"time"
@@ -148,24 +149,29 @@ func startCage(cmd *cobra.Command, name, profileName, imageName string, ports []
 	var virtiofsSocket string
 
 	if len(cfg.Shares) > 0 && cfg.Security.VirtiofsSandbox {
-		share := cfg.Shares[0] // Use first share
-		sharedDir := virtiofs.ExpandPath(share.Host)
-
-		fmt.Fprintf(cmd.OutOrStdout(), "  Starting virtiofsd (%s)...\n", sharedDir)
-
-		virtiofsDaemon, err = virtiofs.Start(&virtiofs.DaemonConfig{
-			CageName:  name,
-			SharedDir: sharedDir,
-			Sandbox:   true,
-			Seccomp:   true,
-		})
-		if err != nil {
-			fmt.Fprintf(cmd.OutOrStdout(), "  Warning: virtiofsd failed: %v\n", err)
-			fmt.Fprintln(cmd.OutOrStdout(), "  Continuing without file sharing...")
+		// virtiofsd requires root (uses setgroups() on startup)
+		if os.Getuid() != 0 {
+			fmt.Fprintln(cmd.OutOrStdout(), "  File sharing requires root (virtiofsd limitation)")
 		} else {
-			virtiofsSocket = virtiofsDaemon.SocketPath
-			// Give virtiofsd time to create socket
-			time.Sleep(500 * time.Millisecond)
+			share := cfg.Shares[0] // Use first share
+			sharedDir := virtiofs.ExpandPath(share.Host)
+
+			fmt.Fprintf(cmd.OutOrStdout(), "  Starting virtiofsd (%s)...\n", sharedDir)
+
+			virtiofsDaemon, err = virtiofs.Start(&virtiofs.DaemonConfig{
+				CageName:  name,
+				SharedDir: sharedDir,
+				Sandbox:   true,
+				Seccomp:   true,
+			})
+			if err != nil {
+				fmt.Fprintf(cmd.OutOrStdout(), "  Warning: virtiofsd failed: %v\n", err)
+				fmt.Fprintln(cmd.OutOrStdout(), "  Continuing without file sharing...")
+			} else {
+				virtiofsSocket = virtiofsDaemon.SocketPath
+				// Give virtiofsd time to create socket
+				time.Sleep(500 * time.Millisecond)
+			}
 		}
 	}
 

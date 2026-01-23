@@ -105,12 +105,18 @@ func BuildArgs(cfg *DaemonConfig) []string {
 		"--cache=auto",
 	}
 
-	if cfg.Sandbox {
-		args = append(args, "--sandbox=chroot")
-	}
-
-	if cfg.Seccomp {
-		args = append(args, "--seccomp=kill")
+	// Check if running as root
+	if os.Getuid() == 0 {
+		// Root can use full sandboxing
+		if cfg.Sandbox {
+			args = append(args, "--sandbox=chroot")
+		}
+		if cfg.Seccomp {
+			args = append(args, "--seccomp=kill")
+		}
+	} else {
+		// Non-root: disable sandbox to avoid setgroups() error
+		args = append(args, "--sandbox=none")
 	}
 
 	return args
