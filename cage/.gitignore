@@ -1,0 +1,9 @@
+# Binary
+cage
+
+# IDE
+.idea/
+.vscode/
+
+# Test coverage
+coverage.out

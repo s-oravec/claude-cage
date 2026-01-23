@@ -99,8 +99,8 @@ go build -o cage ./cmd/cage
 
 ## Deliverables
 
-- [ ] Go project initialized
-- [ ] cobra CLI setup
-- [ ] `cage version` command
-- [ ] `cage doctor` command with all checks
-- [ ] Makefile (build, test, install)
+- [x] Go project initialized
+- [x] cobra CLI setup
+- [x] `cage version` command
+- [x] `cage doctor` command with all checks
+- [x] Makefile (build, test, install)
