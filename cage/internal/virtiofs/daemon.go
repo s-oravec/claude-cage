@@ -13,6 +13,29 @@ import (
 // socketBaseDir can be overridden in tests
 var socketBaseDir = "/tmp/cage-virtiofs"
 
+// Common locations for virtiofsd binary
+var virtiofsdPaths = []string{
+	"virtiofsd",               // In PATH
+	"/usr/lib/qemu/virtiofsd", // Ubuntu/Debian
+	"/usr/libexec/virtiofsd",  // Fedora/RHEL
+}
+
+// FindVirtiofsd returns the path to virtiofsd or empty string if not found
+func FindVirtiofsd() string {
+	for _, path := range virtiofsdPaths {
+		if path == "virtiofsd" {
+			if p, err := exec.LookPath(path); err == nil {
+				return p
+			}
+		} else {
+			if _, err := os.Stat(path); err == nil {
+				return path
+			}
+		}
+	}
+	return ""
+}
+
 // DaemonConfig holds configuration for virtiofsd
 type DaemonConfig struct {
 	CageName  string
@@ -112,13 +135,9 @@ func Start(cfg *DaemonConfig) (*Daemon, error) {
 	args := BuildArgs(cfg)
 
 	// Check if virtiofsd is available
-	virtiofsdPath, err := exec.LookPath("virtiofsd")
-	if err != nil {
-		// Try /usr/libexec/virtiofsd (Fedora/RHEL location)
-		virtiofsdPath = "/usr/libexec/virtiofsd"
-		if _, err := os.Stat(virtiofsdPath); err != nil {
-			return nil, errors.New("virtiofsd not found")
-		}
+	virtiofsdPath := FindVirtiofsd()
+	if virtiofsdPath == "" {
+		return nil, errors.New("virtiofsd not found (checked PATH, /usr/lib/qemu/, /usr/libexec/)")
 	}
 
 	// Start virtiofsd

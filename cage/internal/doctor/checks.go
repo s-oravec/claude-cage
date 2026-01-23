@@ -148,10 +148,32 @@ func checkUserInGroup(groupName string) error {
 	return errors.New("user not in " + groupName + " group")
 }
 
+// Common locations for virtiofsd
+var virtiofsdPaths = []string{
+	"virtiofsd",              // In PATH
+	"/usr/lib/qemu/virtiofsd", // Ubuntu/Debian
+	"/usr/libexec/virtiofsd",  // Fedora/RHEL
+}
+
+// FindVirtiofsd returns the path to virtiofsd or empty string if not found
+func FindVirtiofsd() string {
+	for _, path := range virtiofsdPaths {
+		if path == "virtiofsd" {
+			if p, err := exec.LookPath(path); err == nil {
+				return p
+			}
+		} else {
+			if _, err := os.Stat(path); err == nil {
+				return path
+			}
+		}
+	}
+	return ""
+}
+
 func checkVirtiofsd() error {
-	_, err := exec.LookPath("virtiofsd")
-	if err != nil {
-		return errors.New("virtiofsd not found in PATH")
+	if FindVirtiofsd() == "" {
+		return errors.New("virtiofsd not found (checked PATH, /usr/lib/qemu/, /usr/libexec/)")
 	}
 	return nil
 }
