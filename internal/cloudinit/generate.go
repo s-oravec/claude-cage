@@ -93,6 +93,14 @@ users:
 
 ssh_pwauth: false
 
+# Grow root partition and filesystem to use full disk
+growpart:
+  mode: auto
+  devices: ['/']
+  ignore_growroot_disabled: false
+
+resize_rootfs: true
+
 package_update: false
 package_upgrade: false
 %s

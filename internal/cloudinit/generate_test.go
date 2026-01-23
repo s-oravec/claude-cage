@@ -292,3 +292,12 @@ func TestGenerateUserData_SystemdSupport(t *testing.T) {
 	assert.Contains(t, userData, "systemctl enable docker")
 	assert.Contains(t, userData, "systemctl start docker")
 }
+
+func TestGenerateUserData_GrowPartition(t *testing.T) {
+	userData := GenerateUserData("test", "ssh-ed25519 key")
+
+	// Should have growpart config
+	assert.Contains(t, userData, "growpart:")
+	assert.Contains(t, userData, "mode: auto")
+	assert.Contains(t, userData, "resize_rootfs: true")
+}
