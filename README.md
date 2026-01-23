@@ -729,6 +729,8 @@ make build
 make clean
 ```
 
+For detailed architecture, modules, and security documentation, see [Developer Documentation](docs/development/README.md).
+
 ## License
 
 MIT
