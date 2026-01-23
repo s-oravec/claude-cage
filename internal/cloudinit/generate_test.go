@@ -18,7 +18,7 @@ func TestGenerateUserData(t *testing.T) {
 	assert.Contains(t, userData, "name: cage")
 	assert.Contains(t, userData, "NOPASSWD:ALL")
 	assert.Contains(t, userData, pubKey)
-	assert.Contains(t, userData, "ssh_pwauth: true")
+	assert.Contains(t, userData, "ssh_pwauth: false")
 	assert.Contains(t, userData, "lock_passwd: false")
 	assert.Contains(t, userData, "passwd:")
 }

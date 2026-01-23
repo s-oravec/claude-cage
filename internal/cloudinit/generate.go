@@ -51,7 +51,7 @@ users:
     ssh_authorized_keys:
       - %s
 
-ssh_pwauth: true
+ssh_pwauth: false
 
 package_update: false
 package_upgrade: false
