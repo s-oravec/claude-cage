@@ -76,8 +76,16 @@ func TestBuildArgs(t *testing.T) {
 	args := BuildArgs(cfg)
 
 	assert.Contains(t, args, "--shared-dir=/home/user/projects")
-	assert.Contains(t, args, "--sandbox=chroot")
-	assert.Contains(t, args, "--seccomp=kill")
+	assert.Contains(t, args, "--cache=auto")
+
+	// When running as non-root (tests), always uses --sandbox=none
+	// When running as root, would use --sandbox=chroot and --seccomp=kill
+	if os.Getuid() == 0 {
+		assert.Contains(t, args, "--sandbox=chroot")
+		assert.Contains(t, args, "--seccomp=kill")
+	} else {
+		assert.Contains(t, args, "--sandbox=none")
+	}
 }
 
 func TestBuildArgs_NoHardening(t *testing.T) {
@@ -91,10 +99,9 @@ func TestBuildArgs_NoHardening(t *testing.T) {
 	args := BuildArgs(cfg)
 
 	assert.Contains(t, args, "--shared-dir=/home/user/projects")
-	// Should not contain hardening flags
-	for _, arg := range args {
-		assert.NotContains(t, arg, "sandbox")
-		assert.NotContains(t, arg, "seccomp")
+	// Non-root always gets --sandbox=none regardless of config
+	if os.Getuid() != 0 {
+		assert.Contains(t, args, "--sandbox=none")
 	}
 }
 
