@@ -292,13 +292,13 @@ imageSaveCmd.MarkFlagRequired("name")
 
 ## Deliverables
 
-- [ ] `cage image list`
-- [ ] `cage image save <cage> --name <image>`
-- [ ] `cage image save <cage> --name <image> --description <desc>`
-- [ ] `cage image delete <image>`
-- [ ] `cage image delete <image> --force`
-- [ ] `cage image inspect <image>`
-- [ ] Image metadata storage
-- [ ] qcow2 conversion and compression
-- [ ] In-use detection
-- [ ] Base image protection
+- [x] `cage image list`
+- [x] `cage image save <cage> --name <image>`
+- [x] `cage image save <cage> --name <image> --description <desc>`
+- [x] `cage image delete <image>`
+- [x] `cage image delete <image> --force`
+- [x] `cage image inspect <image>`
+- [x] Image metadata storage
+- [x] qcow2 conversion and compression
+- [x] In-use detection
+- [x] Base image protection

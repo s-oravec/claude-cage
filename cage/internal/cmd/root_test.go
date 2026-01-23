@@ -30,6 +30,7 @@ func TestRootCmd_HasSubcommands(t *testing.T) {
 	assert.Contains(t, names, "port")
 	assert.Contains(t, names, "restart")
 	assert.Contains(t, names, "snapshot")
+	assert.Contains(t, names, "image")
 }
 
 func TestRootCmd_Name(t *testing.T) {
