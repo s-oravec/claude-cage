@@ -121,7 +121,7 @@ cage create -n <name> [options]
 |------|-------|-------|----------|-------------|
 | `bridge` | Yes | Fast | High | Libvirt bridge with firewall isolation (default) |
 | `slirp` | No | Slow | Medium | QEMU SLIRP user-mode networking |
-| `passt` | No | Fast | High | Passt with network restrictions |
+| `passt` | No | Fast | High | Passt with network restrictions (WIP) |
 
 **Examples:**
 ```bash
@@ -292,7 +292,7 @@ cage exec myproject -- /workspace/build.sh
 
 ### cage console
 
-Connect to the cage VM's serial console. Useful when SSH is not available (e.g., with `--user-network` mode).
+Connect to the cage VM's serial console. Useful when SSH is not available (e.g., with `--network slirp` or `--network passt` modes).
 
 ```bash
 cage console <name>
