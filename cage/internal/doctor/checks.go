@@ -13,6 +13,7 @@ type Check struct {
 	Name      string
 	CheckFunc func() error
 	Required  bool
+	FixHint   string // Installation/fix hint for the user
 }
 
 // CheckResult holds the result of running a check
@@ -49,14 +50,54 @@ func AllRequiredPassed(results []CheckResult) bool {
 // DefaultChecks returns the standard set of checks
 func DefaultChecks() []Check {
 	return []Check{
-		{Name: "KVM available", CheckFunc: checkKVM, Required: true},
-		{Name: "libvirtd running", CheckFunc: checkLibvirtd, Required: true},
-		{Name: "User in kvm group", CheckFunc: checkKvmGroup, Required: true},
-		{Name: "User in libvirt group", CheckFunc: checkLibvirtGroup, Required: true},
-		{Name: "virtiofsd installed", CheckFunc: checkVirtiofsd, Required: true},
-		{Name: "qemu-img installed", CheckFunc: checkQemuImg, Required: true},
-		{Name: "cloud-localds installed", CheckFunc: checkCloudLocalds, Required: false},
+		{
+			Name:      "KVM available",
+			CheckFunc: checkKVM,
+			Required:  true,
+			FixHint:   "Enable virtualization in BIOS/UEFI, or install: sudo apt install qemu-kvm",
+		},
+		{
+			Name:      "libvirtd running",
+			CheckFunc: checkLibvirtd,
+			Required:  true,
+			FixHint:   "sudo apt install libvirt-daemon-system && sudo systemctl enable --now libvirtd",
+		},
+		{
+			Name:      "User in kvm group",
+			CheckFunc: checkKvmGroup,
+			Required:  true,
+			FixHint:   "sudo usermod -aG kvm $USER && newgrp kvm",
+		},
+		{
+			Name:      "User in libvirt group",
+			CheckFunc: checkLibvirtGroup,
+			Required:  true,
+			FixHint:   "sudo usermod -aG libvirt $USER && newgrp libvirt",
+		},
+		{
+			Name:      "virtiofsd installed",
+			CheckFunc: checkVirtiofsd,
+			Required:  true,
+			FixHint:   "sudo apt install virtiofsd",
+		},
+		{
+			Name:      "qemu-img installed",
+			CheckFunc: checkQemuImg,
+			Required:  true,
+			FixHint:   "sudo apt install qemu-utils",
+		},
+		{
+			Name:      "cloud-localds installed",
+			CheckFunc: checkCloudLocalds,
+			Required:  false,
+			FixHint:   "sudo apt install cloud-image-utils",
+		},
 	}
+}
+
+// InstallAllHint returns a single command to install all required packages
+func InstallAllHint() string {
+	return "sudo apt install -y qemu-kvm libvirt-daemon-system libvirt-clients virtiofsd qemu-utils cloud-image-utils && sudo usermod -aG kvm,libvirt $USER && sudo systemctl enable --now libvirtd"
 }
 
 func checkKVM() error {
