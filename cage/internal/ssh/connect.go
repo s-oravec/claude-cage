@@ -86,3 +86,27 @@ func WaitForSSH(cageName, ip string, timeout time.Duration) error {
 
 	return ErrSSHTimeout
 }
+
+// ExecCapture executes a command via SSH and captures the output
+func ExecCapture(cageName, ip, command string) (string, error) {
+	keyPath := KeyPath(cageName)
+	knownHostsPath := KnownHostsPath()
+
+	args := []string{
+		"-i", keyPath,
+		"-o", "StrictHostKeyChecking=accept-new",
+		"-o", fmt.Sprintf("UserKnownHostsFile=%s", knownHostsPath),
+		"-o", "LogLevel=ERROR",
+		"-o", "ConnectTimeout=5",
+		"-o", "BatchMode=yes",
+		fmt.Sprintf("cage@%s", ip),
+		command,
+	}
+
+	cmd := exec.Command("ssh", args...)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}

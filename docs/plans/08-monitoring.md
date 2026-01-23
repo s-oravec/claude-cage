@@ -252,13 +252,13 @@ Processes (top 5 by CPU):
 
 ## Deliverables
 
-- [ ] `cage status <name>`
-- [ ] `cage status <name> --json`
-- [ ] `cage status <name> --watch`
-- [ ] `cage exec <name> -- <command>`
-- [ ] `cage logs <name>`
-- [ ] `cage logs <name> -f`
-- [ ] `cage logs <name> -n <lines>`
-- [ ] Resource usage from libvirt
-- [ ] Docker info collection
-- [ ] Process listing
+- [x] `cage status <name>`
+- [x] `cage status <name> --json`
+- [x] `cage status <name> --watch`
+- [x] `cage exec <name> -- <command>`
+- [x] `cage logs <name>`
+- [x] `cage logs <name> -f`
+- [x] `cage logs <name> -n <lines>`
+- [x] Resource usage from config profile
+- [x] Docker info collection
+- [x] Process listing
