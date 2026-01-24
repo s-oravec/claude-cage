@@ -114,7 +114,7 @@ func runInit(cmd *cobra.Command, image, cage, memory string, vcpu, disk int, ssh
 
 	// Add header comment
 	header := `# Cage configuration for this project
-# See: https://github.com/anthropics/claude-cage
+# See: https://github.com/s-oravec/claude-cage
 
 `
 	content := header + string(data)
