@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -128,6 +130,136 @@ func ProjectConfigExists(dir string) bool {
 	path := filepath.Join(dir, ProjectConfigFile)
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// PortMapping represents a host:guest port mapping
+type PortMapping struct {
+	Host  int
+	Guest int
+}
+
+// ResolvedConfig is the fully resolved configuration for a cage
+type ResolvedConfig struct {
+	CageName  string
+	Image     string
+	ImagePath string // full path to image file
+	VCPU      int
+	MemoryMB  int
+	DiskGB    int
+	SSHPort   string // port number or "auto"
+	Ports     []PortMapping
+	Shares    []ShareConfig
+	Env       map[string]string
+	// From global config
+	Network  NetworkConfig
+	Security SecurityConfig
+}
+
+// ParseMemory parses a memory string like "4G" or "512M" to megabytes
+func ParseMemory(s string) (int, error) {
+	s = strings.ToUpper(strings.TrimSpace(s))
+	if s == "" {
+		return 0, errors.New("empty memory value")
+	}
+
+	if strings.HasSuffix(s, "G") {
+		val, err := strconv.Atoi(strings.TrimSuffix(s, "G"))
+		if err != nil {
+			return 0, err
+		}
+		return val * 1024, nil
+	}
+	if strings.HasSuffix(s, "M") {
+		return strconv.Atoi(strings.TrimSuffix(s, "M"))
+	}
+	return strconv.Atoi(s)
+}
+
+// ParsePortMapping parses a port mapping string like "8080:80" to PortMapping
+func ParsePortMapping(s string) (PortMapping, error) {
+	parts := strings.Split(s, ":")
+	if len(parts) != 2 {
+		return PortMapping{}, fmt.Errorf("expected host:guest format")
+	}
+	host, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return PortMapping{}, fmt.Errorf("invalid host port: %w", err)
+	}
+	guest, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return PortMapping{}, fmt.Errorf("invalid guest port: %w", err)
+	}
+	return PortMapping{Host: host, Guest: guest}, nil
+}
+
+// ResolveProjectConfig merges global config, profile, and project config into a final resolved config
+func ResolveProjectConfig(global *Config, project *ProjectConfig, projectDir string) (*ResolvedConfig, error) {
+	resolved := &ResolvedConfig{
+		CageName: project.Cage,
+		Image:    project.Image,
+		Env:      project.Env,
+		Network:  global.Network,
+		Security: global.Security,
+	}
+
+	// Get profile (default if not specified)
+	profileName := project.Profile
+	if profileName == "" {
+		profileName = "default"
+	}
+	profile, ok := global.Profiles[profileName]
+	if !ok {
+		return nil, fmt.Errorf("profile %q not found", profileName)
+	}
+
+	// Apply profile values
+	resolved.VCPU = profile.VCPU
+	resolved.MemoryMB = profile.MemoryMB
+	resolved.DiskGB = profile.DiskGB
+
+	// Apply project overrides
+	if project.Memory != "" {
+		mb, err := ParseMemory(project.Memory)
+		if err != nil {
+			return nil, fmt.Errorf("invalid memory value: %w", err)
+		}
+		resolved.MemoryMB = mb
+	}
+	if project.VCPU > 0 {
+		resolved.VCPU = project.VCPU
+	}
+	if project.DiskGB > 0 {
+		resolved.DiskGB = project.DiskGB
+	}
+
+	// SSH port
+	resolved.SSHPort = project.Network.SSH
+	if resolved.SSHPort == "" {
+		resolved.SSHPort = "auto"
+	}
+
+	// Parse port mappings
+	for _, p := range project.Network.Ports {
+		pm, err := ParsePortMapping(p)
+		if err != nil {
+			return nil, fmt.Errorf("invalid port mapping %q: %w", p, err)
+		}
+		resolved.Ports = append(resolved.Ports, pm)
+	}
+
+	// Resolve share paths to absolute
+	for _, s := range project.Shares {
+		share := s
+		if !filepath.IsAbs(share.Host) {
+			share.Host = filepath.Join(projectDir, share.Host)
+		}
+		resolved.Shares = append(resolved.Shares, share)
+	}
+
+	// Resolve image path - use the images directory from Dir()
+	resolved.ImagePath = filepath.Join(Dir(), "images", project.Image+".qcow2")
+
+	return resolved, nil
 }
 
 // Exists returns true if config file exists

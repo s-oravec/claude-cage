@@ -390,3 +390,210 @@ func TestProjectConfigExists(t *testing.T) {
 	assert.True(t, ProjectConfigExists(tmpDir))
 }
 
+func TestParseMemory(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected int
+		hasError bool
+	}{
+		{"4G", 4096, false},
+		{"8G", 8192, false},
+		{"512M", 512, false},
+		{"1024M", 1024, false},
+		{"2048", 2048, false},
+		{"4g", 4096, false},  // lowercase
+		{" 8G ", 8192, false}, // with spaces
+		{"invalid", 0, true},
+		{"", 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result, err := ParseMemory(tt.input)
+			if tt.hasError {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestParsePortMapping(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected PortMapping
+		hasError bool
+	}{
+		{"8080:80", PortMapping{Host: 8080, Guest: 80}, false},
+		{"3000:3000", PortMapping{Host: 3000, Guest: 3000}, false},
+		{"22:22", PortMapping{Host: 22, Guest: 22}, false},
+		{"invalid", PortMapping{}, true},
+		{"8080", PortMapping{}, true},
+		{"abc:80", PortMapping{}, true},
+		{"8080:abc", PortMapping{}, true},
+		{"8080:80:extra", PortMapping{}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result, err := ParsePortMapping(tt.input)
+			if tt.hasError {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestResolveProjectConfig(t *testing.T) {
+	globalCfg := DefaultConfig()
+
+	projectCfg := &ProjectConfig{
+		Cage:    "my-project",
+		Image:   "ubuntu-24.04",
+		Profile: "default",
+		Memory:  "8G", // override profile
+		Network: ProjectNetwork{
+			SSH:   "auto",
+			Ports: []string{"8080:80"},
+		},
+		Shares: []ShareConfig{
+			{Host: "./src", Guest: "/home/cage/src", Mode: "rw"},
+		},
+		Env: map[string]string{"NODE_ENV": "dev"},
+	}
+
+	resolved, err := ResolveProjectConfig(globalCfg, projectCfg, "/home/user/myproject")
+	require.NoError(t, err)
+
+	assert.Equal(t, "my-project", resolved.CageName)
+	assert.Equal(t, "ubuntu-24.04", resolved.Image)
+	assert.Equal(t, 4, resolved.VCPU)           // from default profile
+	assert.Equal(t, 8192, resolved.MemoryMB)    // overridden (8G = 8192MB)
+	assert.Equal(t, 20, resolved.DiskGB)        // from default profile
+	assert.Equal(t, "auto", resolved.SSHPort)
+	assert.Len(t, resolved.Ports, 1)
+	assert.Equal(t, 8080, resolved.Ports[0].Host)
+	assert.Equal(t, 80, resolved.Ports[0].Guest)
+	assert.Len(t, resolved.Shares, 1)
+	// Share host path should be absolute
+	assert.Equal(t, "/home/user/myproject/src", resolved.Shares[0].Host)
+	assert.Equal(t, "dev", resolved.Env["NODE_ENV"])
+	// ImagePath should be set
+	assert.Contains(t, resolved.ImagePath, "ubuntu-24.04.qcow2")
+	// Network and Security from global
+	assert.Equal(t, globalCfg.Network.PortBind, resolved.Network.PortBind)
+	assert.Equal(t, globalCfg.Security.MaxCages, resolved.Security.MaxCages)
+}
+
+func TestResolveProjectConfig_ProfileOverrides(t *testing.T) {
+	globalCfg := DefaultConfig()
+
+	projectCfg := &ProjectConfig{
+		Cage:    "heavy-project",
+		Image:   "ubuntu-24.04",
+		Profile: "heavy",
+		VCPU:    16,    // override heavy profile VCPU
+		DiskGB:  100,   // override heavy profile disk
+		// Memory not set, should use heavy profile value
+		Network: ProjectNetwork{
+			SSH: "2222",
+		},
+	}
+
+	resolved, err := ResolveProjectConfig(globalCfg, projectCfg, "/home/user/project")
+	require.NoError(t, err)
+
+	assert.Equal(t, 16, resolved.VCPU)          // overridden
+	assert.Equal(t, 8192, resolved.MemoryMB)    // from heavy profile
+	assert.Equal(t, 100, resolved.DiskGB)       // overridden
+	assert.Equal(t, "2222", resolved.SSHPort)
+}
+
+func TestResolveProjectConfig_UnknownProfile(t *testing.T) {
+	globalCfg := DefaultConfig()
+
+	projectCfg := &ProjectConfig{
+		Cage:    "my-project",
+		Image:   "ubuntu-24.04",
+		Profile: "nonexistent",
+	}
+
+	_, err := ResolveProjectConfig(globalCfg, projectCfg, "/home/user/project")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "nonexistent")
+}
+
+func TestResolveProjectConfig_DefaultProfile(t *testing.T) {
+	globalCfg := DefaultConfig()
+
+	// No profile specified, should use "default"
+	projectCfg := &ProjectConfig{
+		Cage:  "my-project",
+		Image: "ubuntu-24.04",
+	}
+
+	resolved, err := ResolveProjectConfig(globalCfg, projectCfg, "/home/user/project")
+	require.NoError(t, err)
+
+	assert.Equal(t, 4, resolved.VCPU)        // default profile
+	assert.Equal(t, 4096, resolved.MemoryMB) // default profile
+	assert.Equal(t, 20, resolved.DiskGB)     // default profile
+	assert.Equal(t, "auto", resolved.SSHPort) // default SSH port
+}
+
+func TestResolveProjectConfig_AbsoluteSharePath(t *testing.T) {
+	globalCfg := DefaultConfig()
+
+	projectCfg := &ProjectConfig{
+		Cage:  "my-project",
+		Image: "ubuntu-24.04",
+		Shares: []ShareConfig{
+			{Host: "/absolute/path", Guest: "/guest", Mode: "ro"},
+			{Host: "relative/path", Guest: "/guest2", Mode: "rw"},
+		},
+	}
+
+	resolved, err := ResolveProjectConfig(globalCfg, projectCfg, "/project/dir")
+	require.NoError(t, err)
+
+	// Absolute path should stay absolute
+	assert.Equal(t, "/absolute/path", resolved.Shares[0].Host)
+	// Relative path should be resolved
+	assert.Equal(t, "/project/dir/relative/path", resolved.Shares[1].Host)
+}
+
+func TestResolveProjectConfig_InvalidMemory(t *testing.T) {
+	globalCfg := DefaultConfig()
+
+	projectCfg := &ProjectConfig{
+		Cage:   "my-project",
+		Image:  "ubuntu-24.04",
+		Memory: "invalid",
+	}
+
+	_, err := ResolveProjectConfig(globalCfg, projectCfg, "/home/user/project")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid memory")
+}
+
+func TestResolveProjectConfig_InvalidPortMapping(t *testing.T) {
+	globalCfg := DefaultConfig()
+
+	projectCfg := &ProjectConfig{
+		Cage:  "my-project",
+		Image: "ubuntu-24.04",
+		Network: ProjectNetwork{
+			Ports: []string{"invalid"},
+		},
+	}
+
+	_, err := ResolveProjectConfig(globalCfg, projectCfg, "/home/user/project")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "port mapping")
+}
+
