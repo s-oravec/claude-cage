@@ -13,14 +13,17 @@ I want to use Claude Code in yolo mode (automatic command approval) but:
 ## Solution
 
 ```bash
-# 1. Start cage
-cage create -n dev -p heavy --ssh auto
-cage start dev --port 3000:3000 --port 5432:5432
+# 1. Initialize cage configuration in project directory
+cd ~/projects/myapp
+cage init --image ubuntu-24.04 --memory 8G --vcpu 8
 
-# 2. SSH into cage
-cage ssh dev
+# 2. Start cage with port forwarding
+cage start --port 3000:3000 --port 5432:5432
 
-# 3. Run Claude Code in yolo mode
+# 3. SSH into cage
+cage ssh
+
+# 4. Run Claude Code in yolo mode
 claude --dangerously-skip-permissions
 
 # Claude can now:
@@ -115,13 +118,23 @@ claude --dangerously-skip-permissions
 ## Typical Workflow
 
 ```bash
+# === FIRST TIME SETUP ===
+cd ~/projects/myapp
+cage init --image ubuntu-24.04 --memory 8G --vcpu 8
+
+# Add port forwards to .claude-cage.yml if needed regularly:
+# network:
+#   ssh: auto
+#   ports:
+#     - "3000:3000"
+#     - "5432:5432"
+
 # === MORNING - Start work ===
 cd ~/projects/myapp
-cage create -n dev -p heavy --ssh auto
-cage start dev --port 3000:3000 --port 5432:5432
+cage start
 
 # SSH into cage
-cage ssh dev
+cage ssh
 
 # Start development stack
 cd /workspace
@@ -143,7 +156,7 @@ claude --dangerously-skip-permissions
 exit                    # exit Claude
 docker compose down     # stop containers
 exit                    # leave cage
-cage stop dev           # stop VM
+cage stop               # stop VM
 
 # State:
 # - Changes in ~/projects/myapp (host) are preserved

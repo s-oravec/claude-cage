@@ -43,40 +43,53 @@ go install github.com/s-oravec/claude-cage/cmd/cage@latest
 
 ## Quick Start
 
+### Project-Based Workflow (Recommended)
+
 ```bash
 # Check system requirements
 cage doctor
 
-# Initialize configuration
+# Initialize global configuration
 cage config init
 
-# Download a base image (alpine is default)
-cage setup
+# Download a base image
+cage setup --base ubuntu-24.04
 
-# Create a cage with SSH access
-cage create -n myvm --ssh auto
+# In your project directory, create a cage configuration
+cd ~/projects/myapp
+cage init --image ubuntu-24.04
 
-# Start the cage
-cage start myvm
+# Start the cage (creates automatically on first run)
+cage start
 
 # Connect via SSH
-cage ssh myvm
-
-# Or connect via serial console (no --ssh needed)
-# cage console myvm
+cage ssh
 
 # Stop the cage (preserves resources)
-cage stop myvm
+cage stop
 
 # Remove the cage completely
-cage remove myvm
+cage remove
+```
+
+### Direct Usage (Without Project Config)
+
+```bash
+# Start an existing cage by name
+cage start myvm
+
+# Connect to a specific cage
+cage ssh myvm
+
+# Stop a specific cage
+cage stop myvm
 ```
 
 ## Commands
 
 ### Lifecycle Commands
-- [`cage create`](#cage-create) - Create a new cage without starting it
-- [`cage start`](#cage-start) - Start an existing cage
+- [`cage init`](#cage-init) - Initialize cage configuration in current directory
+- [`cage start`](#cage-start) - Start a cage (creates if needed)
 - [`cage stop`](#cage-stop) - Stop a running cage (preserves resources)
 - [`cage remove`](#cage-remove) - Remove a cage and all its resources
 - [`cage restart`](#cage-restart) - Restart a running cage
@@ -106,71 +119,74 @@ cage remove myvm
 
 ## Command Reference
 
-### cage create
+### cage init
 
-Create a new cage VM without starting it. Creates disk overlay, network, SSH keys, and VM definition.
+Initialize a `.claude-cage.yml` configuration file in the current directory. This file defines how `cage start` will create and run the cage.
 
 ```bash
-cage create -n <name> [options]
+cage init --image <image> [options]
 ```
 
 **Options:**
 | Option | Description |
 |--------|-------------|
-| `-n, --name` | Name for the cage (required) |
-| `-i, --image` | Base image (defaults to config default) |
-| `-p, --profile` | Resource profile: `default`, `heavy`, `light` (default: `default`) |
-| `--network` | Network mode: `auto`, `bridge` (default: `auto`) |
-| `--ssh` | SSH port forwarding: `auto` or specific port (e.g., `2222`) |
-
-**Network Modes:**
-| Mode | Root? | Speed | SSH | Description |
-|------|-------|-------|-----|-------------|
-| `auto` | No | Fast* | Via `--ssh` | Auto-detect: passt > slirp (default) |
-| `bridge` | Yes | Fast | Direct IP | Libvirt bridge with firewall isolation |
-
-\* passt is fast, slirp fallback is slower
+| `--image` | Base image name (required) |
+| `--cage` | Cage name (default: directory name) |
+| `--memory` | Memory allocation (e.g., `4G`, `8G`) |
+| `--vcpu` | Number of virtual CPUs |
+| `--disk` | Disk size in GB |
+| `--ssh` | SSH port: `auto` or specific port (default: `auto`) |
+| `-f, --force` | Overwrite existing configuration |
+| `--dir` | Target directory (default: current directory) |
 
 **Examples:**
 ```bash
-# Create with default settings (auto network, console access only)
-cage create -n myproject
+# Initialize with Ubuntu image
+cage init --image ubuntu-24.04
 
-# Create with SSH access (auto port)
-cage create -n myproject --ssh auto
+# Initialize with custom resources
+cage init --image debian-12 --memory 8G --vcpu 4
 
-# Create with SSH on specific port
-cage create -n myproject --ssh 2222
-
-# Create with specific image and profile
-cage create -n heavy-workload -i ubuntu -p heavy --ssh auto
-
-# Create with bridge network (requires root, SSH via direct IP)
-cage create -n isolated --network bridge
+# Initialize with specific cage name
+cage init --image alpine --cage my-sandbox
 ```
 
 ---
 
 ### cage start
 
-Start a cage that was previously created.
+Start a cage. If run in a directory with `.claude-cage.yml` and the cage doesn't exist, it will be created automatically.
 
 ```bash
-cage start <name> [options]
+cage start [name] [options]
 ```
+
+**Arguments:**
+| Argument | Description |
+|----------|-------------|
+| `name` | Cage name (optional if `.claude-cage.yml` exists in current directory) |
 
 **Options:**
 | Option | Description |
 |--------|-------------|
 | `--port` | Port forwarding (e.g., `8080:80`), can be specified multiple times |
 
+**Behavior:**
+- If `name` is provided: starts the specified cage
+- If `name` is omitted: reads cage name from `.claude-cage.yml` in current directory
+- If cage doesn't exist and `.claude-cage.yml` is present: creates the cage first
+- If cage exists: validates configuration and reconfigures if stopped
+
 **Examples:**
 ```bash
-# Start a cage
+# Start cage from project config (in project directory)
+cage start
+
+# Start a specific cage by name
 cage start myproject
 
 # Start with port forwarding
-cage start myproject --port 8080:80 --port 3000:3000
+cage start --port 8080:80 --port 3000:3000
 ```
 
 ---
@@ -628,48 +644,73 @@ cage verify myproject
 
 ## Configuration
 
+### Project Configuration
+
+Create a `.claude-cage.yml` file in your project directory with `cage init` or manually. This file defines the cage for your project.
+
+**File:** `.claude-cage.yml` (in project root)
+
+**Example:**
+```yaml
+# Cage configuration for this project
+cage: my-project        # optional, defaults to directory name
+image: ubuntu-24.04     # required, base image
+
+# Resources (optional, overrides profile)
+profile: default        # optional, uses global profile as base
+memory: 4G              # optional, overrides profile
+vcpu: 2                 # optional, overrides profile
+disk: 20                # optional, disk size in GB
+
+# Network
+network:
+  ssh: auto             # port number or "auto"
+  ports:                # optional, additional port forwards
+    - "8080:80"
+    - "3000:3000"
+
+# File sharing
+shares:
+  - host: ./src         # relative to project directory
+    guest: /home/cage/src
+  - host: ./data
+    guest: /data
+    mode: ro            # optional, "ro" for read-only
+
+# Environment variables (injected at start time)
+env:
+  NODE_ENV: development
+  DEBUG: "true"
+```
+
+**Field Reference:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `cage` | No | Cage name (default: directory name) |
+| `image` | Yes | Base image (e.g., `ubuntu-24.04`, `alpine`) |
+| `profile` | No | Global profile to use as base (`default`, `heavy`, `light`) |
+| `memory` | No | Memory allocation (e.g., `4G`, `8G`) |
+| `vcpu` | No | Number of virtual CPUs |
+| `disk` | No | Disk size in GB |
+| `network.ssh` | No | SSH port: `auto` or specific port number |
+| `network.ports` | No | Port forwards in `host:guest` format |
+| `shares` | No | Directory shares (host/guest/mode) |
+| `env` | No | Environment variables |
+
 ### Global Configuration
 
 Global config file: `~/.claude-cage/config.yaml`
 
-### Project Configuration
+This file defines default settings, resource profiles, and security configuration used across all cages.
 
-You can create a `.claude-cage.yml` file in your project directory to override global settings. This is useful for project-specific environment variables, resource profiles, or port mappings.
-
-**Lookup order:** `./.claude-cage.yml` → `~/.claude-cage/config.yaml`
-
-**Merge behavior:**
-- Scalar values (image, profile): project wins
-- Maps (env, profiles): merged, project wins on conflicts
-- Arrays (shares, dns, blocked_subnets): project replaces entirely
-
-**Example `.claude-cage.yml`:**
-```yaml
-# Override default profile
-profiles:
-  default:
-    vcpu: 8
-    memory_mb: 8192
-    disk_gb: 50
-
-# Project-specific environment
-env:
-  NODE_ENV: development
-  DATABASE_URL: postgres://localhost/myapp
-  API_KEY: secret
-
-# Custom shares for this project
-shares:
-  - host: .
-    guest: /app
-    mode: rw
-```
-
-### Full Configuration Reference
+### Global Configuration Reference
 
 ```yaml
+# ~/.claude-cage/config.yaml
+
 images:
-  default: alpine
+  default: alpine           # Default image for new cages
 
 profiles:
   default:
@@ -707,10 +748,21 @@ security:
 env:
   MY_API_KEY: "secret-key"
   NODE_ENV: "development"
-  PATH_EXTRA: "/opt/custom/bin"
 ```
 
-The `env` section defines environment variables that are injected into `/etc/profile.d/cage-env.sh` and available to all login shells in the cage.
+### Configuration Resolution
+
+When `cage start` runs, configuration is resolved in this order:
+
+1. **Global config** (`~/.claude-cage/config.yaml`) - provides defaults and profiles
+2. **Project config** (`.claude-cage.yml`) - specifies image, overrides resources
+3. **Command line** - port forwarding flags
+
+Project config `profile` field references a global profile, then `memory`/`vcpu`/`disk` override specific values.
+
+### Environment Variables
+
+Environment variables from `env` are injected at cage start time via virtiofs, allowing changes without recreating the cage. They are available in `/etc/profile.d/cage-runtime-env.sh`.
 
 ## Development
 

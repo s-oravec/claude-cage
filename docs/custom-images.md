@@ -11,12 +11,13 @@ Preparing pre-configured environments for quick start and team sharing.
 ## Creating a Custom Image
 
 ```bash
-# 1. Start cage with base image
-cage create -n setup --ssh auto
-cage start setup
+# 1. Create a temporary directory and initialize a cage
+mkdir /tmp/image-setup && cd /tmp/image-setup
+cage init --image ubuntu-24.04 --cage setup
+cage start
 
 # 2. SSH and install stack
-cage ssh setup
+cage ssh
 
 sudo apt update && sudo apt install -y \
     nodejs npm \
@@ -32,18 +33,25 @@ exit
 cage image save setup --name mystack --description "Node.js + Python stack"
 
 # 4. Cleanup
-cage stop setup
-cage remove setup
+cage stop
+cage remove
+cd ~ && rm -rf /tmp/image-setup
 ```
 
 ## Using Custom Image
 
 ```bash
-# Instant start with pre-prepared tools
-cage create -n dev -i mystack --ssh auto
-cage start dev --port 3000:3000
+# In your project directory
+cd ~/projects/myapp
 
-cage ssh dev
+# Initialize with custom image
+cage init --image mystack
+
+# Start the cage (port forwarding can be in config or command line)
+cage start --port 3000:3000
+
+# Connect and verify
+cage ssh
 node --version    # works
 python3 --version # works
 ```
@@ -61,8 +69,9 @@ cp ~/.claude-cage/images/team-backend-v1.qcow2 /shared/team/
 cp /shared/team/team-backend-v1.qcow2 ~/.claude-cage/images/
 
 # Everyone uses the same environment
-cage create -n feature-x -i team-backend-v1 --ssh auto
-cage start feature-x
+cd ~/projects/feature-x
+cage init --image team-backend-v1
+cage start
 ```
 
 ## Managing Images

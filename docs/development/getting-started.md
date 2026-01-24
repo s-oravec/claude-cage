@@ -135,12 +135,17 @@ make e2e
 # Download a base image
 ./cage setup --base alpine
 
-# Create and test a cage
-./cage create -n test --ssh auto
-./cage start test
-./cage ssh test
-./cage stop test
-./cage remove test
+# Test with project config workflow
+mkdir /tmp/test-cage && cd /tmp/test-cage
+./cage init --image alpine
+./cage start
+./cage ssh
+./cage stop
+./cage remove
+cd ~ && rm -rf /tmp/test-cage
+
+# Or test with explicit cage name
+./cage start test-direct  # Will fail without project config
 ```
 
 ## Code Style
@@ -227,21 +232,42 @@ virsh -c qemu:///session console cage-<name>
 ### Testing Network Isolation
 
 ```bash
-./cage create -n testnet --network bridge --ssh auto
-./cage start testnet
-./cage verify testnet
-./cage remove testnet --force
+# Create a test directory with project config
+mkdir /tmp/test-net && cd /tmp/test-net
+cat > .claude-cage.yml << 'EOF'
+image: alpine
+network:
+  ssh: auto
+EOF
+
+./cage start
+./cage verify
+./cage remove --force
+cd ~ && rm -rf /tmp/test-net
 ```
 
 ### Testing File Sharing
 
 ```bash
-mkdir /tmp/test-share
-./cage create -n testfs --ssh auto
-# Edit config to add share, or use project config
-./cage start testfs
-./cage ssh testfs ls /workspace
-./cage remove testfs --force
+# Create project with custom shares
+mkdir /tmp/test-share && cd /tmp/test-share
+mkdir -p src data
+cat > .claude-cage.yml << 'EOF'
+image: alpine
+network:
+  ssh: auto
+shares:
+  - host: ./src
+    guest: /home/cage/src
+  - host: ./data
+    guest: /data
+    mode: ro
+EOF
+
+./cage start
+./cage ssh ls /home/cage/src
+./cage remove --force
+cd ~ && rm -rf /tmp/test-share
 ```
 
 ## IDE Setup

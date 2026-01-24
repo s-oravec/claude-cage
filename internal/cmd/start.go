@@ -70,7 +70,7 @@ func runStartCmd(cmd *cobra.Command, args []string, ports []string) error {
 	if !cage.Exists(name) {
 		// Cage doesn't exist - need project config to create
 		if resolved == nil {
-			return fmt.Errorf("cage '%s' not found, use 'cage create' first or run from a directory with %s", name, config.ProjectConfigFile)
+			return fmt.Errorf("cage '%s' not found. Run 'cage init' in a project directory to create a %s configuration, then run 'cage start'", name, config.ProjectConfigFile)
 		}
 
 		// Create the cage

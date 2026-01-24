@@ -58,9 +58,17 @@ if network.HasPasst() {
 
 ### SSH Port Forwarding
 
+In `.claude-cage.yml`:
+```yaml
+network:
+  ssh: auto       # Find free port
+  ssh: 2222       # Use specific port
+```
+
+Or with `cage init`:
 ```bash
-cage create -n myvm --ssh auto  # Find free port
-cage create -n myvm --ssh 2222  # Use specific port
+cage init --image ubuntu-24.04 --ssh auto   # Find free port
+cage init --image ubuntu-24.04 --ssh 2222   # Use specific port
 ```
 
 Generated QEMU command line:

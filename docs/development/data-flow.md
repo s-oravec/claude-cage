@@ -2,113 +2,99 @@
 
 This document describes how data flows through Claude Cage during key operations.
 
-## Cage Creation Flow
+## Cage Start Flow (with Auto-Creation)
+
+The `cage start` command handles both cage creation and starting. When run in a directory
+with `.claude-cage.yml`, it will create the cage if it doesn't exist.
 
 ```
-cage create -n myvm --ssh auto
+cage start (in project directory)
         │
         ▼
 ┌───────────────────────────────────────────────────────────────┐
-│ 1. Validation                                                  │
-│    - Check cage doesn't exist                                  │
-│    - Validate network mode                                     │
-│    - Parse SSH port (auto → find free port)                    │
+│ 1. Resolve Cage Name                                           │
+│    - If name provided as argument: use it                      │
+│    - If no argument: load from .claude-cage.yml                │
+│    - Cage name defaults to directory name if not in config     │
 └───────────────────────────────────────────────────────────────┘
         │
         ▼
 ┌───────────────────────────────────────────────────────────────┐
 │ 2. Load Configuration                                          │
-│    - Load ~/.claude-cage/config.yaml                          │
-│    - Merge .claude-cage.yml if present                        │
-│    - Resolve profile (default, heavy, light)                  │
+│    - Load ~/.claude-cage/config.yaml (global)                 │
+│    - Load .claude-cage.yml (project)                          │
+│    - Resolve config (merge profile + overrides)               │
 │    - Resolve image alias (alpine → alpine-3.21)               │
 └───────────────────────────────────────────────────────────────┘
         │
         ▼
 ┌───────────────────────────────────────────────────────────────┐
-│ 3. Create Cage Directory                                       │
-│    ~/.claude-cage/cages/<name>/                               │
+│ 3. Check If Cage Exists                                        │
+│    Does ~/.claude-cage/cages/<name>/ exist?                   │
+│    ├── NO  → Create cage (see below)                          │
+│    └── YES → Validate image, reconfigure if stopped           │
+└───────────────────────────────────────────────────────────────┘
+        │
+        ▼ (if cage doesn't exist)
+┌───────────────────────────────────────────────────────────────┐
+│ 4. Create Cage                                                 │
+│    a. Create cage directory                                   │
+│    b. Create disk overlay (qemu-img)                          │
+│    c. Generate SSH keys                                       │
+│    d. Create runtime directory for env injection              │
+│    e. Generate cloud-init ISO (with UseRuntimeEnv=true)       │
+│    f. Generate domain XML (with RuntimeDir set)               │
+│    g. Define libvirt domain (virsh define)                    │
+│    h. Save state with status="stopped"                        │
 └───────────────────────────────────────────────────────────────┘
         │
         ▼
 ┌───────────────────────────────────────────────────────────────┐
-│ 4. Network Setup (bridge mode only)                            │
-│    - Create libvirt NAT network (virsh net-define/start)      │
-│    - Setup iptables firewall rules                            │
-│    - Setup DNS DNAT                                           │
+│ 5. Write Runtime Environment                                   │
+│    - Write env vars to <cage>/runtime/env.sh                  │
+│    - This is mounted via virtiofs at /cage/runtime            │
+│    - Sourced from /etc/profile.d/cage-runtime-env.sh          │
 └───────────────────────────────────────────────────────────────┘
         │
         ▼
 ┌───────────────────────────────────────────────────────────────┐
-│ 5. Create Disk Overlay                                         │
-│    qemu-img create -f qcow2 -b <base> disk.qcow2 <size>G     │
-└───────────────────────────────────────────────────────────────┘
-        │
-        ▼
-┌───────────────────────────────────────────────────────────────┐
-│ 6. Generate SSH Keys                                           │
-│    ssh-keygen -t ed25519 → ~/.claude-cage/keys/<name>/        │
-└───────────────────────────────────────────────────────────────┘
-        │
-        ▼
-┌───────────────────────────────────────────────────────────────┐
-│ 7. Generate Cloud-init ISO                                     │
-│    - Create user-data (user, SSH key, packages, env vars)     │
-│    - Create meta-data (hostname)                              │
-│    - Generate ISO (cloud-localds or genisoimage)              │
-└───────────────────────────────────────────────────────────────┘
-        │
-        ▼
-┌───────────────────────────────────────────────────────────────┐
-│ 8. Define libvirt Domain                                       │
-│    - Generate domain XML (cpu, memory, disk, network, etc.)   │
-│    - virsh define <xml>                                       │
-└───────────────────────────────────────────────────────────────┘
-        │
-        ▼
-┌───────────────────────────────────────────────────────────────┐
-│ 9. Save State                                                  │
-│    Write state.json with status="stopped"                     │
+│ 6. Start VM                                                    │
+│    - Start virtiofsd if configured (bridge mode)              │
+│    - virsh start cage-<name>                                  │
+│    - Setup port forwarding                                    │
+│    - Update state to status="running"                         │
 └───────────────────────────────────────────────────────────────┘
 ```
 
-## Cage Start Flow
+## Cage Init Flow
 
 ```
-cage start myvm
+cage init --image ubuntu-24.04
         │
         ▼
 ┌───────────────────────────────────────────────────────────────┐
-│ 1. Load State                                                  │
-│    Read ~/.claude-cage/cages/<name>/state.json                │
-│    Verify status is "stopped"                                 │
+│ 1. Validate                                                    │
+│    - --image is required                                      │
+│    - Check if .claude-cage.yml already exists                 │
+│    - If exists and no --force: error                          │
 └───────────────────────────────────────────────────────────────┘
         │
         ▼
 ┌───────────────────────────────────────────────────────────────┐
-│ 2. Start virtiofsd (if file sharing configured)               │
-│    virtiofsd --socket-path=<sock> --shared-dir=<path>         │
-│    Save PID for cleanup                                       │
+│ 2. Build ProjectConfig                                         │
+│    - Set image from --image                                   │
+│    - Set cage name from --cage or leave empty (dir name)      │
+│    - Set memory/vcpu/disk if provided                         │
+│    - Set network.ssh (default: auto)                          │
+│    - Add default share: . → /workspace                        │
 └───────────────────────────────────────────────────────────────┘
         │
         ▼
 ┌───────────────────────────────────────────────────────────────┐
-│ 3. Start Domain                                                │
-│    virsh start cage-<name>                                    │
-└───────────────────────────────────────────────────────────────┘
-        │
-        ▼
-┌───────────────────────────────────────────────────────────────┐
-│ 4. Setup Port Forwarding (auto mode only)                      │
-│    Start forwarding processes for requested ports             │
-│    Save PIDs for cleanup                                      │
-└───────────────────────────────────────────────────────────────┘
-        │
-        ▼
-┌───────────────────────────────────────────────────────────────┐
-│ 5. Update State                                                │
-│    status="running", startedAt=now()                          │
-│    Save PIDs: virtiofsd, forwarder, passt                     │
+│ 3. Write .claude-cage.yml                                      │
+│    - Add header comment                                       │
+│    - Marshal config to YAML                                   │
+│    - Write to file                                            │
 └───────────────────────────────────────────────────────────────┘
 ```
 
@@ -137,10 +123,10 @@ cage ssh myvm
 └───────────────────────────────────────────────────────────────┘
 ```
 
-## Configuration Merge Flow
+## Configuration Resolution Flow
 
 ```
-cage create -n myvm
+cage start (with .claude-cage.yml)
         │
         ▼
 ┌───────────────────────────────────────────────────────────────┐
@@ -151,6 +137,7 @@ cage create -n myvm
 │    │   default: alpine                    │                    │
 │    │ profiles:                            │                    │
 │    │   default: {vcpu: 4, memory: 4096}   │                    │
+│    │   heavy: {vcpu: 8, memory: 8192}     │                    │
 │    │ network:                             │                    │
 │    │   dns: [1.1.1.1, 8.8.8.8]           │                    │
 │    └─────────────────────────────────────┘                    │
@@ -158,31 +145,29 @@ cage create -n myvm
         │
         ▼
 ┌───────────────────────────────────────────────────────────────┐
-│ 2. Check for Project Config                                    │
-│    ./.claude-cage.yml (current directory)                     │
+│ 2. Load Project Config                                         │
+│    ./.claude-cage.yml                                         │
 │    ┌─────────────────────────────────────┐                    │
-│    │ profiles:                            │                    │
-│    │   default: {vcpu: 8, memory: 8192}   │  ← overrides      │
+│    │ image: ubuntu-24.04                  │ (required)        │
+│    │ profile: default                     │ (reference)       │
+│    │ memory: 8G                           │ (override)        │
 │    │ env:                                 │                    │
-│    │   NODE_ENV: development              │  ← adds           │
+│    │   NODE_ENV: development              │                    │
 │    └─────────────────────────────────────┘                    │
 └───────────────────────────────────────────────────────────────┘
         │
         ▼
 ┌───────────────────────────────────────────────────────────────┐
-│ 3. Merge Configs                                               │
-│    - Scalars: project wins                                    │
-│    - Maps: merge, project wins on conflict                    │
-│    - Arrays: project replaces                                 │
+│ 3. Resolve Config                                              │
+│    ResolveProjectConfig(global, project, projectDir)          │
 │    ┌─────────────────────────────────────┐                    │
-│    │ images:                              │                    │
-│    │   default: alpine                    │ (global)          │
-│    │ profiles:                            │                    │
-│    │   default: {vcpu: 8, memory: 8192}   │ (project)         │
-│    │ network:                             │                    │
-│    │   dns: [1.1.1.1, 8.8.8.8]           │ (global)          │
-│    │ env:                                 │                    │
-│    │   NODE_ENV: development              │ (project)         │
+│    │ CageName: "myproject"                │ (from dir name)   │
+│    │ Image: "ubuntu-24.04"                │ (from project)    │
+│    │ VCPU: 4                              │ (from profile)    │
+│    │ MemoryMB: 8192                       │ (override: 8G)    │
+│    │ DiskGB: 20                           │ (from profile)    │
+│    │ Env: {NODE_ENV: development}         │ (from project)    │
+│    │ Shares: [{./src → /workspace}]       │ (resolved paths)  │
 │    └─────────────────────────────────────┘                    │
 └───────────────────────────────────────────────────────────────┘
 ```
