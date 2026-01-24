@@ -319,6 +319,256 @@ func TestCageStartInvalidImage(t *testing.T) {
 	}
 }
 
+// runCageInDir executes the cage CLI with given arguments from a specific directory
+func runCageInDir(dir string, args ...string) (string, string, error) {
+	cmd := exec.Command(cageBin, args...)
+	cmd.Dir = dir
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	return stdout.String(), stderr.String(), err
+}
+
+// runCageInDirWithTimeout executes cage with a timeout from a specific directory
+func runCageInDirWithTimeout(dir string, timeout time.Duration, args ...string) (string, string, error) {
+	cmd := exec.Command(cageBin, args...)
+	cmd.Dir = dir
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Start(); err != nil {
+		return "", "", err
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- cmd.Wait()
+	}()
+
+	select {
+	case err := <-done:
+		return stdout.String(), stderr.String(), err
+	case <-time.After(timeout):
+		cmd.Process.Kill()
+		return stdout.String(), stderr.String(), fmt.Errorf("timeout after %v", timeout)
+	}
+}
+
+// TestInitStartWorkflow tests the complete init -> start -> modify -> restart workflow
+func TestInitStartWorkflow(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping workflow test in short mode")
+	}
+
+	// Use temp config dir (no shares configured)
+	configDir := t.TempDir()
+	t.Setenv("CAGE_CONFIG_DIR", configDir)
+	runCage("config", "init", "--force")
+
+	// Check prerequisites
+	if _, _, err := runCage("doctor"); err != nil {
+		t.Skip("skipping: cage doctor reports issues")
+	}
+
+	// Check if image is available (look for checkmark before image name)
+	stdout, _, _ := runCage("setup", "--list")
+	if !strings.Contains(stdout, "✓") || !strings.Contains(stdout, testImage) {
+		t.Skipf("skipping: image %s not downloaded (run 'cage setup --base %s' first)", testImage, testImage)
+	}
+
+	// 1. Create temp project directory
+	projectDir := t.TempDir()
+	t.Logf("Using project directory: %s", projectDir)
+
+	// Generate unique cage name based on project dir name
+	cageName := fmt.Sprintf("e2e-init-%d", time.Now().UnixNano()%10000)
+
+	// Cleanup on exit
+	t.Cleanup(func() {
+		t.Log("Cleaning up...")
+		runCage("stop", cageName, "--force")
+		runCage("remove", cageName, "--force")
+		time.Sleep(2 * time.Second)
+	})
+
+	var startFailed bool
+
+	// 2. Run cage init
+	t.Run("Init", func(t *testing.T) {
+		stdout, stderr, err := runCageInDir(projectDir, "init", "--image", testImage, "--ssh", "auto", "--cage", cageName)
+		if err != nil {
+			t.Fatalf("cage init failed: %v\nstdout: %s\nstderr: %s", err, stdout, stderr)
+		}
+		t.Logf("Init output: %s", stdout)
+
+		// 3. Verify .claude-cage.yml was created
+		configPath := filepath.Join(projectDir, ".claude-cage.yml")
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			t.Fatal(".claude-cage.yml was not created")
+		}
+
+		// Read and verify config content
+		content, err := os.ReadFile(configPath)
+		if err != nil {
+			t.Fatalf("failed to read config: %v", err)
+		}
+		configStr := string(content)
+		if !strings.Contains(configStr, testImage) {
+			t.Errorf("config does not contain image %s: %s", testImage, configStr)
+		}
+		if !strings.Contains(configStr, "ssh: auto") {
+			t.Errorf("config does not contain 'ssh: auto': %s", configStr)
+		}
+		t.Logf("Config content:\n%s", configStr)
+	})
+
+	// 4. Run cage start (from project dir, no name needed)
+	t.Run("FirstStart", func(t *testing.T) {
+		stdout, stderr, err := runCageInDirWithTimeout(projectDir, 2*time.Minute, "start")
+		if err != nil {
+			startFailed = true
+			if strings.Contains(stderr, "Operation not permitted") {
+				t.Skipf("skipping: network creation requires root (use CAGE_NETWORK=bridge and run as root)")
+			}
+			t.Fatalf("cage start failed: %v\nstdout: %s\nstderr: %s", err, stdout, stderr)
+		}
+		t.Logf("Start output: %s", stdout)
+	})
+
+	if startFailed {
+		t.Skip("skipping remaining tests: cage failed to start")
+	}
+
+	// Wait for VM to boot
+	t.Log("Waiting for VM to boot...")
+	time.Sleep(10 * time.Second)
+
+	// 5. Verify cage is running
+	t.Run("VerifyRunning", func(t *testing.T) {
+		stdout, _, err := runCage("list")
+		if err != nil {
+			t.Fatalf("cage list failed: %v", err)
+		}
+		if !strings.Contains(stdout, cageName) {
+			t.Errorf("cage %s not in list: %s", cageName, stdout)
+		}
+		if !strings.Contains(stdout, "running") {
+			t.Errorf("cage not showing as running: %s", stdout)
+		}
+	})
+
+	// Wait for SSH to be ready
+	t.Run("WaitForSSH", func(t *testing.T) {
+		var sshOK bool
+		for i := 0; i < 30; i++ {
+			stdout, _, err := runCageWithTimeout(10*time.Second, "ssh", cageName, "echo SSH_OK")
+			if err == nil && strings.Contains(stdout, "SSH_OK") {
+				sshOK = true
+				break
+			}
+			t.Logf("Waiting for SSH... (%d/30)", i+1)
+			time.Sleep(5 * time.Second)
+		}
+		if !sshOK {
+			t.Fatal("SSH connection failed after 150s")
+		}
+		t.Log("SSH connection successful")
+	})
+
+	// 6. Stop cage (from project dir, no name needed)
+	t.Run("Stop", func(t *testing.T) {
+		stdout, stderr, err := runCageInDir(projectDir, "stop")
+		if err != nil {
+			t.Fatalf("cage stop failed: %v\nstdout: %s\nstderr: %s", err, stdout, stderr)
+		}
+		t.Logf("Stop output: %s", stdout)
+	})
+
+	// Wait for stop
+	time.Sleep(3 * time.Second)
+
+	// 7. Modify .claude-cage.yml - add env var
+	t.Run("ModifyConfig", func(t *testing.T) {
+		configPath := filepath.Join(projectDir, ".claude-cage.yml")
+		content, err := os.ReadFile(configPath)
+		if err != nil {
+			t.Fatalf("failed to read config: %v", err)
+		}
+
+		// Add env var to config
+		newContent := string(content) + "\nenv:\n  E2E_TEST_VAR: hello_from_config\n"
+		if err := os.WriteFile(configPath, []byte(newContent), 0644); err != nil {
+			t.Fatalf("failed to write modified config: %v", err)
+		}
+		t.Logf("Modified config:\n%s", newContent)
+	})
+
+	// 8. Start again (from project dir)
+	t.Run("RestartWithEnv", func(t *testing.T) {
+		stdout, stderr, err := runCageInDirWithTimeout(projectDir, 2*time.Minute, "start")
+		if err != nil {
+			t.Fatalf("cage start (after modify) failed: %v\nstdout: %s\nstderr: %s", err, stdout, stderr)
+		}
+		t.Logf("Restart output: %s", stdout)
+	})
+
+	// Wait for VM to boot
+	t.Log("Waiting for VM to boot after restart...")
+	time.Sleep(10 * time.Second)
+
+	// Wait for SSH again
+	t.Run("WaitForSSHAfterRestart", func(t *testing.T) {
+		var sshOK bool
+		for i := 0; i < 30; i++ {
+			stdout, _, err := runCageWithTimeout(10*time.Second, "ssh", cageName, "echo SSH_OK")
+			if err == nil && strings.Contains(stdout, "SSH_OK") {
+				sshOK = true
+				break
+			}
+			t.Logf("Waiting for SSH after restart... (%d/30)", i+1)
+			time.Sleep(5 * time.Second)
+		}
+		if !sshOK {
+			t.Fatal("SSH connection failed after restart")
+		}
+	})
+
+	// 9. SSH in and verify env var is set
+	t.Run("VerifyEnvVar", func(t *testing.T) {
+		// Give time for cloud-init to set up env vars
+		time.Sleep(5 * time.Second)
+
+		// Source the env file and echo the var
+		stdout, stderr, err := runCageWithTimeout(30*time.Second, "ssh", cageName,
+			"bash -c 'source /etc/profile.d/cage-env.sh 2>/dev/null || true; echo $E2E_TEST_VAR'")
+		if err != nil {
+			t.Fatalf("SSH command failed: %v\nstdout: %s\nstderr: %s", err, stdout, stderr)
+		}
+		t.Logf("Env var output: %s", stdout)
+
+		if !strings.Contains(stdout, "hello_from_config") {
+			// Try alternate approach - check if the env file exists
+			stdout2, _, _ := runCageWithTimeout(30*time.Second, "ssh", cageName,
+				"cat /etc/profile.d/cage-env.sh 2>/dev/null || cat /mnt/runtime/env 2>/dev/null || echo 'no env file found'")
+			t.Logf("Env file content: %s", stdout2)
+
+			// The env var may not be in the shell environment yet, but should be in the file
+			if !strings.Contains(stdout2, "E2E_TEST_VAR") && !strings.Contains(stdout2, "hello_from_config") {
+				t.Errorf("expected E2E_TEST_VAR=hello_from_config, got stdout: %s", stdout)
+			} else {
+				t.Log("Env var found in env file (not yet in shell environment)")
+			}
+		}
+	})
+
+	// 10. Final stop (cleanup will do the remove)
+	t.Run("FinalStop", func(t *testing.T) {
+		runCageInDir(projectDir, "stop", "--force")
+	})
+}
+
 // TestCageStartDuplicate tests starting a cage that already exists and is running
 func TestCageStartDuplicate(t *testing.T) {
 	if testing.Short() {
