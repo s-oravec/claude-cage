@@ -16,6 +16,7 @@ type CloudInitConfig struct {
 	MountVirtiofs bool
 	Env           map[string]string
 	InstallSSH    bool
+	UseRuntimeEnv bool // Source env from /cage/runtime/env.sh instead of baking in Env
 }
 
 // GenerateUserData generates cloud-init user-data content
@@ -64,18 +65,38 @@ func generateEnvRuncmd(env map[string]string) string {
 
 // GenerateUserDataWithConfig generates cloud-init user-data with full config
 func GenerateUserDataWithConfig(cfg *CloudInitConfig) string {
-	virtiofsMounts := ""
+	var mounts []string
 	virtiofsRuncmd := ""
 
 	if cfg.MountVirtiofs {
-		virtiofsMounts = `
-mounts:
-  - [ workspace, /workspace, virtiofs, "defaults,nofail", "0", "0" ]
-`
+		mounts = append(mounts, `  - [ workspace, /workspace, virtiofs, "defaults,nofail", "0", "0" ]`)
 		virtiofsRuncmd = `
   - mkdir -p /workspace
   - mount -t virtiofs workspace /workspace || true
   - chown cage:cage /workspace || true`
+	}
+
+	if cfg.UseRuntimeEnv {
+		mounts = append(mounts, `  - [ cage-runtime, /cage/runtime, virtiofs, "ro,nofail", "0", "0" ]`)
+	}
+
+	virtiofsMounts := ""
+	if len(mounts) > 0 {
+		virtiofsMounts = "\nmounts:\n" + strings.Join(mounts, "\n") + "\n"
+	}
+
+	writeFiles := ""
+	if cfg.UseRuntimeEnv {
+		writeFiles = `
+write_files:
+  - path: /etc/profile.d/cage-runtime-env.sh
+    permissions: '0644'
+    content: |
+      # Source cage runtime environment
+      if [ -f /cage/runtime/env.sh ]; then
+          . /cage/runtime/env.sh
+      fi
+`
 	}
 
 	sshRuncmd := ""
@@ -88,7 +109,11 @@ mounts:
   - which zypper && zypper install -y openssh && systemctl enable sshd && systemctl start sshd || true`
 	}
 
-	envRuncmd := generateEnvRuncmd(cfg.Env)
+	// When UseRuntimeEnv is true, don't use the old Env field (mutually exclusive)
+	envRuncmd := ""
+	if !cfg.UseRuntimeEnv {
+		envRuncmd = generateEnvRuncmd(cfg.Env)
+	}
 
 	return fmt.Sprintf(`#cloud-config
 users:
@@ -114,7 +139,7 @@ resize_rootfs: true
 
 package_update: false
 package_upgrade: false
-%s
+%s%s
 runcmd:
   # Install sudo on Alpine (apk) or ensure it exists on other distros
   - which apk && apk add --no-cache sudo doas || true
@@ -129,7 +154,7 @@ runcmd:
   # Docker setup (OpenRC-based distros like Alpine)
   - which rc-update && rc-update add docker default || true
   - which rc-service && rc-service docker start || true%s%s%s
-`, cfg.PubKey, virtiofsMounts, virtiofsRuncmd, sshRuncmd, envRuncmd)
+`, cfg.PubKey, virtiofsMounts, writeFiles, virtiofsRuncmd, sshRuncmd, envRuncmd)
 }
 
 // GenerateMetaData generates cloud-init meta-data content

@@ -301,3 +301,67 @@ func TestGenerateUserData_GrowPartition(t *testing.T) {
 	assert.Contains(t, userData, "mode: auto")
 	assert.Contains(t, userData, "resize_rootfs: true")
 }
+
+func TestGenerateCloudConfig_RuntimeEnvSource(t *testing.T) {
+	cfg := &CloudInitConfig{
+		CageName:      "testcage",
+		PubKey:        "ssh-ed25519 AAAA... test@key",
+		UseRuntimeEnv: true,
+	}
+
+	userData := GenerateUserDataWithConfig(cfg)
+
+	// Should have mounts section with cage-runtime virtiofs
+	assert.Contains(t, userData, "mounts:")
+	assert.Contains(t, userData, "cage-runtime")
+	assert.Contains(t, userData, "/cage/runtime")
+	assert.Contains(t, userData, "virtiofs")
+	assert.Contains(t, userData, `"ro,nofail"`)
+
+	// Should have write_files section with profile script
+	assert.Contains(t, userData, "write_files:")
+	assert.Contains(t, userData, "/etc/profile.d/cage-runtime-env.sh")
+	assert.Contains(t, userData, "permissions: '0644'")
+	assert.Contains(t, userData, ". /cage/runtime/env.sh")
+	assert.Contains(t, userData, "if [ -f /cage/runtime/env.sh ]")
+}
+
+func TestGenerateCloudConfig_RuntimeEnvMutuallyExclusive(t *testing.T) {
+	cfg := &CloudInitConfig{
+		CageName:      "testcage",
+		PubKey:        "ssh-ed25519 AAAA... test@key",
+		UseRuntimeEnv: true,
+		Env: map[string]string{
+			"MY_VAR":      "hello",
+			"ANOTHER_VAR": "world",
+		},
+	}
+
+	userData := GenerateUserDataWithConfig(cfg)
+
+	// Should have runtime env sourcing
+	assert.Contains(t, userData, "/etc/profile.d/cage-runtime-env.sh")
+	assert.Contains(t, userData, ". /cage/runtime/env.sh")
+
+	// Should NOT have the old baked-in env vars (mutually exclusive)
+	assert.NotContains(t, userData, "export MY_VAR='hello'")
+	assert.NotContains(t, userData, "export ANOTHER_VAR='world'")
+	assert.NotContains(t, userData, "/etc/profile.d/cage-env.sh")
+}
+
+func TestGenerateCloudConfig_RuntimeEnvWithVirtiofs(t *testing.T) {
+	cfg := &CloudInitConfig{
+		CageName:      "testcage",
+		PubKey:        "ssh-ed25519 AAAA... test@key",
+		MountVirtiofs: true,
+		UseRuntimeEnv: true,
+	}
+
+	userData := GenerateUserDataWithConfig(cfg)
+
+	// Should have both mounts
+	assert.Contains(t, userData, "mounts:")
+	assert.Contains(t, userData, "workspace")
+	assert.Contains(t, userData, "cage-runtime")
+	assert.Contains(t, userData, "/cage/runtime")
+}
