@@ -172,7 +172,7 @@ func TestGenerateDomainXML_ContainsRequiredElements(t *testing.T) {
 
 	// Cloud-init CDROM
 	assert.Contains(t, xml, "<disk type='file' device='cdrom'>")
-	assert.Contains(t, xml, "<target dev='sda' bus='sata'/>")
+	assert.Contains(t, xml, "<target dev='hdc' bus='ide'/>")
 	assert.Contains(t, xml, "<readonly/>")
 
 	// Console
