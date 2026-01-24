@@ -463,7 +463,8 @@ func TestInitStartWorkflow(t *testing.T) {
 	t.Run("WaitForSSH", func(t *testing.T) {
 		var sshOK bool
 		for i := 0; i < 30; i++ {
-			stdout, _, err := runCageWithTimeout(10*time.Second, "ssh", cageName, "echo SSH_OK")
+			// Use cage ssh from project dir (no cage name) to test project config resolution
+			stdout, _, err := runCageInDirWithTimeout(projectDir, 10*time.Second, "ssh", "echo", "SSH_OK")
 			if err == nil && strings.Contains(stdout, "SSH_OK") {
 				sshOK = true
 				break
@@ -518,11 +519,11 @@ func TestInitStartWorkflow(t *testing.T) {
 	t.Log("Waiting for VM to boot after restart...")
 	time.Sleep(10 * time.Second)
 
-	// Wait for SSH again
+	// Wait for SSH again (from project dir)
 	t.Run("WaitForSSHAfterRestart", func(t *testing.T) {
 		var sshOK bool
 		for i := 0; i < 30; i++ {
-			stdout, _, err := runCageWithTimeout(10*time.Second, "ssh", cageName, "echo SSH_OK")
+			stdout, _, err := runCageInDirWithTimeout(projectDir, 10*time.Second, "ssh", "echo", "SSH_OK")
 			if err == nil && strings.Contains(stdout, "SSH_OK") {
 				sshOK = true
 				break
@@ -535,14 +536,14 @@ func TestInitStartWorkflow(t *testing.T) {
 		}
 	})
 
-	// 9. SSH in and verify env var is set
+	// 9. SSH in and verify env var is set (from project dir)
 	t.Run("VerifyEnvVar", func(t *testing.T) {
 		// Give time for cloud-init to set up env vars
 		time.Sleep(5 * time.Second)
 
 		// Source the env file and echo the var
-		stdout, stderr, err := runCageWithTimeout(30*time.Second, "ssh", cageName,
-			"bash -c 'source /etc/profile.d/cage-env.sh 2>/dev/null || true; echo $E2E_TEST_VAR'")
+		stdout, stderr, err := runCageInDirWithTimeout(projectDir, 30*time.Second, "ssh",
+			"bash", "-c", "source /etc/profile.d/cage-env.sh 2>/dev/null || true; echo $E2E_TEST_VAR")
 		if err != nil {
 			t.Fatalf("SSH command failed: %v\nstdout: %s\nstderr: %s", err, stdout, stderr)
 		}
@@ -550,8 +551,8 @@ func TestInitStartWorkflow(t *testing.T) {
 
 		if !strings.Contains(stdout, "hello_from_config") {
 			// Try alternate approach - check if the env file exists
-			stdout2, _, _ := runCageWithTimeout(30*time.Second, "ssh", cageName,
-				"cat /etc/profile.d/cage-env.sh 2>/dev/null || cat /mnt/runtime/env 2>/dev/null || echo 'no env file found'")
+			stdout2, _, _ := runCageInDirWithTimeout(projectDir, 30*time.Second, "ssh",
+				"cat", "/etc/profile.d/cage-env.sh")
 			t.Logf("Env file content: %s", stdout2)
 
 			// The env var may not be in the shell environment yet, but should be in the file

@@ -87,3 +87,20 @@ func DeleteKeys(cageName string) error {
 func KnownHostsPath() string {
 	return filepath.Join(config.Dir(), "known_hosts")
 }
+
+// RemoveKnownHost removes a host entry from the known_hosts file.
+// For user-mode networking with port forwarding, host should be "[127.0.0.1]:PORT".
+// For bridge networking, host should be the IP address.
+func RemoveKnownHost(host string) error {
+	knownHostsPath := KnownHostsPath()
+
+	// Check if file exists
+	if _, err := os.Stat(knownHostsPath); os.IsNotExist(err) {
+		return nil // Nothing to remove
+	}
+
+	cmd := exec.Command("ssh-keygen", "-f", knownHostsPath, "-R", host)
+	// Ignore errors - entry might not exist
+	cmd.Run()
+	return nil
+}
