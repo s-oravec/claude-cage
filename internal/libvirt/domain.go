@@ -13,7 +13,8 @@ type DomainConfig struct {
 	DiskPath       string
 	CloudInitISO   string
 	NetworkName    string // if empty, uses user-mode networking (SLIRP)
-	VirtiofsSocket string // optional: path to virtiofsd socket
+	VirtiofsSocket string // optional: path to virtiofsd socket for workspace sharing
+	RuntimeDir     string // optional: host path to runtime directory for env vars
 	SSHPort        int    // optional: host port for SSH forwarding (user-mode only)
 }
 
@@ -33,7 +34,7 @@ const domainXMLTemplate = `<domain type='kvm'{{if and (not .NetworkName) (gt .SS
   </features>
 
   <cpu mode='host-passthrough'/>
-{{if .VirtiofsSocket}}
+{{if or .VirtiofsSocket .RuntimeDir}}
   <memoryBacking>
     <source type='memfd'/>
     <access mode='shared'/>
@@ -47,10 +48,13 @@ const domainXMLTemplate = `<domain type='kvm'{{if and (not .NetworkName) (gt .SS
       <target dev='vda' bus='virtio'/>
     </disk>
 
-    <!-- Cloud-init ISO -->
+    <!-- Cloud-init ISO: Using IDE bus instead of SATA to avoid PCI slot
+         conflicts. SATA creates an AHCI controller that takes PCI slot 0x2,
+         which can conflict with other devices (virtio-net-pci). IDE is
+         emulated as part of PIIX chipset and doesn't occupy a separate PCI slot. -->
     <disk type='file' device='cdrom'>
       <source file='{{.CloudInitISO}}'/>
-      <target dev='sda' bus='sata'/>
+      <target dev='hdc' bus='ide'/>
       <readonly/>
     </disk>
 
@@ -68,11 +72,19 @@ const domainXMLTemplate = `<domain type='kvm'{{if and (not .NetworkName) (gt .SS
     </interface>
 {{end}}{{end}}
 {{if .VirtiofsSocket}}
-    <!-- Virtio-fs shared directory -->
+    <!-- Virtio-fs shared directory (workspace) -->
     <filesystem type='mount' accessmode='passthrough'>
       <driver type='virtiofs' queue='1024'/>
       <source socket='{{.VirtiofsSocket}}'/>
       <target dir='workspace'/>
+    </filesystem>
+{{end}}
+{{if .RuntimeDir}}
+    <!-- Virtio-fs runtime directory (env vars) -->
+    <filesystem type='mount' accessmode='passthrough'>
+      <driver type='virtiofs'/>
+      <source dir='{{.RuntimeDir}}'/>
+      <target dir='cage-runtime'/>
     </filesystem>
 {{end}}
     <!-- Console -->
@@ -89,11 +101,17 @@ const domainXMLTemplate = `<domain type='kvm'{{if and (not .NetworkName) (gt .SS
     </rng>
   </devices>
 {{if and (not .NetworkName) (gt .SSHPort 0)}}
+  <!-- User-mode networking with SSH port forwarding via QEMU command line.
+       We must specify explicit PCI address (0x10) because qemu:commandline
+       bypasses libvirt's PCI address management. Without it, QEMU would
+       auto-assign a low slot (e.g., 0x2) that conflicts with libvirt-managed
+       devices like virtio-blk. Slot 0x10 is high enough to avoid conflicts
+       with libvirt's auto-assignment which starts from low numbers. -->
   <qemu:commandline>
     <qemu:arg value='-netdev'/>
     <qemu:arg value='user,id=net0,hostfwd=tcp:127.0.0.1:{{.SSHPort}}-:22'/>
     <qemu:arg value='-device'/>
-    <qemu:arg value='virtio-net-pci,netdev=net0'/>
+    <qemu:arg value='virtio-net-pci,netdev=net0,bus=pci.0,addr=0x10'/>
   </qemu:commandline>
 {{end}}
 </domain>`

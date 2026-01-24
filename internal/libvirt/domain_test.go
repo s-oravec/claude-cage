@@ -268,3 +268,67 @@ func TestGenerateDomainXML_CombinedSlirpNetworkAndVirtiofs(t *testing.T) {
 	assert.Contains(t, xml, "<filesystem type='mount'")
 	assert.Contains(t, xml, "<memoryBacking>")
 }
+
+func TestGenerateDomainXML_RuntimeMount(t *testing.T) {
+	cfg := &DomainConfig{
+		Name:         "test",
+		MemoryMB:     4096,
+		VCPU:         4,
+		DiskPath:     "/tmp/disk.qcow2",
+		CloudInitISO: "/tmp/cloud-init.iso",
+		NetworkName:  "default",
+		RuntimeDir:   "/home/user/.claude-cage/cages/test/runtime",
+	}
+
+	xml, err := GenerateDomainXML(cfg)
+	require.NoError(t, err)
+
+	// Should have runtime virtiofs filesystem
+	assert.Contains(t, xml, "<filesystem type='mount' accessmode='passthrough'>")
+	assert.Contains(t, xml, "type='virtiofs'")
+	assert.Contains(t, xml, cfg.RuntimeDir)
+	assert.Contains(t, xml, "<target dir='cage-runtime'/>")
+
+	// Should have shared memory backing for virtiofs
+	assert.Contains(t, xml, "<memoryBacking>")
+	assert.Contains(t, xml, "<source type='memfd'/>")
+	assert.Contains(t, xml, "<access mode='shared'/>")
+
+	// Should NOT have workspace virtiofs (VirtiofsSocket not set)
+	assert.NotContains(t, xml, "<target dir='workspace'/>")
+}
+
+func TestGenerateDomainXML_RuntimeMountWithVirtiofs(t *testing.T) {
+	cfg := &DomainConfig{
+		Name:           "test",
+		MemoryMB:       4096,
+		VCPU:           4,
+		DiskPath:       "/tmp/disk.qcow2",
+		CloudInitISO:   "/tmp/cloud-init.iso",
+		NetworkName:    "default",
+		VirtiofsSocket: "/run/cage/test/virtiofs.sock",
+		RuntimeDir:     "/home/user/.claude-cage/cages/test/runtime",
+	}
+
+	xml, err := GenerateDomainXML(cfg)
+	require.NoError(t, err)
+
+	// Should have BOTH virtiofs filesystems
+
+	// Workspace mount (socket-based virtiofsd)
+	assert.Contains(t, xml, cfg.VirtiofsSocket)
+	assert.Contains(t, xml, "<target dir='workspace'/>")
+
+	// Runtime mount (direct directory)
+	assert.Contains(t, xml, cfg.RuntimeDir)
+	assert.Contains(t, xml, "<target dir='cage-runtime'/>")
+
+	// Should have shared memory backing (required for virtiofs)
+	assert.Contains(t, xml, "<memoryBacking>")
+	assert.Contains(t, xml, "<source type='memfd'/>")
+	assert.Contains(t, xml, "<access mode='shared'/>")
+
+	// Count filesystem elements - should have exactly 2
+	fsCount := strings.Count(xml, "<filesystem type='mount'")
+	assert.Equal(t, 2, fsCount, "Should have exactly 2 filesystem mounts")
+}
