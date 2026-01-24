@@ -278,101 +278,115 @@ func TestMerge_PartialConfig(t *testing.T) {
 	assert.Equal(t, 4, base.Profiles["default"].VCPU)
 }
 
-func TestFindProjectConfig_NotFound(t *testing.T) {
-	// Save current dir
-	oldDir, _ := os.Getwd()
-	tmpDir := t.TempDir()
-	os.Chdir(tmpDir)
-	defer os.Chdir(oldDir)
-
-	path := FindProjectConfig()
-	assert.Empty(t, path)
-}
-
-func TestFindProjectConfig_Found(t *testing.T) {
-	// Save current dir
-	oldDir, _ := os.Getwd()
-	tmpDir := t.TempDir()
-	os.Chdir(tmpDir)
-	defer os.Chdir(oldDir)
-
-	// Create project config
-	configPath := filepath.Join(tmpDir, ProjectConfigName)
-	os.WriteFile(configPath, []byte("images:\n  default: ubuntu\n"), 0644)
-
-	path := FindProjectConfig()
-	assert.Equal(t, configPath, path)
-}
-
 func TestLoadProjectConfig(t *testing.T) {
-	// Save current dir
-	oldDir, _ := os.Getwd()
 	tmpDir := t.TempDir()
-	os.Chdir(tmpDir)
-	defer os.Chdir(oldDir)
 
-	// Create project config
-	configPath := filepath.Join(tmpDir, ProjectConfigName)
-	os.WriteFile(configPath, []byte(`
-images:
-  default: ubuntu
+	// Create a full project config
+	configPath := filepath.Join(tmpDir, ProjectConfigFile)
+	configContent := `
+cage: my-project
+image: ubuntu:22.04
+profile: heavy
+memory: 8G
+vcpu: 4
+disk: 50
+network:
+  ssh: "2222"
+  ports:
+    - "8080:80"
+    - "3000:3000"
+shares:
+  - host: ~/code
+    guest: /workspace
+    mode: rw
 env:
   NODE_ENV: production
-`), 0644)
+  DEBUG: "true"
+`
+	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	require.NoError(t, err)
 
-	cfg, err := LoadProjectConfig()
+	cfg, err := LoadProjectConfig(tmpDir)
 	require.NoError(t, err)
 	require.NotNil(t, cfg)
 
-	assert.Equal(t, "ubuntu", cfg.Images.Default)
+	assert.Equal(t, "my-project", cfg.Cage)
+	assert.Equal(t, "ubuntu:22.04", cfg.Image)
+	assert.Equal(t, "heavy", cfg.Profile)
+	assert.Equal(t, "8G", cfg.Memory)
+	assert.Equal(t, 4, cfg.VCPU)
+	assert.Equal(t, 50, cfg.DiskGB)
+	assert.Equal(t, "2222", cfg.Network.SSH)
+	assert.Equal(t, []string{"8080:80", "3000:3000"}, cfg.Network.Ports)
+	require.Len(t, cfg.Shares, 1)
+	assert.Equal(t, "~/code", cfg.Shares[0].Host)
+	assert.Equal(t, "/workspace", cfg.Shares[0].Guest)
+	assert.Equal(t, "rw", cfg.Shares[0].Mode)
 	assert.Equal(t, "production", cfg.Env["NODE_ENV"])
+	assert.Equal(t, "true", cfg.Env["DEBUG"])
+}
+
+func TestLoadProjectConfig_CageNameFromDir(t *testing.T) {
+	// Create a temp dir with a specific name
+	parentDir := t.TempDir()
+	projectDir := filepath.Join(parentDir, "awesome-project")
+	err := os.MkdirAll(projectDir, 0755)
+	require.NoError(t, err)
+
+	// Create minimal config without cage name
+	configPath := filepath.Join(projectDir, ProjectConfigFile)
+	configContent := `image: alpine:latest`
+	err = os.WriteFile(configPath, []byte(configContent), 0644)
+	require.NoError(t, err)
+
+	cfg, err := LoadProjectConfig(projectDir)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	// Cage name should default to directory name
+	assert.Equal(t, "awesome-project", cfg.Cage)
+	assert.Equal(t, "alpine:latest", cfg.Image)
 }
 
 func TestLoadProjectConfig_NotFound(t *testing.T) {
-	// Save current dir
-	oldDir, _ := os.Getwd()
 	tmpDir := t.TempDir()
-	os.Chdir(tmpDir)
-	defer os.Chdir(oldDir)
 
-	cfg, err := LoadProjectConfig()
-	assert.NoError(t, err)
+	cfg, err := LoadProjectConfig(tmpDir)
+	assert.Error(t, err)
 	assert.Nil(t, cfg)
+	assert.Contains(t, err.Error(), ProjectConfigFile)
 }
 
-func TestLoad_WithProjectConfig(t *testing.T) {
-	// Setup global config dir
-	globalDir := t.TempDir()
-	oldConfigDir := configDir
-	configDir = globalDir
-	defer func() { configDir = oldConfigDir }()
+func TestLoadProjectConfig_MissingImage(t *testing.T) {
+	tmpDir := t.TempDir()
 
-	// Save global config
-	globalCfg := DefaultConfig()
-	globalCfg.Env = map[string]string{"GLOBAL": "yes"}
-	Save(globalCfg)
-
-	// Setup project dir
-	oldDir, _ := os.Getwd()
-	projectDir := t.TempDir()
-	os.Chdir(projectDir)
-	defer os.Chdir(oldDir)
-
-	// Create project config
-	os.WriteFile(filepath.Join(projectDir, ProjectConfigName), []byte(`
-images:
-  default: debian
-env:
-  PROJECT: yes
-`), 0644)
-
-	// Load should merge
-	cfg, err := Load()
+	// Create config without image field
+	configPath := filepath.Join(tmpDir, ProjectConfigFile)
+	configContent := `
+cage: my-project
+memory: 4G
+`
+	err := os.WriteFile(configPath, []byte(configContent), 0644)
 	require.NoError(t, err)
 
-	// Project overrides
-	assert.Equal(t, "debian", cfg.Images.Default)
-	assert.Equal(t, "yes", cfg.Env["PROJECT"])
-	// Global preserved
-	assert.Equal(t, "yes", cfg.Env["GLOBAL"])
+	cfg, err := LoadProjectConfig(tmpDir)
+	assert.Error(t, err)
+	assert.Nil(t, cfg)
+	assert.Contains(t, err.Error(), "image")
 }
+
+func TestProjectConfigExists(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Should not exist initially
+	assert.False(t, ProjectConfigExists(tmpDir))
+
+	// Create config file
+	configPath := filepath.Join(tmpDir, ProjectConfigFile)
+	err := os.WriteFile(configPath, []byte("image: alpine"), 0644)
+	require.NoError(t, err)
+
+	// Should exist now
+	assert.True(t, ProjectConfigExists(tmpDir))
+}
+

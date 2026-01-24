@@ -71,40 +71,63 @@ func Path() string {
 	return filepath.Join(Dir(), "config.yaml")
 }
 
-// ProjectConfigName is the name of the project-level config file
-const ProjectConfigName = ".claude-cage.yml"
+// ProjectConfigFile is the name of the project-level config file
+const ProjectConfigFile = ".claude-cage.yml"
 
-// FindProjectConfig looks for .claude-cage.yml in the current directory
-func FindProjectConfig() string {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return ""
-	}
-	path := filepath.Join(cwd, ProjectConfigName)
-	if _, err := os.Stat(path); err == nil {
-		return path
-	}
-	return ""
+// ProjectNetwork holds network settings for a project
+type ProjectNetwork struct {
+	SSH   string   `yaml:"ssh,omitempty"`   // port number or "auto"
+	Ports []string `yaml:"ports,omitempty"` // "host:guest" format
 }
 
-// LoadProjectConfig loads the project-level config if it exists
-func LoadProjectConfig() (*Config, error) {
-	path := FindProjectConfig()
-	if path == "" {
-		return nil, nil
-	}
+// ProjectConfig holds project-level configuration from .claude-cage.yml
+type ProjectConfig struct {
+	Cage    string            `yaml:"cage,omitempty"`    // cage name, optional, defaults to directory name
+	Image   string            `yaml:"image"`             // required, base image
+	Profile string            `yaml:"profile,omitempty"` // references global profile
+	Memory  string            `yaml:"memory,omitempty"`  // e.g. "4G", "8G"
+	VCPU    int               `yaml:"vcpu,omitempty"`
+	DiskGB  int               `yaml:"disk,omitempty"`
+	Network ProjectNetwork    `yaml:"network,omitempty"`
+	Shares  []ShareConfig     `yaml:"shares,omitempty"` // reuses existing ShareConfig
+	Env     map[string]string `yaml:"env,omitempty"`
+}
+
+// LoadProjectConfig loads the project-level config from a directory
+func LoadProjectConfig(dir string) (*ProjectConfig, error) {
+	path := filepath.Join(dir, ProjectConfigFile)
 
 	data, err := os.ReadFile(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("project config file %s not found in %s", ProjectConfigFile, dir)
+		}
 		return nil, err
 	}
 
-	var cfg Config
+	var cfg ProjectConfig
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse %s: %w", ProjectConfigFile, err)
+	}
+
+	// Default cage name to directory name if not specified
+	if cfg.Cage == "" {
+		cfg.Cage = filepath.Base(dir)
+	}
+
+	// Validate required fields
+	if cfg.Image == "" {
+		return nil, fmt.Errorf("image is required in %s", ProjectConfigFile)
 	}
 
 	return &cfg, nil
+}
+
+// ProjectConfigExists returns true if the project config file exists in the directory
+func ProjectConfigExists(dir string) bool {
+	path := filepath.Join(dir, ProjectConfigFile)
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // Exists returns true if config file exists
@@ -140,7 +163,7 @@ func DefaultConfig() *Config {
 	}
 }
 
-// Load reads config from file and merges with project config if present
+// Load reads config from file
 func Load() (*Config, error) {
 	data, err := os.ReadFile(Path())
 	if err != nil {
@@ -150,15 +173,6 @@ func Load() (*Config, error) {
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, err
-	}
-
-	// Try to load and merge project config
-	projectCfg, err := LoadProjectConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load project config: %w", err)
-	}
-	if projectCfg != nil {
-		cfg.Merge(projectCfg)
 	}
 
 	return &cfg, nil
