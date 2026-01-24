@@ -90,6 +90,13 @@ func runStartCmd(cmd *cobra.Command, args []string, ports []string) error {
 			if state.Image != resolvedImage {
 				return fmt.Errorf("cage image mismatch: cage uses '%s', config specifies '%s'. Use 'cage rm %s' and restart to recreate", state.Image, resolvedImage, name)
 			}
+
+			// Reconfigure domain with new settings if cage is stopped
+			if state.Status != cage.StatusRunning {
+				if err := cage.Reconfigure(name, resolved); err != nil {
+					return fmt.Errorf("failed to reconfigure cage: %w", err)
+				}
+			}
 		}
 	}
 

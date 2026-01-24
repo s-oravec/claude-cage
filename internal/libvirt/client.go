@@ -140,3 +140,24 @@ func (c *Client) ListRunningDomains() ([]string, error) {
 	}
 	return cages, nil
 }
+
+// RedefineDomain undefines and redefines a domain with new XML
+// The domain must be stopped (inactive) for this to work.
+func (c *Client) RedefineDomain(name, xml string) error {
+	// Check if domain is running - can't redefine a running domain
+	if c.DomainIsRunning(name) {
+		return fmt.Errorf("domain cage-%s is running, cannot redefine", name)
+	}
+
+	// Undefine the old domain
+	if err := c.UndefineDomain(name); err != nil {
+		return fmt.Errorf("failed to undefine domain: %w", err)
+	}
+
+	// Define the new domain
+	if err := c.DefineDomain(xml); err != nil {
+		return fmt.Errorf("failed to define new domain: %w", err)
+	}
+
+	return nil
+}
