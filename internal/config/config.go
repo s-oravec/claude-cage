@@ -50,7 +50,7 @@ type NetworkConfig struct {
 type ShareConfig struct {
 	Host  string `yaml:"host"`
 	Guest string `yaml:"guest"`
-	Mode  string `yaml:"mode"`
+	Mode  string `yaml:"mode,omitempty"`
 }
 
 // SecurityConfig holds security settings
