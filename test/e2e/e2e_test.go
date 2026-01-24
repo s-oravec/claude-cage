@@ -154,36 +154,21 @@ func TestCageLifecycle(t *testing.T) {
 		time.Sleep(2 * time.Second)
 	})
 
-	// Create cage
-	var createFailed bool
-	t.Run("Create", func(t *testing.T) {
-		args := []string{"create", "-n", name, "-i", testImage, "-p", "light", "--ssh", "auto"}
+	// Start cage (creates and starts in one step)
+	var startFailed bool
+	t.Run("Start", func(t *testing.T) {
+		args := []string{"start", name, "-i", testImage, "-p", "light", "--ssh", "auto"}
 		if networkMode == "bridge" {
 			args = append(args, "--network", "bridge")
 		}
 
-		stdout, stderr, err := runCageWithTimeout(60*time.Second, args...)
+		stdout, stderr, err := runCageWithTimeout(2*time.Minute, args...)
 		if err != nil {
-			createFailed = true
+			startFailed = true
 			// Check if it's a permissions issue
 			if strings.Contains(stderr, "Operation not permitted") {
 				t.Skipf("skipping: network creation requires root (use CAGE_NETWORK=bridge and run as root)")
 			}
-			t.Fatalf("cage create failed: %v\nstdout: %s\nstderr: %s", err, stdout, stderr)
-		}
-		t.Logf("Create output: %s", stdout)
-	})
-
-	if createFailed {
-		t.Skip("skipping remaining tests: cage failed to create")
-	}
-
-	// Start cage
-	var startFailed bool
-	t.Run("Start", func(t *testing.T) {
-		stdout, stderr, err := runCageWithTimeout(2*time.Minute, "start", name)
-		if err != nil {
-			startFailed = true
 			t.Fatalf("cage start failed: %v\nstdout: %s\nstderr: %s", err, stdout, stderr)
 		}
 		t.Logf("Start output: %s", stdout)
@@ -324,18 +309,18 @@ func TestCageLifecycle(t *testing.T) {
 	runCage("stop", name, "--force")
 }
 
-// TestCageCreateInvalidImage tests creating with invalid image
-func TestCageCreateInvalidImage(t *testing.T) {
+// TestCageStartInvalidImage tests starting with invalid image
+func TestCageStartInvalidImage(t *testing.T) {
 	name := uniqueName(t)
-	_, _, err := runCage("create", "-n", name, "-i", "nonexistent-image-12345")
+	_, _, err := runCage("start", name, "-i", "nonexistent-image-12345")
 	if err == nil {
 		t.Error("expected error for nonexistent image")
 		runCage("remove", name, "--force")
 	}
 }
 
-// TestCageCreateDuplicate tests creating a cage that already exists
-func TestCageCreateDuplicate(t *testing.T) {
+// TestCageStartDuplicate tests starting a cage that already exists and is running
+func TestCageStartDuplicate(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping in short mode")
 	}
@@ -353,27 +338,28 @@ func TestCageCreateDuplicate(t *testing.T) {
 
 	name := uniqueName(t)
 	t.Cleanup(func() {
+		runCage("stop", name, "--force")
 		runCage("remove", name, "--force")
 		time.Sleep(2 * time.Second)
 	})
 
-	args := []string{"create", "-n", name, "-i", testImage, "-p", "light"}
+	args := []string{"start", name, "-i", testImage, "-p", "light"}
 	if networkMode == "bridge" {
 		args = append(args, "--network", "bridge")
 	}
 
-	// First create should succeed
-	_, stderr, err := runCageWithTimeout(60*time.Second, args...)
+	// First start should succeed
+	_, stderr, err := runCageWithTimeout(2*time.Minute, args...)
 	if err != nil {
 		if strings.Contains(stderr, "Operation not permitted") {
 			t.Skipf("skipping: network creation requires root")
 		}
-		t.Fatalf("first create failed: %v", err)
+		t.Fatalf("first start failed: %v", err)
 	}
 
-	// Second create should fail
+	// Second start should fail (already running)
 	_, _, err = runCage(args...)
 	if err == nil {
-		t.Error("expected error for duplicate cage name")
+		t.Error("expected error for already running cage")
 	}
 }
