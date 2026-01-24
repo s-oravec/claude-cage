@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/s-oravec/claude-cage/internal/cage"
+	"github.com/s-oravec/claude-cage/internal/config"
 )
 
 // NewRestartCmd creates the restart command
@@ -52,9 +53,15 @@ func restartCage(cmd *cobra.Command, name string, force bool) error {
 		return fmt.Errorf("failed to stop cage: %w", err)
 	}
 
+	// Load config for start
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
 	// Start the cage again
 	fmt.Fprintln(cmd.OutOrStdout())
-	if err := startCage(cmd, name, nil); err != nil {
+	if err := startCage(cmd, name, nil, cfg); err != nil {
 		return fmt.Errorf("failed to start cage: %w", err)
 	}
 
