@@ -23,6 +23,8 @@ func NewStopCmd() *cobra.Command {
 By default, performs a graceful shutdown. Use --force for immediate termination.
 The cage's resources (disk, network, keys) are preserved and can be restarted.
 
+When run from a directory with .claude-cage.yml, the cage name is optional.
+
 To remove a cage and all its resources, use 'cage remove'.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -30,11 +32,12 @@ To remove a cage and all its resources, use 'cage remove'.`,
 				return stopAllCages(cmd, force)
 			}
 
-			if len(args) == 0 {
-				return fmt.Errorf("cage name required (or use --all)")
+			name, _, err := resolveCageName(args)
+			if err != nil {
+				return err
 			}
 
-			return stopCage(cmd, args[0], force)
+			return stopCage(cmd, name, force)
 		},
 	}
 

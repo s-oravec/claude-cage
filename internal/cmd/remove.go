@@ -25,22 +25,26 @@ func NewRemoveCmd() *cobra.Command {
 This stops the VM (if running) and removes:
 - The VM definition
 - Disk overlay
-- SSH keys
+- SSH keys and known_hosts entries
 - Network configuration
 - Firewall rules
 
+When run from a directory with .claude-cage.yml, the cage name is optional.
+
 The cage's data is permanently deleted.`,
-		Args: cobra.MaximumNArgs(1),
+		Args:    cobra.MaximumNArgs(1),
+		Aliases: []string{"rm"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if all {
 				return removeAllCages(cmd, force)
 			}
 
-			if len(args) == 0 {
-				return fmt.Errorf("cage name required (or use --all)")
+			name, _, err := resolveCageName(args)
+			if err != nil {
+				return err
 			}
 
-			return removeCage(cmd, args[0], force)
+			return removeCage(cmd, name, force)
 		},
 	}
 
@@ -112,9 +116,17 @@ func removeCage(cmd *cobra.Command, name string, force bool) error {
 		}
 	}
 
-	// Delete SSH keys
+	// Delete SSH keys and known_hosts entry
 	fmt.Fprintln(cmd.OutOrStdout(), "  Removing SSH keys...")
 	ssh.DeleteKeys(name)
+
+	// Remove known_hosts entry to avoid "host key changed" errors on recreate
+	if state.SSHPort > 0 {
+		ssh.RemoveKnownHost(fmt.Sprintf("[127.0.0.1]:%d", state.SSHPort))
+	}
+	if state.IP != "" {
+		ssh.RemoveKnownHost(state.IP)
+	}
 
 	// Cleanup firewall and network (only for bridge mode)
 	if state.NetworkMode == cage.NetworkBridge {
