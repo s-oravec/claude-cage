@@ -33,7 +33,10 @@ This creates a project-level configuration that defines the cage settings
 for this directory. The configuration includes the base image, resources,
 and a default share mapping the current directory to /workspace.
 
+If --image is not specified, uses the default image from ~/.claude-cage/config.yaml.
+
 Example:
+  cage init                              # uses default image from config
   cage init --image ubuntu-24.04
   cage init --image debian-12 --memory 8G --vcpu 4`,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -41,7 +44,7 @@ Example:
 		},
 	}
 
-	cmd.Flags().StringVar(&image, "image", "", "Base image name (required)")
+	cmd.Flags().StringVar(&image, "image", "", "Base image name (default: from config)")
 	cmd.Flags().StringVar(&cage, "cage", "", "Cage name (default: directory name)")
 	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation (e.g., 4G, 8G)")
 	cmd.Flags().IntVar(&vcpu, "vcpu", 0, "Number of virtual CPUs")
@@ -54,9 +57,14 @@ Example:
 }
 
 func runInit(cmd *cobra.Command, image, cage, memory string, vcpu, disk int, ssh string, force bool, dir string) error {
-	// Validate required flag
+	// If no image specified, try to get default from global config
 	if image == "" {
-		return fmt.Errorf("--image is required")
+		cfg, err := config.Load()
+		if err == nil && cfg.Images.Default != "" {
+			image = cfg.Images.Default
+		} else {
+			return fmt.Errorf("--image is required (or set images.default in ~/.claude-cage/config.yaml)")
+		}
 	}
 
 	// Get target directory

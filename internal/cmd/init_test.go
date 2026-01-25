@@ -101,8 +101,13 @@ func TestInitCommand_ForceOverwrites(t *testing.T) {
 	assert.Equal(t, "ubuntu-24.04", cfg.Image)
 }
 
-func TestInitCommand_RequiresImage(t *testing.T) {
+func TestInitCommand_RequiresImageWhenNoDefault(t *testing.T) {
 	tmpDir := t.TempDir()
+
+	// Override config dir to ensure no default image is set
+	oldConfigDir := config.Dir()
+	config.SetDir(filepath.Join(tmpDir, "empty-config"))
+	defer config.SetDir(oldConfigDir)
 
 	buf := new(bytes.Buffer)
 	errBuf := new(bytes.Buffer)

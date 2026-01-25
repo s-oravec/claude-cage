@@ -14,6 +14,11 @@ import (
 // configDir can be overridden in tests
 var configDir string
 
+// SetDir overrides the config directory (for testing)
+func SetDir(dir string) {
+	configDir = dir
+}
+
 // Config holds all cage configuration
 type Config struct {
 	Images   ImagesConfig       `yaml:"images"`
