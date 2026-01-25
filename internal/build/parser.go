@@ -26,17 +26,57 @@ func Parse(r io.Reader) ([]Instruction, error) {
 	var instructions []Instruction
 	scanner := bufio.NewScanner(r)
 	lineNum := 0
+	startLineNum := 0
+
+	var currentLine strings.Builder
 
 	for scanner.Scan() {
 		lineNum++
-		line := strings.TrimSpace(scanner.Text())
+		line := scanner.Text()
 
-		// Skip empty lines and comments
-		if line == "" || strings.HasPrefix(line, "#") {
+		// Handle line continuation with backslash
+		if currentLine.Len() == 0 {
+			startLineNum = lineNum
+		}
+
+		trimmed := strings.TrimSpace(line)
+
+		// Skip empty lines and comments (only if not in continuation)
+		if currentLine.Len() == 0 && (trimmed == "" || strings.HasPrefix(trimmed, "#")) {
 			continue
 		}
 
-		instruction, err := parseLine(line, lineNum)
+		// Check for line continuation
+		if strings.HasSuffix(trimmed, "\\") {
+			// Remove trailing backslash and add to buffer
+			trimmed = strings.TrimSuffix(trimmed, "\\")
+			trimmed = strings.TrimRight(trimmed, " \t")
+			if currentLine.Len() > 0 {
+				currentLine.WriteString(" ")
+			}
+			currentLine.WriteString(trimmed)
+			continue
+		}
+
+		// Complete line (no continuation)
+		if currentLine.Len() > 0 {
+			currentLine.WriteString(" ")
+			currentLine.WriteString(trimmed)
+			trimmed = strings.TrimSpace(currentLine.String())
+			currentLine.Reset()
+		}
+
+		instruction, err := parseLine(trimmed, startLineNum)
+		if err != nil {
+			return nil, err
+		}
+		instructions = append(instructions, instruction)
+	}
+
+	// Handle case where file ends with continuation
+	if currentLine.Len() > 0 {
+		trimmed := strings.TrimSpace(currentLine.String())
+		instruction, err := parseLine(trimmed, startLineNum)
 		if err != nil {
 			return nil, err
 		}

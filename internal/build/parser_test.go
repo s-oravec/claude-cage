@@ -220,3 +220,59 @@ RUN echo ${VERSION}`
 		t.Errorf("expected 'echo 2.0', got '%s'", resolved.Instructions[1].Value)
 	}
 }
+
+func TestParseMultilineRun(t *testing.T) {
+	input := `FROM ubuntu:22.04
+RUN apt-get update && \
+    apt-get install -y \
+    nodejs \
+    npm`
+
+	instructions, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(instructions) != 2 {
+		t.Fatalf("expected 2 instructions, got %d", len(instructions))
+	}
+	if instructions[1].Type != "RUN" {
+		t.Errorf("expected RUN, got %s", instructions[1].Type)
+	}
+	// Should be joined with spaces
+	expected := "apt-get update && apt-get install -y nodejs npm"
+	if instructions[1].Value != expected {
+		t.Errorf("expected %q, got %q", expected, instructions[1].Value)
+	}
+}
+
+func TestParseMultilineWithComments(t *testing.T) {
+	input := `FROM ubuntu:22.04
+# Install packages
+RUN apt-get update && \
+    apt-get install -y curl
+# Done`
+
+	instructions, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(instructions) != 2 {
+		t.Fatalf("expected 2 instructions, got %d", len(instructions))
+	}
+}
+
+func TestParseMultilineEndsWithBackslash(t *testing.T) {
+	// File ends with continuation - should still work
+	input := "FROM ubuntu:22.04\nRUN echo hello \\"
+
+	instructions, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(instructions) != 2 {
+		t.Fatalf("expected 2 instructions, got %d", len(instructions))
+	}
+	if instructions[1].Value != "echo hello" {
+		t.Errorf("expected 'echo hello', got %q", instructions[1].Value)
+	}
+}

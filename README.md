@@ -557,7 +557,9 @@ cage build -t <name> <context>
 | `ENV <key>=<value>` | Environment variable |
 | `WORKDIR <path>` | Set working directory |
 | `COPY <src> <dest>` | Copy files from build context |
-| `RUN <command>` | Execute shell command |
+| `RUN <command>` | Execute shell command (supports `\` line continuation) |
+
+For full syntax documentation, see [Cagefile Reference](docs/cagefile.md).
 
 **Example Cagefile:**
 ```dockerfile
@@ -565,7 +567,13 @@ FROM ubuntu-24.04
 ARG VERSION=1.0
 ENV NODE_ENV=development
 WORKDIR /app
-RUN apt-get update && apt-get install -y nodejs npm
+
+# Multiline RUN with backslash continuation
+RUN apt-get update && \
+    apt-get install -y \
+    nodejs \
+    npm
+
 COPY ./package.json /app/
 RUN npm install
 COPY ./src /app/src
