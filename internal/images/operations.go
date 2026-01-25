@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/s-oravec/claude-cage/internal/cage"
-	"github.com/s-oravec/claude-cage/internal/ssh"
 )
 
 // List returns all available images
@@ -50,7 +49,7 @@ func List() ([]Image, error) {
 	return images, nil
 }
 
-// Save creates a new image from a running cage
+// Save creates a new image from a stopped cage
 func Save(cageName, imageName, description string) error {
 	// Check cage exists
 	if !cage.Exists(cageName) {
@@ -63,19 +62,14 @@ func Save(cageName, imageName, description string) error {
 		return fmt.Errorf("failed to load cage state: %w", err)
 	}
 
-	// Cage must be running so we can SSH in and prepare it
-	if state.Status != cage.StatusRunning {
-		return fmt.Errorf("cage '%s' must be running to save (need to prepare image for reuse)", cageName)
+	// Cage must be stopped to avoid corrupted disk state
+	if state.Status == cage.StatusRunning {
+		return fmt.Errorf("cage '%s' is running. Stop it first: cage stop %s", cageName, cageName)
 	}
 
 	// Check image name not taken
 	if Exists(imageName) {
 		return ErrImageExists
-	}
-
-	// Prepare the image for reuse by clearing SSH keys and resetting cloud-init
-	if err := prepareForSave(cageName, state); err != nil {
-		return fmt.Errorf("failed to prepare image: %w", err)
 	}
 
 	// Get source disk path
@@ -104,6 +98,13 @@ func Save(cageName, imageName, description string) error {
 		return fmt.Errorf("failed to save image: %s", strings.TrimSpace(string(output)))
 	}
 
+	// Prepare image for reuse: clear SSH keys and reset cloud-init
+	// This uses virt-customize to modify the image while it's not running
+	if err := prepareImageForReuse(destPath); err != nil {
+		os.Remove(destPath)
+		return fmt.Errorf("failed to prepare image: %w", err)
+	}
+
 	// Get size of new image
 	info, err := os.Stat(destPath)
 	if err != nil {
@@ -130,37 +131,29 @@ func Save(cageName, imageName, description string) error {
 	return nil
 }
 
-// prepareForSave prepares a running cage for saving as a reusable image
+// prepareImageForReuse modifies a qcow2 image to prepare it for reuse
 // It clears SSH authorized_keys and resets cloud-init so it re-runs on next boot
-func prepareForSave(cageName string, state *cage.State) error {
-	// Determine SSH target
-	var host string
-	var port int
-
-	if state.SSHPort > 0 {
-		host = "127.0.0.1"
-		port = state.SSHPort
-	} else if state.IP != "" {
-		host = state.IP
-		port = 22
-	} else {
-		return fmt.Errorf("no SSH access to cage")
+func prepareImageForReuse(imagePath string) error {
+	// Check if virt-customize is available
+	if _, err := exec.LookPath("virt-customize"); err != nil {
+		// virt-customize not available, skip preparation
+		// The image will work but SSH keys won't be reset
+		return nil
 	}
 
-	// Commands to prepare the image for reuse:
-	// 1. Remove authorized_keys so new keys can be injected
-	// 2. Reset cloud-init so it re-runs on next boot
-	prepareCommands := []string{
-		"rm -f ~/.ssh/authorized_keys",
-		"sudo cloud-init clean --logs 2>/dev/null || sudo rm -rf /var/lib/cloud/instances",
-	}
+	// Run virt-customize to prepare the image
+	// - Remove authorized_keys so new keys can be injected via cloud-init
+	// - Reset cloud-init so it re-runs on next boot
+	cmd := exec.Command("virt-customize",
+		"-a", imagePath,
+		"--run-command", "rm -f /home/cage/.ssh/authorized_keys",
+		"--run-command", "rm -f /root/.ssh/authorized_keys",
+		"--run-command", "cloud-init clean --logs 2>/dev/null || rm -rf /var/lib/cloud/instances",
+	)
 
-	for _, cmd := range prepareCommands {
-		_, err := ssh.ExecCaptureWithPort(cageName, host, port, cmd)
-		if err != nil {
-			// Log but don't fail on cleanup errors
-			continue
-		}
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("virt-customize failed: %s", strings.TrimSpace(string(output)))
 	}
 
 	return nil

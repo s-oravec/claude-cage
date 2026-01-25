@@ -126,17 +126,8 @@ func saveImage(cmd *cobra.Command, cageName, imageName, description string) erro
 		return fmt.Errorf("cage '%s' not found", cageName)
 	}
 
-	// Check cage is running (required for preparation)
-	state, err := cage.LoadState(cageName)
-	if err != nil {
-		return fmt.Errorf("failed to load cage state: %w", err)
-	}
-	if state.Status != cage.StatusRunning {
-		return fmt.Errorf("cage '%s' must be running to save.\nStart it with 'cage start %s' first", cageName, cageName)
-	}
-
 	fmt.Fprintf(cmd.OutOrStdout(), "Saving cage '%s' as image '%s'...\n", cageName, imageName)
-	fmt.Fprintln(cmd.OutOrStdout(), "  Preparing image for reuse (clearing SSH keys, resetting cloud-init)...")
+	fmt.Fprintln(cmd.OutOrStdout(), "  Converting disk image...")
 
 	if err := images.Save(cageName, imageName, description); err != nil {
 		return err
@@ -150,7 +141,7 @@ func saveImage(cmd *cobra.Command, cageName, imageName, description string) erro
 		fmt.Fprintf(cmd.OutOrStdout(), "✓ Image '%s' saved\n", imageName)
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), "\nNote: The cage's SSH keys were cleared. Run 'cage stop' then 'cage start' to restore SSH access.")
+	fmt.Fprintln(cmd.OutOrStdout(), "  SSH keys cleared, cloud-init reset - image ready for reuse")
 
 	return nil
 }

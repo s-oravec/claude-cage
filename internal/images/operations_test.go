@@ -90,10 +90,10 @@ func TestSave(t *testing.T) {
 	})
 
 	t.Run("save to existing image name", func(t *testing.T) {
-		// Create cage
+		// Create cage (must be stopped)
 		state := &cage.State{
 			Name:    "test-cage",
-			Status:  cage.StatusRunning,
+			Status:  cage.StatusStopped,
 			Image:   "ubuntu-24.04",
 			Profile: "default",
 		}
