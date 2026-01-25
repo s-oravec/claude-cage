@@ -83,7 +83,7 @@ func TestSave(t *testing.T) {
 	defer cage.SetCagesDir(oldCagesDir)
 
 	t.Run("save non-existent cage", func(t *testing.T) {
-		err := Save("nonexistent", "new-image", "")
+		_, err := Save("nonexistent", "new-image", "")
 		if err == nil {
 			t.Error("expected error for non-existent cage")
 		}
@@ -103,7 +103,7 @@ func TestSave(t *testing.T) {
 		imgPath := filepath.Join(tmpDir, "existing.qcow2")
 		os.WriteFile(imgPath, []byte("test"), 0644)
 
-		err := Save("test-cage", "existing", "")
+		_, err := Save("test-cage", "existing", "")
 		if err != ErrImageExists {
 			t.Errorf("expected ErrImageExists, got %v", err)
 		}

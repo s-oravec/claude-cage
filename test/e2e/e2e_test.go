@@ -150,6 +150,9 @@ func TestCageLifecycle(t *testing.T) {
 	name := uniqueName(t)
 	t.Logf("Testing with cage name: %s", name)
 
+	// Create project directory for init+start workflow
+	projectDir := t.TempDir()
+
 	// Cleanup on exit
 	t.Cleanup(func() {
 		t.Log("Cleaning up...")
@@ -158,15 +161,19 @@ func TestCageLifecycle(t *testing.T) {
 		time.Sleep(2 * time.Second)
 	})
 
-	// Start cage (creates and starts in one step)
+	// Init cage (creates .claude-cage.yml)
 	var startFailed bool
-	t.Run("Start", func(t *testing.T) {
-		args := []string{"start", name, "-i", testImage, "-p", "light", "--ssh", "auto"}
-		if networkMode == "bridge" {
-			args = append(args, "--network", "bridge")
+	t.Run("Init", func(t *testing.T) {
+		stdout, stderr, err := runCageInDir(projectDir, "init", "--image", testImage, "--cage", name, "--ssh", "auto")
+		if err != nil {
+			t.Fatalf("cage init failed: %v\nstdout: %s\nstderr: %s", err, stdout, stderr)
 		}
+		t.Logf("Init output: %s", stdout)
+	})
 
-		stdout, stderr, err := runCageWithTimeout(2*time.Minute, args...)
+	// Start cage
+	t.Run("Start", func(t *testing.T) {
+		stdout, stderr, err := runCageInDirWithTimeout(projectDir, 2*time.Minute, "start")
 		if err != nil {
 			startFailed = true
 			// Check if it's a permissions issue
@@ -315,8 +322,18 @@ func TestCageLifecycle(t *testing.T) {
 
 // TestCageStartInvalidImage tests starting with invalid image
 func TestCageStartInvalidImage(t *testing.T) {
+	projectDir := t.TempDir()
 	name := uniqueName(t)
-	_, _, err := runCage("start", name, "-i", "nonexistent-image-12345")
+
+	// Init with invalid image
+	_, _, err := runCageInDir(projectDir, "init", "--image", "nonexistent-image-12345", "--cage", name)
+	if err != nil {
+		// Init itself might fail for invalid image (if validation is done there)
+		return
+	}
+
+	// If init succeeds, start should fail
+	_, _, err = runCageInDirWithTimeout(projectDir, 30*time.Second, "start")
 	if err == nil {
 		t.Error("expected error for nonexistent image")
 		runCage("remove", name, "--force")
@@ -777,8 +794,8 @@ func TestCageStartDuplicate(t *testing.T) {
 	}
 
 	// Use temp config dir (no shares configured)
-	tmpDir := t.TempDir()
-	t.Setenv("CAGE_CONFIG_DIR", tmpDir)
+	configDir := t.TempDir()
+	t.Setenv("CAGE_CONFIG_DIR", configDir)
 	runCage("config", "init", "--force")
 
 	// Check if image is available (look for ✓ before image name)
@@ -787,20 +804,24 @@ func TestCageStartDuplicate(t *testing.T) {
 		t.Skipf("skipping: image %s not downloaded", testImage)
 	}
 
+	// Create project directory for init+start workflow
+	projectDir := t.TempDir()
 	name := uniqueName(t)
+
 	t.Cleanup(func() {
 		runCage("stop", name, "--force")
 		runCage("remove", name, "--force")
 		time.Sleep(2 * time.Second)
 	})
 
-	args := []string{"start", name, "-i", testImage, "-p", "light"}
-	if networkMode == "bridge" {
-		args = append(args, "--network", "bridge")
+	// Init cage
+	_, _, err := runCageInDir(projectDir, "init", "--image", testImage, "--cage", name)
+	if err != nil {
+		t.Fatalf("init failed: %v", err)
 	}
 
 	// First start should succeed
-	_, stderr, err := runCageWithTimeout(2*time.Minute, args...)
+	_, stderr, err := runCageInDirWithTimeout(projectDir, 2*time.Minute, "start")
 	if err != nil {
 		if strings.Contains(stderr, "Operation not permitted") {
 			t.Skipf("skipping: network creation requires root")
@@ -809,7 +830,7 @@ func TestCageStartDuplicate(t *testing.T) {
 	}
 
 	// Second start should fail (already running)
-	_, _, err = runCage(args...)
+	_, _, err = runCageInDir(projectDir, "start")
 	if err == nil {
 		t.Error("expected error for already running cage")
 	}

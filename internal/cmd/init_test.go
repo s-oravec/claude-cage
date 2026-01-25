@@ -104,10 +104,17 @@ func TestInitCommand_ForceOverwrites(t *testing.T) {
 func TestInitCommand_RequiresImageWhenNoDefault(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	// Override config dir to ensure no default image is set
+	// Override config dir and create config with empty default image
+	configDir := filepath.Join(tmpDir, "empty-config")
+	os.MkdirAll(configDir, 0755)
 	oldConfigDir := config.Dir()
-	config.SetDir(filepath.Join(tmpDir, "empty-config"))
+	config.SetDir(configDir)
 	defer config.SetDir(oldConfigDir)
+
+	// Create config file with no default image
+	cfg := config.DefaultConfig()
+	cfg.Images.Default = "" // No default image
+	config.Save(cfg)
 
 	buf := new(bytes.Buffer)
 	errBuf := new(bytes.Buffer)
