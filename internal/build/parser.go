@@ -83,3 +83,36 @@ func parseLine(line string, lineNum int) (Instruction, error) {
 		return Instruction{}, fmt.Errorf("line %d: unknown instruction %s", lineNum, instType)
 	}
 }
+
+// ParseAndValidate parses a Cagefile and validates its structure
+func ParseAndValidate(r io.Reader) (*Cagefile, error) {
+	instructions, err := Parse(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(instructions) == 0 {
+		return nil, fmt.Errorf("Cagefile is empty")
+	}
+
+	// FROM must be first instruction
+	if instructions[0].Type != "FROM" {
+		return nil, fmt.Errorf("first instruction must be FROM")
+	}
+
+	// Only one FROM allowed
+	fromCount := 0
+	for _, inst := range instructions {
+		if inst.Type == "FROM" {
+			fromCount++
+		}
+	}
+	if fromCount > 1 {
+		return nil, fmt.Errorf("multiple FROM instructions not supported")
+	}
+
+	return &Cagefile{
+		BaseImage:    instructions[0].Value,
+		Instructions: instructions[1:], // Skip FROM
+	}, nil
+}

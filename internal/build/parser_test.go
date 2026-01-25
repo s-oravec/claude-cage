@@ -139,3 +139,41 @@ func TestParseErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateCagefile(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{
+			name:    "valid cagefile",
+			input:   "FROM ubuntu:22.04\nRUN echo hello",
+			wantErr: false,
+		},
+		{
+			name:    "missing FROM",
+			input:   "RUN echo hello",
+			wantErr: true,
+		},
+		{
+			name:    "FROM not first",
+			input:   "RUN echo hello\nFROM ubuntu:22.04",
+			wantErr: true,
+		},
+		{
+			name:    "multiple FROM",
+			input:   "FROM ubuntu:22.04\nFROM alpine:3.18",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseAndValidate(strings.NewReader(tt.input))
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ParseAndValidate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
