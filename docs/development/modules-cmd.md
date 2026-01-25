@@ -44,36 +44,35 @@ func NewRootCmd() *cobra.Command {
 
 ### Lifecycle Commands
 
-#### create (`create.go`)
-Creates a new cage without starting it.
+#### init (`init.go`)
+Initializes project configuration.
 
 **Flow:**
-1. Validate cage doesn't exist
-2. Load and merge configuration
-3. Create cage directory
-4. Setup network (bridge mode)
-5. Create disk overlay (qcow2)
-6. Generate SSH keys
-7. Generate cloud-init ISO
-8. Define libvirt domain
-9. Save state as "stopped"
+1. Check if `.claude-cage.yml` already exists
+2. Load default image from global config (if --image not specified)
+3. Create `.claude-cage.yml` with image, shares, and options
 
 **Flags:**
-- `-n, --name` (required) - Cage name
-- `-p, --profile` - Resource profile
-- `-i, --image` - Base image
-- `--network` - Network mode (auto/bridge)
-- `--ssh` - SSH port (auto or specific)
+- `--image` - Base image (default: from `~/.claude-cage/config.yaml`)
+- `--cage` - Cage name (default: directory name)
+- `--memory` - Memory allocation (e.g., `4G`)
+- `--vcpu` - Number of virtual CPUs
+- `--disk` - Disk size in GB
+- `--ssh` - SSH port (default: `auto`)
+- `-f, --force` - Overwrite existing config
+- `--dir` - Target directory (default: current)
 
 #### start (`start.go`)
-Starts a stopped cage.
+Starts a cage, creating it if needed.
 
 **Flow:**
-1. Load cage state
-2. Start virtiofsd (if configured)
-3. Start libvirt domain
-4. Setup port forwarding
-5. Update state to "running"
+1. Resolve cage name (from args or `.claude-cage.yml`)
+2. If cage doesn't exist and project config exists: create cage
+3. If cage stopped: reconfigure if project config changed
+4. Start virtiofsd (if configured)
+5. Start libvirt domain
+6. Setup port forwarding
+7. Update state to "running"
 
 **Flags:**
 - `--port` - Additional port forwards
@@ -93,7 +92,7 @@ Stops a running cage.
 - `-a, --all` - Stop all cages
 
 #### remove (`remove.go`)
-Removes a cage and all resources.
+Removes a cage and all resources. Alias: `rm`
 
 **Flow:**
 1. Load cage state
@@ -102,6 +101,7 @@ Removes a cage and all resources.
 4. Cleanup network (bridge mode)
 5. Delete SSH keys
 6. Delete cage directory
+7. Cleanup SSH known_hosts entries
 
 **Flags:**
 - `-f, --force` - Force removal of running cage
@@ -184,7 +184,7 @@ Manages VM snapshots.
 - `create <cage> --name <snap>` - Create snapshot
 - `list <cage>` - List snapshots
 - `restore <cage> --name <snap>` - Restore snapshot
-- `delete <cage> --name <snap>` - Delete snapshot
+- `remove <cage> --name <snap>` - Remove snapshot (aliases: `rm`, `delete`)
 
 #### port (`port.go`)
 Manages port forwarding.
@@ -199,9 +199,13 @@ Manages base and custom images.
 
 **Subcommands:**
 - `list` - List images
-- `save <cage> --name <img>` - Save cage as image
-- `delete <img>` - Delete image
+- `save [cage] --name <img>` - Save stopped cage as image (cage name optional in project directory)
+- `remove <img>` - Remove image (aliases: `rm`, `delete`)
 - `inspect <img>` - Show image details
+
+**Notes:**
+- `save` requires cage to be stopped (prevents corrupted disk state)
+- Uses `virt-customize` to prepare images for reuse (clears SSH keys, resets cloud-init)
 
 ### Setup Commands
 

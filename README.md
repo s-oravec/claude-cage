@@ -124,13 +124,13 @@ cage stop myvm
 Initialize a `.claude-cage.yml` configuration file in the current directory. This file defines how `cage start` will create and run the cage.
 
 ```bash
-cage init --image <image> [options]
+cage init [options]
 ```
 
 **Options:**
 | Option | Description |
 |--------|-------------|
-| `--image` | Base image name (required) |
+| `--image` | Base image name (default: from `~/.claude-cage/config.yaml`) |
 | `--cage` | Cage name (default: directory name) |
 | `--memory` | Memory allocation (e.g., `4G`, `8G`) |
 | `--vcpu` | Number of virtual CPUs |
@@ -141,7 +141,10 @@ cage init --image <image> [options]
 
 **Examples:**
 ```bash
-# Initialize with Ubuntu image
+# Initialize using default image from config
+cage init
+
+# Initialize with specific image
 cage init --image ubuntu-24.04
 
 # Initialize with custom resources
@@ -226,6 +229,7 @@ Remove a cage and all its associated resources permanently.
 
 ```bash
 cage remove <name> [options]
+cage rm <name> [options]
 cage remove --all
 ```
 
@@ -431,7 +435,7 @@ cage snapshot <subcommand>
 | `create` | Create a snapshot |
 | `list` | List snapshots |
 | `restore` | Restore to a snapshot |
-| `delete` | Delete a snapshot |
+| `remove` | Remove a snapshot (aliases: `rm`, `delete`) |
 
 **Examples:**
 ```bash
@@ -444,8 +448,8 @@ cage snapshot list myproject
 # Restore snapshot
 cage snapshot restore myproject --name before-update
 
-# Delete snapshot
-cage snapshot delete myproject --name before-update
+# Remove snapshot
+cage snapshot remove myproject --name before-update
 ```
 
 ---
@@ -491,20 +495,29 @@ cage image <subcommand>
 | Subcommand | Description |
 |------------|-------------|
 | `list` | List available images |
-| `save` | Save a cage as a new image |
-| `delete` | Delete an image |
+| `save` | Save a stopped cage as a new image |
+| `remove` | Remove an image (aliases: `rm`, `delete`) |
 | `inspect` | Show image details |
+
+**Notes:**
+- `save` requires the cage to be stopped to avoid corrupted disk state
+- When run from a project directory with `.claude-cage.yml`, cage-name is optional
+- Saved images are prepared for reuse (SSH keys cleared, cloud-init reset)
+- For full image preparation, install `virt-customize` (from `libguestfs-tools`)
 
 **Examples:**
 ```bash
 # List images
 cage image list
 
-# Save cage as image
+# Save cage as image (explicit cage name)
 cage image save myproject --name my-custom-image
 
-# Delete image
-cage image delete my-custom-image
+# Save cage as image (from project directory)
+cage image save --name my-custom-image
+
+# Remove image
+cage image remove my-custom-image
 
 # Inspect image
 cage image inspect ubuntu-24.04

@@ -2,6 +2,23 @@
 
 Preparing pre-configured environments for quick start and team sharing.
 
+## Prerequisites
+
+For full image preparation (SSH key cleanup, cloud-init reset), install `virt-customize`:
+
+```bash
+# Ubuntu/Debian
+sudo apt install libguestfs-tools
+
+# Fedora/RHEL/Rocky/Alma
+sudo dnf install guestfs-tools
+
+# openSUSE
+sudo zypper install guestfs-tools
+```
+
+Without `virt-customize`, images will still be saved but may require manual cleanup of SSH keys on first reuse.
+
 ## Problem
 
 - I don't want to install the same packages every time I start
@@ -29,12 +46,14 @@ pip3 install numpy pandas
 
 exit
 
-# 3. Save as custom image
+# 3. Stop the cage (required before save)
+cage stop
+
+# 4. Save as custom image
 cage image save setup --name mystack --description "Node.js + Python stack"
 
-# 4. Cleanup
-cage stop
-cage remove
+# 5. Cleanup
+cage remove setup
 cd ~ && rm -rf /tmp/image-setup
 ```
 
@@ -88,6 +107,6 @@ cage image list
 # Details
 cage image inspect mystack
 
-# Delete
-cage image delete old-image
+# Remove
+cage image remove old-image
 ```
