@@ -90,6 +90,11 @@ func WaitForSSH(cageName, ip string, timeout time.Duration) error {
 
 // ExecCapture executes a command via SSH and captures the output
 func ExecCapture(cageName, ip, command string) (string, error) {
+	return ExecCaptureWithPort(cageName, ip, 22, command)
+}
+
+// ExecCaptureWithPort executes a command via SSH with explicit port and captures the output
+func ExecCaptureWithPort(cageName, host string, port int, command string) (string, error) {
 	keyPath := KeyPath(cageName)
 	knownHostsPath := KnownHostsPath()
 
@@ -100,14 +105,15 @@ func ExecCapture(cageName, ip, command string) (string, error) {
 		"-o", "LogLevel=ERROR",
 		"-o", "ConnectTimeout=5",
 		"-o", "BatchMode=yes",
-		fmt.Sprintf("cage@%s", ip),
+		"-p", fmt.Sprintf("%d", port),
+		fmt.Sprintf("cage@%s", host),
 		command,
 	}
 
 	cmd := exec.Command("ssh", args...)
-	out, err := cmd.Output()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", err
+		return string(out), err
 	}
 	return string(out), nil
 }
