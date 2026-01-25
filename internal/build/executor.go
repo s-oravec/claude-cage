@@ -275,6 +275,17 @@ func (e *Executor) startCage() error {
 	}
 
 	e.log(" ---> SSH ready")
+
+	// Wait for cloud-init to complete (avoids apt lock issues)
+	e.log(" ---> Waiting for cloud-init...")
+	_, err := ssh.ExecCaptureWithPort(e.tempCage, "127.0.0.1", e.sshPort, "cloud-init status --wait 2>/dev/null || true")
+	if err != nil {
+		// cloud-init might not exist on all images, that's OK
+		e.log(" ---> cloud-init not available, continuing")
+	} else {
+		e.log(" ---> cloud-init complete")
+	}
+
 	return nil
 }
 
