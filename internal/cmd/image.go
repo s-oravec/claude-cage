@@ -42,15 +42,21 @@ func newImageSaveCmd() *cobra.Command {
 	var description string
 
 	cmd := &cobra.Command{
-		Use:   "save <cage-name>",
+		Use:   "save [cage-name]",
 		Short: "Save a cage as a new image",
 		Long: `Save the current state of a cage as a new custom image.
 
 The image can then be used to create new cages with the same
-software and configuration.`,
-		Args: cobra.ExactArgs(1),
+software and configuration.
+
+When run from a directory with .claude-cage.yml, the cage name is optional.`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return saveImage(cmd, args[0], name, description)
+			cageName, _, err := resolveCageName(args)
+			if err != nil {
+				return err
+			}
+			return saveImage(cmd, cageName, name, description)
 		},
 	}
 
