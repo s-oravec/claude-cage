@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 // CloudInitConfig holds configuration for cloud-init generation
@@ -165,10 +166,14 @@ runcmd:
 }
 
 // GenerateMetaData generates cloud-init meta-data content
+// Uses a unique instance-id with timestamp to ensure cloud-init re-runs on each cage creation
 func GenerateMetaData(cageName string) string {
+	// Add timestamp to instance-id to force cloud-init to re-run
+	// This is critical for custom images where cloud-init data from the original cage exists
+	instanceID := fmt.Sprintf("%s-%d", cageName, time.Now().UnixNano())
 	return fmt.Sprintf(`instance-id: %s
 local-hostname: %s
-`, cageName, cageName)
+`, instanceID, cageName)
 }
 
 // WriteCloudInitFiles writes user-data and meta-data to a directory
