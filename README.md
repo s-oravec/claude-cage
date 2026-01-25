@@ -1,4 +1,4 @@
-# Claude Cage
+<h1><img src="assets/claude-cage.png" height="50" alt="Claude Cage" style="vertical-align: middle;"> Claude Cage</h1>
 
 A lightweight QEMU/KVM-based VM sandbox CLI for running Claude Code in isolation.
 
@@ -108,6 +108,9 @@ cage stop myvm
 - [`cage snapshot`](#cage-snapshot) - Manage cage snapshots
 - [`cage port`](#cage-port) - Manage port forwarding
 - [`cage image`](#cage-image) - Manage custom images
+
+### Build Commands
+- [`cage build`](#cage-build) - Build an image from a Cagefile
 
 ### Setup Commands
 - [`cage setup`](#cage-setup) - Download base images
@@ -521,6 +524,66 @@ cage image remove my-custom-image
 
 # Inspect image
 cage image inspect ubuntu-24.04
+```
+
+---
+
+### cage build
+
+Build a custom image from a Cagefile using Dockerfile-compatible syntax.
+
+```bash
+cage build -t <name> <context>
+```
+
+**Arguments:**
+| Argument | Description |
+|----------|-------------|
+| `context` | Build context directory (for COPY operations) |
+
+**Options:**
+| Option | Description |
+|--------|-------------|
+| `-t, --tag` | Name for the built image (required) |
+| `-f, --file` | Path to Cagefile (default: `<context>/Cagefile`) |
+| `--build-arg` | Build argument KEY=VALUE (can be repeated) |
+| `--keep-on-error` | Keep temporary cage on build failure for debugging |
+
+**Cagefile Instructions:**
+| Instruction | Description |
+|-------------|-------------|
+| `FROM <image>` | Base image (required, must be first) |
+| `ARG <name>=<value>` | Build-time argument |
+| `ENV <key>=<value>` | Environment variable |
+| `WORKDIR <path>` | Set working directory |
+| `COPY <src> <dest>` | Copy files from build context |
+| `RUN <command>` | Execute shell command |
+
+**Example Cagefile:**
+```dockerfile
+FROM ubuntu-24.04
+ARG VERSION=1.0
+ENV NODE_ENV=development
+WORKDIR /app
+RUN apt-get update && apt-get install -y nodejs npm
+COPY ./package.json /app/
+RUN npm install
+COPY ./src /app/src
+```
+
+**Examples:**
+```bash
+# Build from current directory
+cage build -t my-dev-env .
+
+# Build with custom Cagefile location
+cage build -t my-image -f ./docker/Cagefile ./project
+
+# Build with build arguments
+cage build -t my-image --build-arg VERSION=2.0 --build-arg DEBUG=true .
+
+# Keep temp cage on failure for debugging
+cage build -t my-image --keep-on-error .
 ```
 
 ---
