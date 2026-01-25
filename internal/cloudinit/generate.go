@@ -125,7 +125,7 @@ users:
     # password: cage
     passwd: $6$jPpNVOdPlZdiMeW.$tGs/Xy0/9wH7CtN9pMaGFnDFmK0THolDE5SALY.rIcwezfG7WU0syq7xov9ZFy.8GI5K03j/LcvK2vr3pf2pp1
     ssh_authorized_keys:
-      - %s
+      - %[1]s
 
 ssh_pwauth: false
 
@@ -139,8 +139,15 @@ resize_rootfs: true
 
 package_update: false
 package_upgrade: false
-%s%s
+%[2]s%[3]s
 runcmd:
+  # Ensure SSH key is set (critical for custom images where user already exists)
+  # This ensures the new key is always written, even if cloud-init user module skips existing users
+  - mkdir -p /home/cage/.ssh
+  - chmod 700 /home/cage/.ssh
+  - echo '%[1]s' > /home/cage/.ssh/authorized_keys
+  - chmod 600 /home/cage/.ssh/authorized_keys
+  - chown -R cage:cage /home/cage/.ssh
   # Install sudo on Alpine (apk) or ensure it exists on other distros
   - which apk && apk add --no-cache sudo doas || true
   # Configure doas for Alpine (wheel group)
@@ -153,7 +160,7 @@ runcmd:
   - systemctl start docker || true
   # Docker setup (OpenRC-based distros like Alpine)
   - which rc-update && rc-update add docker default || true
-  - which rc-service && rc-service docker start || true%s%s%s
+  - which rc-service && rc-service docker start || true%[4]s%[5]s%[6]s
 `, cfg.PubKey, virtiofsMounts, writeFiles, virtiofsRuncmd, sshRuncmd, envRuncmd)
 }
 

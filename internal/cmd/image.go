@@ -136,7 +136,8 @@ func saveImage(cmd *cobra.Command, cageName, imageName, description string) erro
 	fmt.Fprintf(cmd.OutOrStdout(), "Saving cage '%s' as image '%s'...\n", cageName, imageName)
 	fmt.Fprintln(cmd.OutOrStdout(), "  Converting disk image...")
 
-	if err := images.Save(cageName, imageName, description); err != nil {
+	result, err := images.Save(cageName, imageName, description)
+	if err != nil {
 		return err
 	}
 
@@ -148,7 +149,11 @@ func saveImage(cmd *cobra.Command, cageName, imageName, description string) erro
 		fmt.Fprintf(cmd.OutOrStdout(), "✓ Image '%s' saved\n", imageName)
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), "  SSH keys cleared, cloud-init reset - image ready for reuse")
+	if result.VirtCustomizeUsed {
+		fmt.Fprintln(cmd.OutOrStdout(), "  SSH keys cleared, cloud-init reset - image ready for reuse")
+	} else {
+		fmt.Fprintln(cmd.OutOrStdout(), "  Image ready for reuse (SSH keys will be injected on first boot)")
+	}
 
 	return nil
 }

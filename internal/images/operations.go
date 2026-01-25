@@ -49,38 +49,43 @@ func List() ([]Image, error) {
 	return images, nil
 }
 
+// SaveResult contains the result of saving an image
+type SaveResult struct {
+	VirtCustomizeUsed bool
+}
+
 // Save creates a new image from a stopped cage
-func Save(cageName, imageName, description string) error {
+func Save(cageName, imageName, description string) (*SaveResult, error) {
 	// Check cage exists
 	if !cage.Exists(cageName) {
-		return fmt.Errorf("cage '%s' not found", cageName)
+		return nil, fmt.Errorf("cage '%s' not found", cageName)
 	}
 
 	// Load cage state
 	state, err := cage.LoadState(cageName)
 	if err != nil {
-		return fmt.Errorf("failed to load cage state: %w", err)
+		return nil, fmt.Errorf("failed to load cage state: %w", err)
 	}
 
 	// Cage must be stopped to avoid corrupted disk state
 	if state.Status == cage.StatusRunning {
-		return fmt.Errorf("cage '%s' is running. Stop it first: cage stop %s", cageName, cageName)
+		return nil, fmt.Errorf("cage '%s' is running. Stop it first: cage stop %s", cageName, cageName)
 	}
 
 	// Check image name not taken
 	if Exists(imageName) {
-		return ErrImageExists
+		return nil, ErrImageExists
 	}
 
 	// Get source disk path
 	sourceDisk := filepath.Join(cage.Dir(cageName), "disk.qcow2")
 	if _, err := os.Stat(sourceDisk); err != nil {
-		return fmt.Errorf("cage disk not found: %w", err)
+		return nil, fmt.Errorf("cage disk not found: %w", err)
 	}
 
 	// Ensure images directory exists
 	if err := EnsureDir(); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Create destination path
@@ -95,20 +100,21 @@ func Save(cageName, imageName, description string) error {
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to save image: %s", strings.TrimSpace(string(output)))
+		return nil, fmt.Errorf("failed to save image: %s", strings.TrimSpace(string(output)))
 	}
 
 	// Prepare image for reuse: clear SSH keys and reset cloud-init
 	// This uses virt-customize to modify the image while it's not running
-	if err := prepareImageForReuse(destPath); err != nil {
+	prepResult, err := prepareImageForReuse(destPath)
+	if err != nil {
 		os.Remove(destPath)
-		return fmt.Errorf("failed to prepare image: %w", err)
+		return nil, fmt.Errorf("failed to prepare image: %w", err)
 	}
 
 	// Get size of new image
 	info, err := os.Stat(destPath)
 	if err != nil {
-		return fmt.Errorf("failed to stat image: %w", err)
+		return nil, fmt.Errorf("failed to stat image: %w", err)
 	}
 
 	// Save metadata
@@ -125,20 +131,28 @@ func Save(cageName, imageName, description string) error {
 	if err := SaveMetadata(img); err != nil {
 		// Try to clean up the image file
 		os.Remove(destPath)
-		return fmt.Errorf("failed to save metadata: %w", err)
+		return nil, fmt.Errorf("failed to save metadata: %w", err)
 	}
 
-	return nil
+	return &SaveResult{VirtCustomizeUsed: prepResult.VirtCustomizeUsed}, nil
+}
+
+// PrepareResult indicates what preparation was done on the image
+type PrepareResult struct {
+	VirtCustomizeUsed bool
 }
 
 // prepareImageForReuse modifies a qcow2 image to prepare it for reuse
 // It clears SSH authorized_keys and resets cloud-init so it re-runs on next boot
-func prepareImageForReuse(imagePath string) error {
+// Returns PrepareResult indicating what was done
+func prepareImageForReuse(imagePath string) (*PrepareResult, error) {
+	result := &PrepareResult{}
+
 	// Check if virt-customize is available
 	if _, err := exec.LookPath("virt-customize"); err != nil {
 		// virt-customize not available, skip preparation
-		// The image will work but SSH keys won't be reset
-		return nil
+		// Cloud-init runcmd will inject SSH keys on boot, so this should still work
+		return result, nil
 	}
 
 	// Run virt-customize to prepare the image
@@ -153,10 +167,11 @@ func prepareImageForReuse(imagePath string) error {
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("virt-customize failed: %s", strings.TrimSpace(string(output)))
+		return nil, fmt.Errorf("virt-customize failed: %s", strings.TrimSpace(string(output)))
 	}
 
-	return nil
+	result.VirtCustomizeUsed = true
+	return result, nil
 }
 
 // Delete removes an image
