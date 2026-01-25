@@ -1,3 +1,22 @@
+# Claude Cage Makefile
+#
+# Build and test targets for the cage CLI tool.
+#
+# Usage:
+#   make build          - Build the cage binary
+#   make test           - Run tests with coverage summary
+#   make test-quick     - Run tests without coverage (faster)
+#   make test-verbose   - Run tests with verbose output and coverage
+#   make coverage       - Detailed coverage report by package
+#   make coverage-html  - Generate HTML coverage report
+#   make coverage-check - CI-friendly coverage check (fails if below threshold)
+#   make e2e            - Run E2E tests with bridge networking (requires root)
+#   make e2e-short      - Run E2E tests in short mode
+#   make e2e-user       - Run E2E tests with user-mode networking (no root)
+#   make e2e-ubuntu     - Run E2E tests with Ubuntu image
+#   make install        - Install cage to ~/.local/bin/
+#   make clean          - Remove build artifacts
+
 .PHONY: build test test-quick test-verbose coverage coverage-html coverage-check e2e e2e-short e2e-user e2e-ubuntu install clean
 
 VERSION := 0.1.0
@@ -6,10 +25,11 @@ COVERAGE_FILE := coverage.out
 COVERAGE_HTML := coverage.html
 COVERAGE_THRESHOLD := 40
 
+# Build the cage binary with version info
 build:
 	go build $(LDFLAGS) -o cage ./cmd/cage
 
-# Default test target includes coverage
+# Run tests with coverage summary (default target)
 test:
 	@echo "Running tests with coverage..."
 	@go test ./... -coverprofile=$(COVERAGE_FILE) -covermode=atomic -race 2>&1 | tee /tmp/test-output.txt
@@ -24,16 +44,16 @@ test:
 		echo "✓ Coverage: $$total (threshold: $(COVERAGE_THRESHOLD)%)"; \
 	fi
 
-# Quick test without coverage (faster)
+# Quick test without coverage (faster iteration)
 test-quick:
 	go test ./...
 
-# Verbose test with coverage
+# Verbose test with coverage details
 test-verbose:
 	@echo "Running tests with coverage (verbose)..."
 	@go test ./... -v -coverprofile=$(COVERAGE_FILE) -covermode=atomic -race
 
-# Detailed coverage report
+# Detailed coverage report by package
 coverage:
 	@echo "Running tests with coverage..."
 	@go test ./... -coverprofile=$(COVERAGE_FILE) -covermode=atomic 2>&1 | tee /tmp/coverage-run.txt
@@ -55,11 +75,12 @@ coverage:
 		echo "✓ Coverage ($$total%) meets threshold ($(COVERAGE_THRESHOLD)%)"; \
 	fi
 
+# Generate HTML coverage report (opens in browser)
 coverage-html: coverage
 	@go tool cover -html=$(COVERAGE_FILE) -o $(COVERAGE_HTML)
 	@echo "Coverage report generated: $(COVERAGE_HTML)"
 
-# CI-friendly coverage check (fails if below threshold)
+# CI-friendly coverage check - exits with error if below threshold
 coverage-check:
 	@go test ./... -coverprofile=$(COVERAGE_FILE) -covermode=atomic > /dev/null 2>&1
 	@total=$$(go tool cover -func=$(COVERAGE_FILE) | grep total | awk '{print $$3}' | tr -d '%'); \
@@ -72,24 +93,30 @@ coverage-check:
 		echo "✓ Coverage check passed: $$total% >= $(COVERAGE_THRESHOLD)%"; \
 	fi
 
+# E2E tests with bridge networking (requires root for network setup)
 e2e: build
 	@echo "Running E2E tests with bridge networking (requires root)..."
 	CAGE_BIN=$(PWD)/cage CAGE_NETWORK=bridge go test -v -timeout 10m ./test/e2e/...
 
+# E2E tests in short mode (skip long-running tests)
 e2e-short: build
 	@echo "Running E2E tests (short mode)..."
 	CAGE_BIN=$(PWD)/cage go test -v -short ./test/e2e/...
 
+# E2E tests with user-mode networking (no root required)
 e2e-user: build
 	@echo "Running E2E tests with user-mode networking (no root)..."
 	CAGE_BIN=$(PWD)/cage go test -v -timeout 10m ./test/e2e/...
 
+# E2E tests with Ubuntu image (longer timeout due to larger image)
 e2e-ubuntu: build
 	@echo "Running E2E tests with Ubuntu..."
 	CAGE_BIN=$(PWD)/cage CAGE_TEST_IMAGE=ubuntu-24.04 go test -v -timeout 15m ./test/e2e/...
 
+# Install cage binary to user's local bin directory
 install: build
 	install -m 755 cage ~/.local/bin/cage
 
+# Remove build artifacts
 clean:
 	rm -f cage $(COVERAGE_FILE) $(COVERAGE_HTML)
