@@ -156,6 +156,9 @@ func saveImage(cmd *cobra.Command, cageName, imageName, description string) erro
 
 	if result.VirtCustomizeUsed {
 		fmt.Fprintln(cmd.OutOrStdout(), "  SSH keys cleared, cloud-init reset - image ready for reuse")
+	} else if result.VirtCustomizeError != "" {
+		fmt.Fprintln(cmd.OutOrStdout(), "  Warning: virt-customize failed (libguestfs issue)")
+		fmt.Fprintln(cmd.OutOrStdout(), "  Image saved - SSH keys will be injected on first boot via cloud-init")
 	} else {
 		fmt.Fprintln(cmd.OutOrStdout(), "  Image ready for reuse (SSH keys will be injected on first boot)")
 	}

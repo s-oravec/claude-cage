@@ -51,7 +51,8 @@ func List() ([]Image, error) {
 
 // SaveResult contains the result of saving an image
 type SaveResult struct {
-	VirtCustomizeUsed bool
+	VirtCustomizeUsed  bool
+	VirtCustomizeError string // Non-fatal error if virt-customize failed
 }
 
 // Save creates a new image from a stopped cage
@@ -134,12 +135,16 @@ func Save(cageName, imageName, description string) (*SaveResult, error) {
 		return nil, fmt.Errorf("failed to save metadata: %w", err)
 	}
 
-	return &SaveResult{VirtCustomizeUsed: prepResult.VirtCustomizeUsed}, nil
+	return &SaveResult{
+		VirtCustomizeUsed:  prepResult.VirtCustomizeUsed,
+		VirtCustomizeError: prepResult.VirtCustomizeError,
+	}, nil
 }
 
 // PrepareResult indicates what preparation was done on the image
 type PrepareResult struct {
-	VirtCustomizeUsed bool
+	VirtCustomizeUsed  bool
+	VirtCustomizeError string // Non-fatal error message if virt-customize failed
 }
 
 // prepareImageForReuse modifies a qcow2 image to prepare it for reuse
@@ -167,7 +172,10 @@ func prepareImageForReuse(imagePath string) (*PrepareResult, error) {
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("virt-customize failed: %s", strings.TrimSpace(string(output)))
+		// virt-customize failed (common with libguestfs misconfiguration)
+		// Don't fail the save - cloud-init runcmd will inject SSH keys on boot
+		result.VirtCustomizeError = fmt.Sprintf("virt-customize failed: %s", strings.TrimSpace(string(output)))
+		return result, nil
 	}
 
 	result.VirtCustomizeUsed = true
