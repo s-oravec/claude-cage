@@ -300,10 +300,19 @@ func DefaultConfig() *Config {
 	}
 }
 
-// Load reads config from file
+// Load reads config from file, creating default config if it doesn't exist
 func Load() (*Config, error) {
 	data, err := os.ReadFile(Path())
 	if err != nil {
+		if os.IsNotExist(err) {
+			// Auto-create default config on first use
+			cfg := DefaultConfig()
+			if saveErr := Save(cfg); saveErr != nil {
+				// If we can't save, just return the default in memory
+				return cfg, nil
+			}
+			return cfg, nil
+		}
 		return nil, err
 	}
 

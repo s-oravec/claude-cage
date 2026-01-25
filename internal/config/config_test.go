@@ -105,9 +105,15 @@ func TestLoad_FileNotExists(t *testing.T) {
 	configDir = tmpDir
 	defer func() { configDir = oldDir }()
 
-	// Should return error when file doesn't exist
-	_, err := Load()
-	assert.Error(t, err)
+	// Should auto-create default config when file doesn't exist
+	cfg, err := Load()
+	require.NoError(t, err)
+	assert.Equal(t, "alpine", cfg.Images.Default)
+	assert.Equal(t, 4, cfg.Profiles["default"].VCPU)
+
+	// Config file should now exist
+	_, err = os.Stat(filepath.Join(tmpDir, "config.yaml"))
+	assert.NoError(t, err)
 }
 
 func TestCreateDefault(t *testing.T) {
