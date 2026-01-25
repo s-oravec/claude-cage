@@ -144,7 +144,7 @@ Connects to serial console.
 ### Information Commands
 
 #### list (`list.go`)
-Lists all cages.
+Lists all cages. Alias: `ls`
 
 **Output:** Table with name, status, image, profile, network info
 
@@ -182,7 +182,7 @@ Manages VM snapshots.
 
 **Subcommands:**
 - `create <cage> --name <snap>` - Create snapshot
-- `list <cage>` - List snapshots
+- `list <cage>` - List snapshots (alias: `ls`)
 - `restore <cage> --name <snap>` - Restore snapshot
 - `remove <cage> --name <snap>` - Remove snapshot (aliases: `rm`, `delete`)
 
@@ -191,14 +191,14 @@ Manages port forwarding.
 
 **Subcommands:**
 - `add <cage> <host:guest>` - Add forward
-- `list <cage>` - List forwards
+- `list <cage>` - List forwards (alias: `ls`)
 - `remove <cage> <host>` - Remove forward
 
 #### image (`image.go`)
 Manages base and custom images.
 
 **Subcommands:**
-- `list` - List images
+- `list` - List images (alias: `ls`)
 - `save [cage] --name <img>` - Save stopped cage as image (cage name optional in project directory)
 - `remove <img>` - Remove image (aliases: `rm`, `delete`)
 - `inspect <img>` - Show image details

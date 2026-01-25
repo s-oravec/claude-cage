@@ -29,8 +29,9 @@ custom images from running cages to save your environment setup.`,
 
 func newImageListCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "list",
-		Short: "List available images",
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List available images",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listAvailableImages(cmd)
 		},

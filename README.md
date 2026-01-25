@@ -342,7 +342,7 @@ cage console myproject
 
 ### cage list
 
-List all cages and their status.
+List all cages and their status. Alias: `ls`
 
 ```bash
 cage list [options]
@@ -433,7 +433,7 @@ cage snapshot <subcommand>
 | Subcommand | Description |
 |------------|-------------|
 | `create` | Create a snapshot |
-| `list` | List snapshots |
+| `list` | List snapshots (alias: `ls`) |
 | `restore` | Restore to a snapshot |
 | `remove` | Remove a snapshot (aliases: `rm`, `delete`) |
 
@@ -466,7 +466,7 @@ cage port <subcommand>
 | Subcommand | Description |
 |------------|-------------|
 | `add` | Add a port forward |
-| `list` | List port forwards |
+| `list` | List port forwards (alias: `ls`) |
 | `remove` | Remove a port forward |
 
 **Examples:**
@@ -494,7 +494,7 @@ cage image <subcommand>
 **Subcommands:**
 | Subcommand | Description |
 |------------|-------------|
-| `list` | List available images |
+| `list` | List available images (alias: `ls`) |
 | `save` | Save a stopped cage as a new image |
 | `remove` | Remove an image (aliases: `rm`, `delete`) |
 | `inspect` | Show image details |

@@ -53,9 +53,10 @@ You can restore to this snapshot later using 'cage snapshot restore'.`,
 
 func newSnapshotListCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "list <cage-name>",
-		Short: "List snapshots of a cage",
-		Args:  cobra.ExactArgs(1),
+		Use:     "list <cage-name>",
+		Aliases: []string{"ls"},
+		Short:   "List snapshots of a cage",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listSnapshots(cmd, args[0])
 		},

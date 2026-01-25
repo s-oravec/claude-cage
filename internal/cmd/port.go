@@ -29,9 +29,10 @@ from your host machine. By default, ports are bound to 127.0.0.1 (localhost only
 
 func newPortListCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "list <name>",
-		Short: "List port forwards for a cage",
-		Args:  cobra.ExactArgs(1),
+		Use:     "list <name>",
+		Aliases: []string{"ls"},
+		Short:   "List port forwards for a cage",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listPorts(cmd, args[0])
 		},
