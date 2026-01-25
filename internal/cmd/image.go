@@ -111,15 +111,20 @@ func listAvailableImages(cmd *cobra.Command) error {
 		return nil
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "%-20s %-8s %-10s %s\n", "NAME", "TYPE", "SIZE", "CREATED")
+	fmt.Fprintf(cmd.OutOrStdout(), "%-20s %-8s %-20s %-10s %s\n", "NAME", "TYPE", "BASE", "SIZE", "CREATED")
 	for _, img := range imgList {
 		created := "-"
 		if !img.CreatedAt.IsZero() {
 			created = img.CreatedAt.Format("2006-01-02")
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "%-20s %-8s %-10s %s\n",
+		base := "-"
+		if img.Base != "" {
+			base = truncateString(img.Base, 20)
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "%-20s %-8s %-20s %-10s %s\n",
 			truncateString(img.Name, 20),
 			img.Type,
+			base,
 			images.FormatSize(img.Size),
 			created)
 	}
