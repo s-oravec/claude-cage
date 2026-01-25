@@ -21,7 +21,7 @@ custom images from running cages to save your environment setup.`,
 
 	cmd.AddCommand(newImageListCmd())
 	cmd.AddCommand(newImageSaveCmd())
-	cmd.AddCommand(newImageDeleteCmd())
+	cmd.AddCommand(newImageRemoveCmd())
 	cmd.AddCommand(newImageInspectCmd())
 
 	return cmd
@@ -61,22 +61,23 @@ software and configuration.`,
 	return cmd
 }
 
-func newImageDeleteCmd() *cobra.Command {
+func newImageRemoveCmd() *cobra.Command {
 	var force bool
 
 	cmd := &cobra.Command{
-		Use:   "delete <image-name>",
-		Short: "Delete an image",
-		Long: `Delete an image from the system.
+		Use:     "remove <image-name>",
+		Aliases: []string{"rm", "delete"},
+		Short:   "Remove an image",
+		Long: `Remove an image from the system.
 
-Base images require --force to delete. Images in use by cages cannot be deleted.`,
+Base images require --force to remove. Images in use by cages cannot be removed.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deleteImage(cmd, args[0], force)
+			return removeImage(cmd, args[0], force)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force delete (required for base images)")
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force remove (required for base images)")
 
 	return cmd
 }
@@ -154,7 +155,7 @@ func saveImage(cmd *cobra.Command, cageName, imageName, description string) erro
 	return nil
 }
 
-func deleteImage(cmd *cobra.Command, imageName string, force bool) error {
+func removeImage(cmd *cobra.Command, imageName string, force bool) error {
 	if !images.Exists(imageName) {
 		return fmt.Errorf("image '%s' not found", imageName)
 	}
@@ -163,7 +164,7 @@ func deleteImage(cmd *cobra.Command, imageName string, force bool) error {
 		return err
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "✓ Image '%s' deleted\n", imageName)
+	fmt.Fprintf(cmd.OutOrStdout(), "✓ Image '%s' removed\n", imageName)
 	return nil
 }
 

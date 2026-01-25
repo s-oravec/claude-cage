@@ -46,8 +46,8 @@ func TestImageCmd(t *testing.T) {
 		if !contains(output, "save") {
 			t.Error("image should have save subcommand")
 		}
-		if !contains(output, "delete") {
-			t.Error("image should have delete subcommand")
+		if !contains(output, "remove") {
+			t.Error("image should have remove subcommand")
 		}
 		if !contains(output, "inspect") {
 			t.Error("image should have inspect subcommand")
@@ -150,11 +150,11 @@ func TestImageCmd(t *testing.T) {
 		}
 	})
 
-	t.Run("image delete has force flag", func(t *testing.T) {
-		cmd := newImageDeleteCmd()
+	t.Run("image remove has force flag", func(t *testing.T) {
+		cmd := newImageRemoveCmd()
 		flag := cmd.Flags().Lookup("force")
 		if flag == nil {
-			t.Error("delete should have --force flag")
+			t.Error("remove should have --force flag")
 		}
 	})
 

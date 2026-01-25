@@ -37,8 +37,8 @@ func TestSnapshotCmd(t *testing.T) {
 		if !contains(output, "restore") {
 			t.Error("snapshot should have restore subcommand")
 		}
-		if !contains(output, "delete") {
-			t.Error("snapshot should have delete subcommand")
+		if !contains(output, "remove") {
+			t.Error("snapshot should have remove subcommand")
 		}
 	})
 

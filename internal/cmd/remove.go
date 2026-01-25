@@ -18,8 +18,9 @@ func NewRemoveCmd() *cobra.Command {
 	var all bool
 
 	cmd := &cobra.Command{
-		Use:   "remove [name]",
-		Short: "Remove a cage and all its resources",
+		Use:     "remove [name]",
+		Aliases: []string{"rm"},
+		Short:   "Remove a cage and all its resources",
 		Long: `Remove a cage VM and all its associated resources.
 
 This stops the VM (if running) and removes:
@@ -32,8 +33,7 @@ This stops the VM (if running) and removes:
 When run from a directory with .claude-cage.yml, the cage name is optional.
 
 The cage's data is permanently deleted.`,
-		Args:    cobra.MaximumNArgs(1),
-		Aliases: []string{"rm"},
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if all {
 				return removeAllCages(cmd, force)

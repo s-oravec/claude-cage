@@ -22,7 +22,7 @@ This is useful for testing, experimentation, or recovery.`,
 	cmd.AddCommand(newSnapshotCreateCmd())
 	cmd.AddCommand(newSnapshotListCmd())
 	cmd.AddCommand(newSnapshotRestoreCmd())
-	cmd.AddCommand(newSnapshotDeleteCmd())
+	cmd.AddCommand(newSnapshotRemoveCmd())
 
 	return cmd
 }
@@ -83,19 +83,20 @@ Warning: This will discard any changes made since the snapshot was created.`,
 	return cmd
 }
 
-func newSnapshotDeleteCmd() *cobra.Command {
+func newSnapshotRemoveCmd() *cobra.Command {
 	var name string
 
 	cmd := &cobra.Command{
-		Use:   "delete <cage-name>",
-		Short: "Delete a snapshot",
-		Args:  cobra.ExactArgs(1),
+		Use:     "remove <cage-name>",
+		Aliases: []string{"rm", "delete"},
+		Short:   "Remove a snapshot",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deleteSnapshot(cmd, args[0], name)
+			return removeSnapshot(cmd, args[0], name)
 		},
 	}
 
-	cmd.Flags().StringVarP(&name, "name", "n", "", "Snapshot name to delete (required)")
+	cmd.Flags().StringVarP(&name, "name", "n", "", "Snapshot name to remove (required)")
 	cmd.MarkFlagRequired("name")
 
 	return cmd
@@ -167,19 +168,19 @@ func restoreSnapshot(cmd *cobra.Command, cageName, snapshotName string) error {
 	return nil
 }
 
-func deleteSnapshot(cmd *cobra.Command, cageName, snapshotName string) error {
+func removeSnapshot(cmd *cobra.Command, cageName, snapshotName string) error {
 	// Check cage exists
 	if !cage.Exists(cageName) {
 		return fmt.Errorf("cage '%s' not found", cageName)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "Deleting snapshot '%s' from cage '%s'...\n", snapshotName, cageName)
+	fmt.Fprintf(cmd.OutOrStdout(), "Removing snapshot '%s' from cage '%s'...\n", snapshotName, cageName)
 
 	if err := snapshot.Delete(cageName, snapshotName); err != nil {
 		return err
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "✓ Snapshot '%s' deleted\n", snapshotName)
+	fmt.Fprintf(cmd.OutOrStdout(), "✓ Snapshot '%s' removed\n", snapshotName)
 	return nil
 }
 
