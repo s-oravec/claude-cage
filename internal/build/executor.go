@@ -330,7 +330,7 @@ func (e *Executor) executeWorkdir(inst Instruction) error {
 	e.workdir = inst.Value
 
 	// Create directory in cage
-	cmd := fmt.Sprintf("mkdir -p %s", e.workdir)
+	cmd := fmt.Sprintf("mkdir -p %q", e.workdir)
 	_, err := ssh.ExecCaptureWithPort(e.tempCage, "127.0.0.1", e.sshPort, cmd)
 	if err != nil {
 		return fmt.Errorf("failed to create workdir: %w", err)
@@ -349,7 +349,7 @@ func (e *Executor) executeRun(inst Instruction) error {
 		envExports += fmt.Sprintf("export %s=%q; ", k, v)
 	}
 
-	cmd := fmt.Sprintf("cd %s && %s%s", e.workdir, envExports, inst.Value)
+	cmd := fmt.Sprintf("cd %q && %s%s", e.workdir, envExports, inst.Value)
 
 	// Execute and stream output
 	output, err := ssh.ExecCaptureWithPort(e.tempCage, "127.0.0.1", e.sshPort, cmd)
@@ -378,10 +378,17 @@ func (e *Executor) executeCopy(inst Instruction) error {
 	// Resolve source relative to context directory
 	srcPath := filepath.Join(e.config.ContextDir, src)
 
+	// Validate source path doesn't escape build context (prevent path traversal)
+	srcPath, _ = filepath.Abs(srcPath)
+	ctxDir, _ := filepath.Abs(e.config.ContextDir)
+	if !strings.HasPrefix(srcPath, ctxDir+string(filepath.Separator)) && srcPath != ctxDir {
+		return fmt.Errorf("source path escapes build context: %s", src)
+	}
+
 	// Check source exists
 	srcInfo, err := os.Stat(srcPath)
 	if err != nil {
-		return fmt.Errorf("source not found: %s", src)
+		return fmt.Errorf("source not found: %s: %w", src, err)
 	}
 
 	// Resolve destination relative to WORKDIR if not absolute
@@ -425,8 +432,11 @@ func (e *Executor) scpDir(src, dest string) error {
 	knownHostsPath := ssh.KnownHostsPath()
 
 	// Create destination directory first
-	mkdirCmd := fmt.Sprintf("mkdir -p %s", dest)
-	ssh.ExecCaptureWithPort(e.tempCage, "127.0.0.1", e.sshPort, mkdirCmd)
+	mkdirCmd := fmt.Sprintf("mkdir -p %q", dest)
+	_, err := ssh.ExecCaptureWithPort(e.tempCage, "127.0.0.1", e.sshPort, mkdirCmd)
+	if err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
 
 	args := []string{
 		"-i", keyPath,
