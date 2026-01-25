@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/s-oravec/claude-cage/internal/cage"
@@ -278,7 +279,179 @@ func (e *Executor) startCage() error {
 }
 
 func (e *Executor) executeInstructions() error {
-	return fmt.Errorf("not implemented")
+	total := len(e.cagefile.Instructions)
+
+	for i, inst := range e.cagefile.Instructions {
+		stepNum := i + 1 // +1 because FROM was step 1
+		e.log("Step %d/%d : %s %s", stepNum+1, total+1, inst.Type, truncate(inst.Value, 50))
+
+		var err error
+		switch inst.Type {
+		case "ARG":
+			// ARG already processed during parsing
+			e.log(" ---> Build arg set")
+		case "ENV":
+			err = e.executeEnv(inst)
+		case "WORKDIR":
+			err = e.executeWorkdir(inst)
+		case "RUN":
+			err = e.executeRun(inst)
+		case "COPY":
+			err = e.executeCopy(inst)
+		default:
+			err = fmt.Errorf("unknown instruction: %s", inst.Type)
+		}
+
+		if err != nil {
+			return fmt.Errorf("step %d failed: %w", stepNum+1, err)
+		}
+	}
+
+	return nil
+}
+
+func (e *Executor) executeEnv(inst Instruction) error {
+	// Parse KEY=VALUE
+	parts := strings.SplitN(inst.Value, "=", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid ENV format: %s", inst.Value)
+	}
+
+	key := parts[0]
+	value := parts[1]
+
+	e.env[key] = value
+	e.log(" ---> ENV %s=%s", key, value)
+
+	return nil
+}
+
+func (e *Executor) executeWorkdir(inst Instruction) error {
+	e.workdir = inst.Value
+
+	// Create directory in cage
+	cmd := fmt.Sprintf("mkdir -p %s", e.workdir)
+	_, err := ssh.ExecCaptureWithPort(e.tempCage, "127.0.0.1", e.sshPort, cmd)
+	if err != nil {
+		return fmt.Errorf("failed to create workdir: %w", err)
+	}
+
+	e.log(" ---> WORKDIR %s", e.workdir)
+	return nil
+}
+
+func (e *Executor) executeRun(inst Instruction) error {
+	e.log(" ---> Running in %s", e.tempCage)
+
+	// Build command with ENV and WORKDIR
+	var envExports string
+	for k, v := range e.env {
+		envExports += fmt.Sprintf("export %s=%q; ", k, v)
+	}
+
+	cmd := fmt.Sprintf("cd %s && %s%s", e.workdir, envExports, inst.Value)
+
+	// Execute and stream output
+	output, err := ssh.ExecCaptureWithPort(e.tempCage, "127.0.0.1", e.sshPort, cmd)
+	if output != "" {
+		// Print output line by line
+		for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+			e.log("%s", line)
+		}
+	}
+
+	if err != nil {
+		return fmt.Errorf("command failed: %w", err)
+	}
+
+	return nil
+}
+
+func (e *Executor) executeCopy(inst Instruction) error {
+	if len(inst.Args) < 2 {
+		return fmt.Errorf("COPY requires source and destination")
+	}
+
+	src := inst.Args[0]
+	dest := inst.Args[len(inst.Args)-1]
+
+	// Resolve source relative to context directory
+	srcPath := filepath.Join(e.config.ContextDir, src)
+
+	// Check source exists
+	srcInfo, err := os.Stat(srcPath)
+	if err != nil {
+		return fmt.Errorf("source not found: %s", src)
+	}
+
+	// Resolve destination relative to WORKDIR if not absolute
+	if !filepath.IsAbs(dest) {
+		dest = filepath.Join(e.workdir, dest)
+	}
+
+	e.log(" ---> Copying %s to %s", src, dest)
+
+	// Use SCP to copy files
+	if srcInfo.IsDir() {
+		return e.scpDir(srcPath, dest)
+	}
+	return e.scpFile(srcPath, dest)
+}
+
+func (e *Executor) scpFile(src, dest string) error {
+	keyPath := ssh.KeyPath(e.tempCage)
+	knownHostsPath := ssh.KnownHostsPath()
+
+	args := []string{
+		"-i", keyPath,
+		"-o", "StrictHostKeyChecking=accept-new",
+		"-o", fmt.Sprintf("UserKnownHostsFile=%s", knownHostsPath),
+		"-o", "LogLevel=ERROR",
+		"-P", fmt.Sprintf("%d", e.sshPort),
+		src,
+		fmt.Sprintf("cage@127.0.0.1:%s", dest),
+	}
+
+	cmd := exec.Command("scp", args...)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("scp failed: %s", string(out))
+	}
+
+	return nil
+}
+
+func (e *Executor) scpDir(src, dest string) error {
+	keyPath := ssh.KeyPath(e.tempCage)
+	knownHostsPath := ssh.KnownHostsPath()
+
+	// Create destination directory first
+	mkdirCmd := fmt.Sprintf("mkdir -p %s", dest)
+	ssh.ExecCaptureWithPort(e.tempCage, "127.0.0.1", e.sshPort, mkdirCmd)
+
+	args := []string{
+		"-i", keyPath,
+		"-o", "StrictHostKeyChecking=accept-new",
+		"-o", fmt.Sprintf("UserKnownHostsFile=%s", knownHostsPath),
+		"-o", "LogLevel=ERROR",
+		"-P", fmt.Sprintf("%d", e.sshPort),
+		"-r", // recursive
+		src + "/.", // copy contents, not directory itself
+		fmt.Sprintf("cage@127.0.0.1:%s", dest),
+	}
+
+	cmd := exec.Command("scp", args...)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("scp failed: %s", string(out))
+	}
+
+	return nil
+}
+
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-3] + "..."
 }
 
 func (e *Executor) stopCage() error {
