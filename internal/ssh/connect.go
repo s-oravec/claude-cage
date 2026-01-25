@@ -88,6 +88,21 @@ func WaitForSSH(cageName, ip string, timeout time.Duration) error {
 	return ErrSSHTimeout
 }
 
+// WaitForSSHWithPort waits for SSH to become available on specific port
+func WaitForSSHWithPort(cageName, host string, port int, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+
+	for time.Now().Before(deadline) {
+		err := SSHExecWithPort(cageName, host, port, "true", false)
+		if err == nil {
+			return nil
+		}
+		time.Sleep(2 * time.Second)
+	}
+
+	return ErrSSHTimeout
+}
+
 // ExecCapture executes a command via SSH and captures the output
 func ExecCapture(cageName, ip, command string) (string, error) {
 	return ExecCaptureWithPort(cageName, ip, 22, command)

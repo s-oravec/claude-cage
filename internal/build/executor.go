@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	"github.com/s-oravec/claude-cage/internal/cage"
 	"github.com/s-oravec/claude-cage/internal/cloudinit"
@@ -252,7 +253,28 @@ func (e *Executor) createTempCage() error {
 }
 
 func (e *Executor) startCage() error {
-	return fmt.Errorf("not implemented")
+	e.log("Step 3: Starting cage...")
+
+	client := libvirt.NewClient()
+
+	if err := client.StartDomain(e.tempCage); err != nil {
+		return fmt.Errorf("failed to start VM: %w", err)
+	}
+
+	// Update state to running
+	state, _ := cage.LoadState(e.tempCage)
+	state.Status = cage.StatusRunning
+	state.StartedAt = time.Now()
+	cage.SaveState(state)
+
+	// Wait for SSH with retry
+	e.log(" ---> Waiting for SSH...")
+	if err := ssh.WaitForSSHWithPort(e.tempCage, "127.0.0.1", e.sshPort, 120*time.Second); err != nil {
+		return fmt.Errorf("SSH timeout: %w", err)
+	}
+
+	e.log(" ---> SSH ready")
+	return nil
 }
 
 func (e *Executor) executeInstructions() error {
@@ -260,7 +282,30 @@ func (e *Executor) executeInstructions() error {
 }
 
 func (e *Executor) stopCage() error {
-	return fmt.Errorf("not implemented")
+	e.log("Stopping temporary cage...")
+
+	client := libvirt.NewClient()
+
+	if err := client.StopDomain(e.tempCage); err != nil {
+		// Try force stop
+		client.DestroyDomain(e.tempCage)
+	}
+
+	// Wait for domain to stop
+	for i := 0; i < 30; i++ {
+		active, _ := client.IsDomainActive(e.tempCage)
+		if !active {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	// Update state
+	state, _ := cage.LoadState(e.tempCage)
+	state.Status = cage.StatusStopped
+	cage.SaveState(state)
+
+	return nil
 }
 
 func (e *Executor) saveImage() error {
@@ -268,5 +313,28 @@ func (e *Executor) saveImage() error {
 }
 
 func (e *Executor) cleanup() {
-	// Stub - to be implemented
+	if e.tempCage == "" {
+		return
+	}
+
+	client := libvirt.NewClient()
+
+	// Force stop if still running
+	if active, _ := client.IsDomainActive(e.tempCage); active {
+		client.DestroyDomain(e.tempCage)
+	}
+
+	// Undefine domain
+	client.UndefineDomain(e.tempCage)
+
+	// Delete SSH keys
+	ssh.DeleteKeys(e.tempCage)
+
+	// Remove known hosts entry
+	ssh.RemoveKnownHost(fmt.Sprintf("[127.0.0.1]:%d", e.sshPort))
+
+	// Delete cage state and files
+	cage.DeleteState(e.tempCage)
+
+	e.tempCage = ""
 }
