@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 )
 
@@ -115,4 +116,80 @@ func ParseAndValidate(r io.Reader) (*Cagefile, error) {
 		BaseImage:    instructions[0].Value,
 		Instructions: instructions[1:], // Skip FROM
 	}, nil
+}
+
+// ResolveArgs resolves ARG values in instructions
+// buildArgs overrides default values from ARG instructions
+func (cf *Cagefile) ResolveArgs(buildArgs map[string]string) *Cagefile {
+	// Collect ARG definitions with defaults
+	args := make(map[string]string)
+	for _, inst := range cf.Instructions {
+		if inst.Type == "ARG" {
+			name, defaultVal := parseArgValue(inst.Value)
+			args[name] = defaultVal
+		}
+	}
+
+	// Override with build args
+	for k, v := range buildArgs {
+		args[k] = v
+	}
+
+	// Create new instructions with substituted values
+	resolved := &Cagefile{
+		BaseImage:    cf.BaseImage,
+		Instructions: make([]Instruction, len(cf.Instructions)),
+	}
+
+	for i, inst := range cf.Instructions {
+		resolved.Instructions[i] = Instruction{
+			Type:  inst.Type,
+			Value: substituteArgs(inst.Value, args),
+			Args:  inst.Args,
+		}
+		// Also substitute in Args for COPY
+		if len(inst.Args) > 0 {
+			resolved.Instructions[i].Args = make([]string, len(inst.Args))
+			for j, arg := range inst.Args {
+				resolved.Instructions[i].Args[j] = substituteArgs(arg, args)
+			}
+		}
+	}
+
+	return resolved
+}
+
+// parseArgValue parses "NAME=default" or "NAME" format
+func parseArgValue(value string) (name, defaultVal string) {
+	parts := strings.SplitN(value, "=", 2)
+	name = parts[0]
+	if len(parts) > 1 {
+		defaultVal = parts[1]
+	}
+	return
+}
+
+// substituteArgs replaces ${VAR} and $VAR with values from args map
+func substituteArgs(s string, args map[string]string) string {
+	// Match ${VAR} pattern
+	re := regexp.MustCompile(`\$\{(\w+)\}`)
+	result := re.ReplaceAllStringFunc(s, func(match string) string {
+		varName := match[2 : len(match)-1] // Remove ${ and }
+		if val, ok := args[varName]; ok {
+			return val
+		}
+		return match // Keep original if not found
+	})
+
+	// Match $VAR pattern (word boundary)
+	re2 := regexp.MustCompile(`\$(\w+)`)
+	result = re2.ReplaceAllStringFunc(result, func(match string) string {
+		varName := match[1:] // Remove $
+		if val, ok := args[varName]; ok {
+			return val
+		}
+		return match
+	})
+
+	return result
 }

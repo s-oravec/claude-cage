@@ -177,3 +177,46 @@ func TestValidateCagefile(t *testing.T) {
 		})
 	}
 }
+
+func TestArgSubstitution(t *testing.T) {
+	input := `FROM ubuntu:22.04
+ARG VERSION=1.0
+RUN echo ${VERSION}
+ENV APP_VERSION=${VERSION}`
+
+	buildArgs := map[string]string{}
+	cf, err := ParseAndValidate(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	resolved := cf.ResolveArgs(buildArgs)
+
+	// RUN should have ${VERSION} replaced with 1.0
+	if resolved.Instructions[1].Value != "echo 1.0" {
+		t.Errorf("expected 'echo 1.0', got '%s'", resolved.Instructions[1].Value)
+	}
+
+	// ENV should have ${VERSION} replaced with 1.0
+	if resolved.Instructions[2].Value != "APP_VERSION=1.0" {
+		t.Errorf("expected 'APP_VERSION=1.0', got '%s'", resolved.Instructions[2].Value)
+	}
+}
+
+func TestArgOverride(t *testing.T) {
+	input := `FROM ubuntu:22.04
+ARG VERSION=1.0
+RUN echo ${VERSION}`
+
+	buildArgs := map[string]string{"VERSION": "2.0"}
+	cf, err := ParseAndValidate(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	resolved := cf.ResolveArgs(buildArgs)
+
+	if resolved.Instructions[1].Value != "echo 2.0" {
+		t.Errorf("expected 'echo 2.0', got '%s'", resolved.Instructions[1].Value)
+	}
+}
