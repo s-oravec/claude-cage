@@ -492,7 +492,20 @@ func (e *Executor) stopCage() error {
 }
 
 func (e *Executor) saveImage() error {
-	return fmt.Errorf("not implemented")
+	e.log("Saving image as '%s'...", e.config.Tag)
+
+	result, err := images.Save(e.tempCage, e.config.Tag, fmt.Sprintf("Built from %s", e.cagefile.BaseImage))
+	if err != nil {
+		return fmt.Errorf("failed to save image: %w", err)
+	}
+
+	if result.VirtCustomizeError != "" {
+		e.log(" ---> Warning: %s", result.VirtCustomizeError)
+	}
+
+	e.log("Successfully built image: %s", e.config.Tag)
+
+	return nil
 }
 
 func (e *Executor) cleanup() {
