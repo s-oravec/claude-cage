@@ -315,6 +315,78 @@ cage start myproject --image my-node-app
 
 ---
 
+## Common Examples
+
+### Node.js Development Environment
+
+```dockerfile
+FROM ubuntu
+
+RUN sudo apt update -y && sudo apt upgrade -y
+
+# Install Node.js 22 via NodeSource
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash - && \
+    sudo apt install -y nodejs
+
+# Verify
+RUN node -v && npm -v
+```
+
+### Python Development Environment
+
+```dockerfile
+FROM ubuntu
+
+RUN sudo apt update -y && \
+    sudo apt install -y \
+    python3 \
+    python3-pip \
+    python3-venv
+
+WORKDIR /app
+COPY ./requirements.txt .
+RUN python3 -m venv venv && \
+    . venv/bin/activate && \
+    pip install -r requirements.txt
+```
+
+### Go Development Environment
+
+```dockerfile
+FROM ubuntu
+
+ARG GO_VERSION=1.22.0
+
+RUN sudo apt update -y && \
+    sudo apt install -y wget
+
+RUN wget https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz && \
+    sudo tar -C /usr/local -xzf go${GO_VERSION}.linux-amd64.tar.gz && \
+    rm go${GO_VERSION}.linux-amd64.tar.gz
+
+ENV PATH=/usr/local/go/bin:$PATH
+
+RUN go version
+```
+
+### Rust Development Environment
+
+```dockerfile
+FROM ubuntu
+
+RUN sudo apt update -y && \
+    sudo apt install -y curl build-essential
+
+# Install Rust via rustup
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+ENV PATH=/home/cage/.cargo/bin:$PATH
+
+RUN rustc --version && cargo --version
+```
+
+---
+
 ## Differences from Dockerfile
 
 | Feature | Cagefile | Dockerfile |
