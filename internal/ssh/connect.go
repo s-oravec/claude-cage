@@ -43,9 +43,19 @@ func SSHExecWithPort(cageName, host string, port int, command string, interactiv
 	keyPath := KeyPath(cageName)
 	knownHostsPath := KnownHostsPath()
 
+	// Use StrictHostKeyChecking=no for localhost connections (user-mode networking)
+	// because VM restarts may regenerate host keys. This is safe because:
+	// 1. We're connecting to VMs we created using our own keypair
+	// 2. The connection is through localhost port forwarding
+	// For non-localhost, use accept-new for better security
+	strictHostKey := "accept-new"
+	if host == "127.0.0.1" || host == "localhost" {
+		strictHostKey = "no"
+	}
+
 	args := []string{
 		"-i", keyPath,
-		"-o", "StrictHostKeyChecking=accept-new",
+		"-o", fmt.Sprintf("StrictHostKeyChecking=%s", strictHostKey),
 		"-o", fmt.Sprintf("UserKnownHostsFile=%s", knownHostsPath),
 		"-o", "LogLevel=ERROR",
 		"-o", "ConnectTimeout=5",
@@ -113,9 +123,16 @@ func ExecCaptureWithPort(cageName, host string, port int, command string) (strin
 	keyPath := KeyPath(cageName)
 	knownHostsPath := KnownHostsPath()
 
+	// Use StrictHostKeyChecking=no for localhost connections (user-mode networking)
+	// because VM restarts may regenerate host keys
+	strictHostKey := "accept-new"
+	if host == "127.0.0.1" || host == "localhost" {
+		strictHostKey = "no"
+	}
+
 	args := []string{
 		"-i", keyPath,
-		"-o", "StrictHostKeyChecking=accept-new",
+		"-o", fmt.Sprintf("StrictHostKeyChecking=%s", strictHostKey),
 		"-o", fmt.Sprintf("UserKnownHostsFile=%s", knownHostsPath),
 		"-o", "LogLevel=ERROR",
 		"-o", "ConnectTimeout=5",

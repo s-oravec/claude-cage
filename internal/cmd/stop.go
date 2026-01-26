@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/s-oravec/claude-cage/internal/cage"
@@ -78,6 +79,11 @@ func stopCage(cmd *cobra.Command, name string, force bool) error {
 		if err := client.StopDomain(name); err != nil {
 			fmt.Fprintf(cmd.OutOrStdout(), "  Warning: %v\n", err)
 		}
+	}
+
+	// Wait for domain to fully stop (virsh destroy/shutdown is async)
+	if err := client.WaitForDomainStopped(name, 30*time.Second); err != nil {
+		fmt.Fprintf(cmd.OutOrStdout(), "  Warning: %v\n", err)
 	}
 
 	// Stop virtiofsd if running

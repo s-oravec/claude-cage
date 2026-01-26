@@ -71,10 +71,7 @@ func TestCageLifecycle(t *testing.T) {
 		t.Skip("skipping remaining tests: cage failed to start")
 	}
 
-	// Wait for VM to boot
-	t.Log("Waiting for VM to boot...")
-	time.Sleep(10 * time.Second)
-
+	// Note: start command now waits for SSH (60s timeout), so VM should be ready
 	// List cages
 	t.Run("List", func(t *testing.T) {
 		stdout, _, err := runCage("list")
@@ -129,6 +126,11 @@ func TestCageLifecycle(t *testing.T) {
 			t.Fatal("SSH connection failed after 150s")
 		}
 		t.Log("SSH connection successful")
+
+		// Wait for cloud-init to complete (avoids apt lock and other race conditions)
+		t.Log("Waiting for cloud-init to complete...")
+		runCageWithTimeout(2*time.Minute, "ssh", name, "cloud-init", "status", "--wait")
+		t.Log("Cloud-init complete")
 	})
 
 	t.Run("Exec", func(t *testing.T) {
@@ -165,6 +167,7 @@ func TestCageLifecycle(t *testing.T) {
 	})
 
 	// Stop cage
+	// Note: stop command now waits for domain to fully stop internally
 	t.Run("Stop", func(t *testing.T) {
 		stdout, stderr, err := runCage("stop", name)
 		if err != nil {
@@ -172,14 +175,19 @@ func TestCageLifecycle(t *testing.T) {
 		}
 	})
 
-	// Wait for stop
-	time.Sleep(3 * time.Second)
-
 	// Verify stopped (cage should still exist but be stopped)
 	t.Run("VerifyStopped", func(t *testing.T) {
 		stdout, _, _ := runCage("list")
-		if strings.Contains(stdout, name) && strings.Contains(stdout, "running") {
-			t.Errorf("cage still showing as running: %s", stdout)
+		// Check that this specific cage is not running (not just any cage)
+		// Parse output line by line to find our cage
+		lines := strings.Split(stdout, "\n")
+		for _, line := range lines {
+			if strings.Contains(line, name) {
+				if strings.Contains(line, "running") {
+					t.Errorf("cage still showing as running: %s", line)
+				}
+				break
+			}
 		}
 	})
 

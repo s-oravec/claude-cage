@@ -396,10 +396,19 @@ func startCage(cmd *cobra.Command, name string, ports []string, cfg *config.Conf
 		return fmt.Errorf("failed to save state: %w", err)
 	}
 
-	// Wait for SSH if we have an IP
+	// Wait for SSH if available
 	if ip != "" {
+		// Bridge networking - SSH via direct IP
 		fmt.Fprint(cmd.OutOrStdout(), "  Waiting for SSH...")
 		if err := ssh.WaitForSSH(name, ip, 60*time.Second); err != nil {
+			fmt.Fprintln(cmd.OutOrStdout(), " timeout (VM may still be booting)")
+		} else {
+			fmt.Fprintln(cmd.OutOrStdout(), " ready")
+		}
+	} else if state.SSHPort > 0 {
+		// User-mode networking - SSH via port forwarding
+		fmt.Fprint(cmd.OutOrStdout(), "  Waiting for SSH...")
+		if err := ssh.WaitForSSHWithPort(name, "127.0.0.1", state.SSHPort, 60*time.Second); err != nil {
 			fmt.Fprintln(cmd.OutOrStdout(), " timeout (VM may still be booting)")
 		} else {
 			fmt.Fprintln(cmd.OutOrStdout(), " ready")

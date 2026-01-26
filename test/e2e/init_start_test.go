@@ -94,10 +94,7 @@ func TestInitStartWorkflow(t *testing.T) {
 		t.Skip("skipping remaining tests: cage failed to start")
 	}
 
-	// Wait for VM to boot
-	t.Log("Waiting for VM to boot...")
-	time.Sleep(10 * time.Second)
-
+	// Note: start command now waits for SSH (60s timeout), so VM should be ready
 	// 5. Verify cage is running
 	t.Run("VerifyRunning", func(t *testing.T) {
 		stdout, _, err := runCage("list")
@@ -129,9 +126,15 @@ func TestInitStartWorkflow(t *testing.T) {
 			t.Fatal("SSH connection failed after 150s")
 		}
 		t.Log("SSH connection successful")
+
+		// Wait for cloud-init to complete (avoids apt lock and other race conditions)
+		t.Log("Waiting for cloud-init to complete...")
+		runCageInDirWithTimeout(projectDir, 2*time.Minute, "ssh", "--", "cloud-init", "status", "--wait")
+		t.Log("Cloud-init complete")
 	})
 
 	// 6. Stop cage (from project dir, no name needed)
+	// Note: stop command now waits for domain to fully stop internally
 	t.Run("Stop", func(t *testing.T) {
 		stdout, stderr, err := runCageInDir(projectDir, "stop", "--force")
 		if err != nil {
@@ -139,9 +142,6 @@ func TestInitStartWorkflow(t *testing.T) {
 		}
 		t.Logf("Stop output: %s", stdout)
 	})
-
-	// Wait for stop to complete (virsh destroy is async)
-	time.Sleep(5 * time.Second)
 
 	// 7. Modify .claude-cage.yml - add env var
 	t.Run("ModifyConfig", func(t *testing.T) {
@@ -160,6 +160,7 @@ func TestInitStartWorkflow(t *testing.T) {
 	})
 
 	// 8. Start again (from project dir)
+	// Note: start command now waits for SSH internally (60s timeout)
 	t.Run("RestartWithEnv", func(t *testing.T) {
 		stdout, stderr, err := runCageInDirWithTimeout(projectDir, 2*time.Minute, "start")
 		if err != nil {
@@ -167,10 +168,6 @@ func TestInitStartWorkflow(t *testing.T) {
 		}
 		t.Logf("Restart output: %s", stdout)
 	})
-
-	// Wait for VM to boot
-	t.Log("Waiting for VM to boot after restart...")
-	time.Sleep(10 * time.Second)
 
 	// Wait for SSH again (from project dir)
 	t.Run("WaitForSSHAfterRestart", func(t *testing.T) {
@@ -187,6 +184,12 @@ func TestInitStartWorkflow(t *testing.T) {
 		if !sshOK {
 			t.Fatal("SSH connection failed after restart")
 		}
+		t.Log("SSH connection successful after restart")
+
+		// Wait for cloud-init to complete (avoids apt lock and other race conditions)
+		t.Log("Waiting for cloud-init to complete...")
+		runCageInDirWithTimeout(projectDir, 2*time.Minute, "ssh", "--", "cloud-init", "status", "--wait")
+		t.Log("Cloud-init complete")
 	})
 
 	// 9. SSH in and verify env var is set (from project dir)
@@ -199,9 +202,6 @@ func TestInitStartWorkflow(t *testing.T) {
 		if strings.Contains(testImage, "alpine") {
 			t.Skip("Skipping env var test on Alpine (no profile.d support)")
 		}
-
-		// Give time for cloud-init to set up env vars
-		time.Sleep(5 * time.Second)
 
 		// Try to source the runtime env file (new mechanism via virtiofs)
 		// Use sh instead of bash for broader compatibility

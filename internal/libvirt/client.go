@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 // Client wraps libvirt operations using virsh CLI
@@ -51,6 +52,25 @@ func (c *Client) IsDomainActive(name string) (bool, error) {
 	}
 	state := strings.TrimSpace(out)
 	return state == "running", nil
+}
+
+// WaitForDomainStopped waits for a domain to stop (become inactive)
+func (c *Client) WaitForDomainStopped(name string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+
+	for time.Now().Before(deadline) {
+		active, err := c.IsDomainActive(name)
+		if err != nil {
+			// Domain might not exist anymore, which is fine
+			return nil
+		}
+		if !active {
+			return nil
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	return fmt.Errorf("timeout waiting for domain cage-%s to stop", name)
 }
 
 // StartDomain starts a defined domain

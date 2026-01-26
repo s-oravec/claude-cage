@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -51,13 +53,16 @@ func TestStartCmd_NonExistentCage(t *testing.T) {
 }
 
 func TestStartCmd_UsesProjectConfig(t *testing.T) {
+	// Use unique cage name to avoid collisions
+	cageName := fmt.Sprintf("test-start-%d", time.Now().UnixNano()%10000)
+
 	// Create a temp directory with a project config
 	tmpDir := t.TempDir()
 
 	// Create project config file
-	configContent := `image: alpine-3.21
-cage: test-cage
-`
+	configContent := fmt.Sprintf(`image: alpine-3.21
+cage: %s
+`, cageName)
 	err := os.WriteFile(filepath.Join(tmpDir, config.ProjectConfigFile), []byte(configContent), 0644)
 	require.NoError(t, err)
 
@@ -65,6 +70,16 @@ cage: test-cage
 	oldWd, _ := os.Getwd()
 	os.Chdir(tmpDir)
 	defer os.Chdir(oldWd)
+
+	// Cleanup any created cage on exit
+	t.Cleanup(func() {
+		// Stop and remove cage if it was created
+		cleanupCmd := NewRootCmd()
+		cleanupCmd.SetOut(&bytes.Buffer{})
+		cleanupCmd.SetErr(&bytes.Buffer{})
+		cleanupCmd.SetArgs([]string{"remove", cageName, "--force"})
+		cleanupCmd.Execute() // Ignore errors - cage might not exist
+	})
 
 	// Run start without name - should pick up cage name from config
 	cmd := NewRootCmd()
