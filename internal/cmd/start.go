@@ -327,11 +327,59 @@ func startCage(cmd *cobra.Command, name string, ports []string, cfg *config.Conf
 		}
 	}
 
+	// Setup isolated networking for SLIRP mode (Auto)
+	var isolatedNet *network.IsolatedNetwork
+	if state.NetworkMode == cage.NetworkAuto && os.Getuid() == 0 {
+		fmt.Fprintln(cmd.OutOrStdout(), "  Setting up isolated network namespace...")
+		isolatedNet, err = network.SetupIsolatedNetwork(&network.IsolationConfig{
+			CageName:       name,
+			BlockedSubnets: cfg.Network.BlockedSubnets,
+		})
+		if err != nil {
+			fmt.Fprintf(cmd.OutOrStdout(), "  Warning: isolated networking failed: %v\n", err)
+			fmt.Fprintln(cmd.OutOrStdout(), "  Falling back to standard SLIRP (without host-level isolation)...")
+		} else {
+			fmt.Fprintf(cmd.OutOrStdout(), "  Passt socket: %s\n", isolatedNet.SocketPath)
+			
+			// Redefine domain with passt socket
+			cageDir := cage.Dir(name)
+			runtimeDir := runtime.RuntimeDir(cageDir)
+			domainCfg := &libvirt.DomainConfig{
+				Name:           name,
+				MemoryMB:       4096, // TODO: get from state/config
+				VCPU:           4,    // TODO: get from state/config
+				DiskPath:       filepath.Join(cageDir, "disk.qcow2"),
+				CloudInitISO:   filepath.Join(cageDir, "cloud-init.iso"),
+				NetworkName:    "",
+				VirtiofsSocket: virtiofsSocket,
+				RuntimeDir:     runtimeDir,
+				SSHPort:        state.SSHPort,
+				PasstSocket:    isolatedNet.SocketPath,
+			}
+			
+			xml, err := libvirt.GenerateDomainXML(domainCfg)
+			if err != nil {
+				isolatedNet.Cleanup()
+				return fmt.Errorf("failed to generate domain XML: %w", err)
+			}
+			
+			if err := client.RedefineDomain(name, xml); err != nil {
+				isolatedNet.Cleanup()
+				return fmt.Errorf("failed to redefine domain with isolation: %w", err)
+			}
+		}
+	} else if state.NetworkMode == cage.NetworkAuto {
+		fmt.Fprintln(cmd.OutOrStdout(), "  Note: Run as root for host-level network isolation")
+	}
+
 	// Start the domain
 	fmt.Fprintln(cmd.OutOrStdout(), "  Starting VM...")
 	if err := client.StartDomain(name); err != nil {
 		if virtiofsDaemon != nil {
 			virtiofsDaemon.Stop()
+		}
+		if isolatedNet != nil {
+			isolatedNet.Cleanup()
 		}
 		return fmt.Errorf("failed to start VM: %w", err)
 	}
@@ -382,6 +430,13 @@ func startCage(cmd *cobra.Command, name string, ports []string, cfg *config.Conf
 
 	if virtiofsDaemon != nil {
 		state.VirtiofsPID = virtiofsDaemon.PID
+	}
+
+	// Save isolation info
+	if isolatedNet != nil {
+		state.IsolationNS = isolatedNet.Namespace
+		state.IsolationPasst = isolatedNet.PasstPID
+		state.IsolationSocket = isolatedNet.SocketPath
 	}
 
 	// Parse and setup port forwarding
