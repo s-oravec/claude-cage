@@ -192,14 +192,26 @@ func createCageFromConfig(cmd *cobra.Command, name string, resolved *config.Reso
 		}
 	}
 
-	// Create cloud-init ISO with UseRuntimeEnv=true
+	// Create cloud-init ISO with UseRuntimeEnv=true and network isolation
 	fmt.Fprintln(cmd.OutOrStdout(), "  Creating cloud-init...")
+	
+	// Enable network isolation by default for SLIRP networking
+	// The SLIRP network (10.0.2.0/24) is allowed, but other private ranges are blocked
+	networkIsolation := networkMode == cage.NetworkAuto
+	allowedSubnets := []string{"10.0.2.0/24"} // QEMU SLIRP default network
+
+	if networkIsolation {
+		fmt.Fprintln(cmd.OutOrStdout(), "  Enabling network isolation (blocking LAN access)...")
+	}
+
 	cloudInitPath, err := cloudinit.GenerateISOWithConfig(cageDir, &cloudinit.CloudInitConfig{
-		CageName:      name,
-		PubKey:        pubKey,
-		MountVirtiofs: false, // Will be set at start time if virtiofsd is available
-		UseRuntimeEnv: true,  // Use runtime env via virtiofs
-		InstallSSH:    sshPort > 0,
+		CageName:         name,
+		PubKey:           pubKey,
+		MountVirtiofs:    false, // Will be set at start time if virtiofsd is available
+		UseRuntimeEnv:    true,  // Use runtime env via virtiofs
+		InstallSSH:       sshPort > 0,
+		NetworkIsolation: networkIsolation,
+		AllowedSubnets:   allowedSubnets,
 	})
 	if err != nil {
 		cage.DeleteState(name)
@@ -315,11 +327,60 @@ func startCage(cmd *cobra.Command, name string, ports []string, cfg *config.Conf
 		}
 	}
 
+	// Setup isolated networking for SLIRP mode (Auto)
+	var isolatedNet *network.IsolatedNetwork
+	if state.NetworkMode == cage.NetworkAuto && os.Getuid() == 0 {
+		fmt.Fprintln(cmd.OutOrStdout(), "  Setting up isolated network namespace...")
+		isolatedNet, err = network.SetupIsolatedNetwork(&network.IsolationConfig{
+			CageName:       name,
+			BlockedSubnets: cfg.Network.BlockedSubnets,
+			SSHPort:        state.SSHPort,
+		})
+		if err != nil {
+			fmt.Fprintf(cmd.OutOrStdout(), "  Warning: isolated networking failed: %v\n", err)
+			fmt.Fprintln(cmd.OutOrStdout(), "  Falling back to standard SLIRP (without host-level isolation)...")
+		} else {
+			fmt.Fprintf(cmd.OutOrStdout(), "  Passt socket: %s\n", isolatedNet.SocketPath)
+			
+			// Redefine domain with passt socket
+			cageDir := cage.Dir(name)
+			runtimeDir := runtime.RuntimeDir(cageDir)
+			domainCfg := &libvirt.DomainConfig{
+				Name:           name,
+				MemoryMB:       4096, // TODO: get from state/config
+				VCPU:           4,    // TODO: get from state/config
+				DiskPath:       filepath.Join(cageDir, "disk.qcow2"),
+				CloudInitISO:   filepath.Join(cageDir, "cloud-init.iso"),
+				NetworkName:    "",
+				VirtiofsSocket: virtiofsSocket,
+				RuntimeDir:     runtimeDir,
+				SSHPort:        state.SSHPort,
+				PasstSocket:    isolatedNet.SocketPath,
+			}
+			
+			xml, err := libvirt.GenerateDomainXML(domainCfg)
+			if err != nil {
+				isolatedNet.Cleanup()
+				return fmt.Errorf("failed to generate domain XML: %w", err)
+			}
+			
+			if err := client.RedefineDomain(name, xml); err != nil {
+				isolatedNet.Cleanup()
+				return fmt.Errorf("failed to redefine domain with isolation: %w", err)
+			}
+		}
+	} else if state.NetworkMode == cage.NetworkAuto {
+		fmt.Fprintln(cmd.OutOrStdout(), "  Note: Run as root for host-level network isolation")
+	}
+
 	// Start the domain
 	fmt.Fprintln(cmd.OutOrStdout(), "  Starting VM...")
 	if err := client.StartDomain(name); err != nil {
 		if virtiofsDaemon != nil {
 			virtiofsDaemon.Stop()
+		}
+		if isolatedNet != nil {
+			isolatedNet.Cleanup()
 		}
 		return fmt.Errorf("failed to start VM: %w", err)
 	}
@@ -348,6 +409,21 @@ func startCage(cmd *cobra.Command, name string, ports []string, cfg *config.Conf
 		fmt.Fprintln(cmd.OutOrStdout(), "  User-mode networking: use 'cage console' to access")
 	}
 
+	// Setup firewall rules for bridge networking to block LAN access
+	if state.NetworkMode == cage.NetworkBridge {
+		fmt.Fprintln(cmd.OutOrStdout(), "  Setting up network isolation firewall...")
+		firewallCfg := &network.FirewallConfig{
+			BridgeName:        network.BridgeName(name),
+			BlockedInterfaces: cfg.Network.BlockedInterfaces,
+			BlockedSubnets:    cfg.Network.BlockedSubnets,
+			AllowedDNS:        cfg.Network.DNS,
+		}
+		if err := network.SetupFirewall(name, firewallCfg); err != nil {
+			fmt.Fprintf(cmd.OutOrStdout(), "  Warning: firewall setup failed: %v\n", err)
+			fmt.Fprintln(cmd.OutOrStdout(), "  Network isolation may not be enforced.")
+		}
+	}
+
 	// Update state
 	state.Status = cage.StatusRunning
 	state.IP = ip
@@ -355,6 +431,14 @@ func startCage(cmd *cobra.Command, name string, ports []string, cfg *config.Conf
 
 	if virtiofsDaemon != nil {
 		state.VirtiofsPID = virtiofsDaemon.PID
+	}
+
+	// Save isolation info
+	if isolatedNet != nil {
+		state.IsolationNS = isolatedNet.Namespace
+		state.IsolationPasst = isolatedNet.PasstPID
+		state.IsolationSocket = isolatedNet.SocketPath
+		state.IsolationIP = isolatedNet.NamespaceIP
 	}
 
 	// Parse and setup port forwarding

@@ -16,9 +16,10 @@ type DomainConfig struct {
 	VirtiofsSocket string // optional: path to virtiofsd socket for workspace sharing
 	RuntimeDir     string // optional: host path to runtime directory for env vars
 	SSHPort        int    // optional: host port for SSH forwarding (user-mode only)
+	PasstSocket    string // optional: path to passt socket for isolated networking
 }
 
-const domainXMLTemplate = `<domain type='kvm'{{if and (not .NetworkName) (gt .SSHPort 0)}} xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'{{end}}>
+const domainXMLTemplate = `<domain type='kvm'{{if or (and (not .NetworkName) (gt .SSHPort 0)) .PasstSocket}} xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'{{end}}>
   <name>cage-{{.Name}}</name>
   <memory unit='MiB'>{{.MemoryMB}}</memory>
   <vcpu>{{.VCPU}}</vcpu>
@@ -100,7 +101,17 @@ const domainXMLTemplate = `<domain type='kvm'{{if and (not .NetworkName) (gt .SS
       <backend model='random'>/dev/urandom</backend>
     </rng>
   </devices>
-{{if and (not .NetworkName) (gt .SSHPort 0)}}
+{{if .PasstSocket}}
+  <!-- Isolated networking via passt in network namespace.
+       Provides host-level network isolation with blackhole routes for private IPs.
+       The passt socket is in an isolated namespace that blocks RFC 1918 ranges. -->
+  <qemu:commandline>
+    <qemu:arg value='-netdev'/>
+    <qemu:arg value='stream,id=net0,server=off,addr.type=unix,addr.path={{.PasstSocket}}'/>
+    <qemu:arg value='-device'/>
+    <qemu:arg value='virtio-net-pci,netdev=net0,bus=pci.0,addr=0x10'/>
+  </qemu:commandline>
+{{else if and (not .NetworkName) (gt .SSHPort 0)}}
   <!-- User-mode networking with SSH port forwarding via QEMU command line.
        We must specify explicit PCI address (0x10) because qemu:commandline
        bypasses libvirt's PCI address management. Without it, QEMU would

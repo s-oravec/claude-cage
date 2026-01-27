@@ -12,12 +12,14 @@ import (
 
 // CloudInitConfig holds configuration for cloud-init generation
 type CloudInitConfig struct {
-	CageName      string
-	PubKey        string
-	MountVirtiofs bool
-	Env           map[string]string
-	InstallSSH    bool
-	UseRuntimeEnv bool // Source env from /cage/runtime/env.sh instead of baking in Env
+	CageName         string
+	PubKey           string
+	MountVirtiofs    bool
+	Env              map[string]string
+	InstallSSH       bool
+	UseRuntimeEnv    bool     // Source env from /cage/runtime/env.sh instead of baking in Env
+	NetworkIsolation bool     // Add routes to block access to private IP ranges
+	AllowedSubnets   []string // Subnets to allow (e.g., SLIRP network 10.0.2.0/24)
 }
 
 // GenerateUserData generates cloud-init user-data content
@@ -27,6 +29,55 @@ func GenerateUserData(cageName, pubKey string) string {
 		PubKey:       pubKey,
 		MountVirtiofs: false,
 	})
+}
+
+// generateNetworkIsolationRuncmd generates runcmd lines for network isolation
+func generateNetworkIsolationRuncmd(allowedSubnets []string) string {
+	// Default blocked subnets (RFC 1918 + link-local)
+	blockedSubnets := []string{
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+		"169.254.0.0/16",
+	}
+
+	var lines []string
+	lines = append(lines, "  # Network isolation: block access to private IP ranges")
+	lines = append(lines, "  # This prevents the cage from accessing the host LAN")
+
+	// Add allowed subnets first (more specific routes take precedence)
+	for _, subnet := range allowedSubnets {
+		lines = append(lines, fmt.Sprintf("  # Allow %s (required for networking)", subnet))
+	}
+
+	// Add unreachable routes for blocked subnets
+	// The more specific allowed routes will take precedence
+	for _, subnet := range blockedSubnets {
+		lines = append(lines, fmt.Sprintf("  - ip route add unreachable %s 2>/dev/null || true", subnet))
+	}
+
+	// Make the routes persistent across reboots
+	lines = append(lines, "  # Persist network isolation routes")
+	lines = append(lines, "  - |")
+	lines = append(lines, "    cat > /etc/network/if-up.d/cage-isolation 2>/dev/null << 'EOF' || true")
+	lines = append(lines, "    #!/bin/sh")
+	for _, subnet := range blockedSubnets {
+		lines = append(lines, fmt.Sprintf("    ip route add unreachable %s 2>/dev/null || true", subnet))
+	}
+	lines = append(lines, "    EOF")
+	lines = append(lines, "  - chmod +x /etc/network/if-up.d/cage-isolation 2>/dev/null || true")
+	// For systemd-networkd based systems
+	lines = append(lines, "  - mkdir -p /etc/networkd-dispatcher/routable.d 2>/dev/null || true")
+	lines = append(lines, "  - |")
+	lines = append(lines, "    cat > /etc/networkd-dispatcher/routable.d/cage-isolation 2>/dev/null << 'EOF' || true")
+	lines = append(lines, "    #!/bin/sh")
+	for _, subnet := range blockedSubnets {
+		lines = append(lines, fmt.Sprintf("    ip route add unreachable %s 2>/dev/null || true", subnet))
+	}
+	lines = append(lines, "    EOF")
+	lines = append(lines, "  - chmod +x /etc/networkd-dispatcher/routable.d/cage-isolation 2>/dev/null || true")
+
+	return "\n" + strings.Join(lines, "\n")
 }
 
 // generateEnvRuncmd generates runcmd lines for environment variables
@@ -116,6 +167,12 @@ write_files:
 		envRuncmd = generateEnvRuncmd(cfg.Env)
 	}
 
+	// Network isolation runcmd
+	networkIsolationRuncmd := ""
+	if cfg.NetworkIsolation {
+		networkIsolationRuncmd = generateNetworkIsolationRuncmd(cfg.AllowedSubnets)
+	}
+
 	return fmt.Sprintf(`#cloud-config
 users:
   - name: cage
@@ -161,8 +218,8 @@ runcmd:
   - systemctl start docker || true
   # Docker setup (OpenRC-based distros like Alpine)
   - which rc-update && rc-update add docker default || true
-  - which rc-service && rc-service docker start || true%[4]s%[5]s%[6]s
-`, cfg.PubKey, virtiofsMounts, writeFiles, virtiofsRuncmd, sshRuncmd, envRuncmd)
+  - which rc-service && rc-service docker start || true%[4]s%[5]s%[6]s%[7]s
+`, cfg.PubKey, virtiofsMounts, writeFiles, virtiofsRuncmd, sshRuncmd, envRuncmd, networkIsolationRuncmd)
 }
 
 // GenerateMetaData generates cloud-init meta-data content

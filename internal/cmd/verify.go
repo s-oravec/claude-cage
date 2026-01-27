@@ -39,27 +39,57 @@ func verifyCage(cmd *cobra.Command, name string) error {
 		return fmt.Errorf("cage '%s' not found or not running", name)
 	}
 
-	if state.IP == "" {
-		return fmt.Errorf("cage '%s' has no IP address", name)
-	}
-
-	// Get SSH key path
-	keyPath := ssh.KeyPath(name)
-	if !ssh.KeyExists(name) {
-		return fmt.Errorf("SSH key not found for cage '%s'", name)
-	}
-
 	fmt.Fprintf(cmd.OutOrStdout(), "=== Network Isolation Verification: %s ===\n\n", name)
-	fmt.Fprintf(cmd.OutOrStdout(), "IP: %s\n\n", state.IP)
 
-	// Run verification tests
-	results, err := network.VerifyIsolation(name, state.IP, keyPath)
-	if err != nil {
-		return fmt.Errorf("verification failed: %w", err)
+	var results []network.VerificationResult
+	allPassed := true
+
+	// Check for host-level isolation (network namespace)
+	if state.IsolationNS != "" {
+		fmt.Fprintf(cmd.OutOrStdout(), "Host-level isolation: ENABLED (namespace: %s)\n\n", state.IsolationNS)
+
+		// Run namespace verification
+		nsResults, err := network.VerifyNamespaceIsolation(state.IsolationNS)
+		if err != nil {
+			fmt.Fprintf(cmd.OutOrStdout(), "Warning: namespace verification failed: %v\n", err)
+		} else {
+			results = append(results, nsResults...)
+		}
+	} else {
+		fmt.Fprintln(cmd.OutOrStdout(), "Host-level isolation: DISABLED (run as root for full isolation)")
+		fmt.Fprintln(cmd.OutOrStdout(), "Falling back to in-VM route verification...")
+	}
+
+	// Run VM-level verification if we have an IP
+	if state.IP != "" {
+		keyPath := ssh.KeyPath(name)
+		if ssh.KeyExists(name) {
+			vmResults, err := network.VerifyIsolation(name, state.IP, keyPath)
+			if err != nil {
+				fmt.Fprintf(cmd.OutOrStdout(), "Warning: VM verification failed: %v\n", err)
+			} else {
+				results = append(results, vmResults...)
+			}
+		}
+	} else if state.SSHPort > 0 {
+		// For SLIRP mode, try SSH via namespace IP (if isolated) or localhost
+		sshHost := "127.0.0.1"
+		if state.IsolationIP != "" {
+			sshHost = state.IsolationIP
+		}
+		keyPath := ssh.KeyPath(name)
+		if ssh.KeyExists(name) {
+			vmResults, err := network.VerifyIsolationWithPort(name, sshHost, state.SSHPort, keyPath)
+			if err != nil {
+				fmt.Fprintf(cmd.OutOrStdout(), "Warning: VM verification failed: %v\n", err)
+			} else {
+				results = append(results, vmResults...)
+			}
+		}
 	}
 
 	// Print results
-	allPassed := true
+	fmt.Fprintln(cmd.OutOrStdout(), "=== Test Results ===")
 	for _, r := range results {
 		status := "✓"
 		if !r.Passed {
@@ -70,6 +100,11 @@ func verifyCage(cmd *cobra.Command, name string) error {
 	}
 
 	fmt.Fprintln(cmd.OutOrStdout())
+
+	if len(results) == 0 {
+		fmt.Fprintln(cmd.OutOrStdout(), "No tests could be run. Make sure the cage is running.")
+		return fmt.Errorf("verification incomplete")
+	}
 
 	if allPassed {
 		fmt.Fprintln(cmd.OutOrStdout(), "✓ All tests passed - network isolation is working correctly")

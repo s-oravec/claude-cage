@@ -104,10 +104,25 @@ func stopCage(cmd *cobra.Command, name string, force bool) error {
 		}
 	}
 
+	// Cleanup network isolation
+	if state.IsolationNS != "" {
+		fmt.Fprintln(cmd.OutOrStdout(), "  Cleaning up network isolation...")
+		isolatedNet := &network.IsolatedNetwork{
+			Namespace:   state.IsolationNS,
+			PasstPID:    state.IsolationPasst,
+			SocketPath:  state.IsolationSocket,
+			OutInterface: network.GetDefaultInterface(),
+		}
+		isolatedNet.Cleanup()
+	}
+
 	// Update state to stopped
 	state.Status = cage.StatusStopped
 	state.VirtiofsPID = 0
 	state.Ports = nil // Clear port forwarders
+	state.IsolationNS = ""
+	state.IsolationPasst = 0
+	state.IsolationSocket = ""
 	if err := cage.SaveState(state); err != nil {
 		return fmt.Errorf("failed to save state: %w", err)
 	}
