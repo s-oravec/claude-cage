@@ -852,16 +852,11 @@ Environment variables from `env` are injected at cage start time via virtiofs, a
 
 ### Go Style & Best Practices
 
-This project follows standard Go conventions and best practices:
+This project follows the [Uber Go Style Guide](https://github.com/uber-go/guide/blob/master/style.md) — the most widely adopted community standard.
 
-**Official Sources:**
+**Additional references:**
 - [Effective Go](https://go.dev/doc/effective_go) — foundational Go idioms
 - [Go Code Review Comments](https://go.dev/wiki/CodeReviewComments) — common review feedback
-- [Go Proverbs](https://go-proverbs.github.io/) — Rob Pike's design philosophy
-
-**Community Standards:**
-- [Uber Go Style Guide](https://github.com/uber-go/guide/blob/master/style.md) — widely adopted industry standard
-- [Google Go Style](https://google.github.io/styleguide/go/) — Google's internal guidelines
 
 **Tooling (enforced in CI):**
 ```bash
