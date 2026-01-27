@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/s-oravec/claude-cage/internal/build"
 	"github.com/s-oravec/claude-cage/internal/images"
+	"github.com/spf13/cobra"
 )
 
 // NewBuildCmd creates the build command

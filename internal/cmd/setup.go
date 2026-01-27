@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/spf13/cobra"
 	"github.com/s-oravec/claude-cage/internal/images"
 	"github.com/s-oravec/claude-cage/internal/progress"
+	"github.com/spf13/cobra"
 )
 
 // NewSetupCmd creates the setup command

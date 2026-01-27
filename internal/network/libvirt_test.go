@@ -7,12 +7,12 @@ import (
 
 func TestGenerateNetworkXML(t *testing.T) {
 	cfg := &NetworkConfig{
-		CageName:    "test",
-		BridgeName:  "cage-test",
-		IPAddress:   "192.168.100.1",
-		Netmask:     "255.255.255.0",
-		DHCPStart:   "192.168.100.2",
-		DHCPEnd:     "192.168.100.254",
+		CageName:   "test",
+		BridgeName: "cage-test",
+		IPAddress:  "192.168.100.1",
+		Netmask:    "255.255.255.0",
+		DHCPStart:  "192.168.100.2",
+		DHCPEnd:    "192.168.100.254",
 	}
 
 	xml := GenerateNetworkXML(cfg)

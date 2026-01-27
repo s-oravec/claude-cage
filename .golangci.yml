@@ -1,0 +1,69 @@
+# golangci-lint configuration
+# https://golangci-lint.run/usage/configuration/
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gosimple
+    - gofmt
+    - goimports
+  disable:
+    - depguard # We don't need import restrictions
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    # Exclude cleanup functions where errors are intentionally ignored
+    exclude-functions:
+      # OS cleanup
+      - os.Remove
+      - os.RemoveAll
+      - (io.Closer).Close
+      - (net.Conn).Close
+      # Process management
+      - (*os/exec.Cmd).Run
+      - (*os/exec.Cmd).Wait
+      - (*os/exec.Cmd).Start
+      - (*os.Process).Kill
+      - (*os.Process).Wait
+      - syscall.Kill
+      # Cobra flag marking (panics on error in practice)
+      - (*github.com/spf13/cobra.Command).MarkFlagRequired
+      # Project-specific cleanup functions
+      - github.com/s-oravec/claude-cage/internal/cage.DeleteState
+      - github.com/s-oravec/claude-cage/internal/cage.SaveState
+      - github.com/s-oravec/claude-cage/internal/ssh.DeleteKeys
+      - github.com/s-oravec/claude-cage/internal/ssh.RemoveKnownHost
+      - github.com/s-oravec/claude-cage/internal/network.StopForwarderByPID
+      - github.com/s-oravec/claude-cage/internal/network.CleanupFirewall
+      - github.com/s-oravec/claude-cage/internal/network.DestroyNetwork
+      - github.com/s-oravec/claude-cage/internal/virtiofs.StopByPID
+      - github.com/s-oravec/claude-cage/internal/virtiofs.CleanupSocket
+      - (*github.com/s-oravec/claude-cage/internal/virtiofs.Daemon).Stop
+      - (*github.com/s-oravec/claude-cage/internal/network.IsolatedNetwork).Cleanup
+      - (*github.com/s-oravec/claude-cage/internal/network.Forwarder).Stop
+      - (*github.com/s-oravec/claude-cage/internal/libvirt.Client).DestroyDomain
+      - (*github.com/s-oravec/claude-cage/internal/libvirt.Client).UndefineDomain
+      - github.com/s-oravec/claude-cage/internal/images.DeleteMetadata
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  exclude-rules:
+    # Ignore errcheck in test files
+    - path: _test\.go
+      linters:
+        - errcheck
+    # Ignore errcheck in e2e tests
+    - path: test/e2e/
+      linters:
+        - errcheck

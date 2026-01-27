@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/s-oravec/claude-cage/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/s-oravec/claude-cage/internal/config"
 )
 
 func TestSSHCmd_Exists(t *testing.T) {

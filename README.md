@@ -850,6 +850,40 @@ Environment variables from `env` are injected at cage start time via virtiofs, a
 
 ## Development
 
+### Go Style & Best Practices
+
+This project follows standard Go conventions and best practices:
+
+**Official Sources:**
+- [Effective Go](https://go.dev/doc/effective_go) — foundational Go idioms
+- [Go Code Review Comments](https://go.dev/wiki/CodeReviewComments) — common review feedback
+- [Go Proverbs](https://go-proverbs.github.io/) — Rob Pike's design philosophy
+
+**Community Standards:**
+- [Uber Go Style Guide](https://github.com/uber-go/guide/blob/master/style.md) — widely adopted industry standard
+- [Google Go Style](https://google.github.io/styleguide/go/) — Google's internal guidelines
+
+**Tooling (enforced in CI):**
+```bash
+# Format code (required - no style debates)
+gofmt -w .
+
+# Static analysis
+go vet ./...
+
+# Comprehensive linting (includes 50+ linters)
+golangci-lint run ./...
+```
+
+**Key Principles:**
+- Always check error returns (`errcheck`)
+- Use `context.Context` for cancellation
+- Prefer explicit over implicit
+- Keep functions small and focused
+- Document exported symbols
+
+### Building & Testing
+
 ```bash
 # Run tests with coverage
 make test
@@ -857,6 +891,9 @@ make test
 # Run e2e tests (requires KVM)
 make e2e-user  # user-mode networking (no root)
 make e2e       # full tests (needs root for bridge)
+
+# Lint (install: https://golangci-lint.run/usage/install/)
+make lint
 
 # Build
 make build

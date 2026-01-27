@@ -12,14 +12,14 @@ type ImageSource struct {
 // imageAliases maps short names to canonical image names
 var imageAliases = map[string]string{
 	// Default aliases point to latest stable/LTS
-	"alpine":  "alpine-3.21",
-	"ubuntu":  "ubuntu-24.04",
-	"debian":  "debian-12",
-	"rocky":   "rocky-9",
-	"alma":    "alma-9",
-	"fedora":  "fedora-41",
+	"alpine":   "alpine-3.21",
+	"ubuntu":   "ubuntu-24.04",
+	"debian":   "debian-12",
+	"rocky":    "rocky-9",
+	"alma":     "alma-9",
+	"fedora":   "fedora-41",
 	"opensuse": "opensuse-15.6",
-	"centos":  "centos-stream-9",
+	"centos":   "centos-stream-9",
 }
 
 // BaseImages returns available base images

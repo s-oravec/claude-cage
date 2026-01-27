@@ -17,7 +17,7 @@ var (
 // Image represents a VM base image
 type Image struct {
 	Name        string    `json:"name"`
-	Type        string    `json:"type"` // base, custom
+	Type        string    `json:"type"`           // base, custom
 	Base        string    `json:"base,omitempty"` // parent image (for custom)
 	Size        int64     `json:"size_bytes"`
 	Description string    `json:"description,omitempty"`

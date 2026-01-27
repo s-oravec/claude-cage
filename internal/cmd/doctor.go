@@ -3,8 +3,8 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"github.com/s-oravec/claude-cage/internal/doctor"
+	"github.com/spf13/cobra"
 )
 
 // NewDoctorCmd creates the doctor command

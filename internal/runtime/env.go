@@ -59,7 +59,7 @@ func WriteEnvFile(path string, env map[string]string) error {
 }
 
 // escapeShellQuote escapes single quotes in a string for use inside single-quoted shell strings
-// The pattern: ' -> '\'' (end quote, escaped quote, start quote)
+// The pattern: ' -> '\” (end quote, escaped quote, start quote)
 func escapeShellQuote(s string) string {
 	return strings.ReplaceAll(s, "'", "'\\''")
 }

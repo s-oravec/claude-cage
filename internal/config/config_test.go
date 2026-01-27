@@ -407,7 +407,7 @@ func TestParseMemory(t *testing.T) {
 		{"512M", 512, false},
 		{"1024M", 1024, false},
 		{"2048", 2048, false},
-		{"4g", 4096, false},  // lowercase
+		{"4g", 4096, false},   // lowercase
 		{" 8G ", 8192, false}, // with spaces
 		{"invalid", 0, true},
 		{"", 0, true},
@@ -478,9 +478,9 @@ func TestResolveProjectConfig(t *testing.T) {
 
 	assert.Equal(t, "my-project", resolved.CageName)
 	assert.Equal(t, "ubuntu-24.04", resolved.Image)
-	assert.Equal(t, 4, resolved.VCPU)           // from default profile
-	assert.Equal(t, 8192, resolved.MemoryMB)    // overridden (8G = 8192MB)
-	assert.Equal(t, 20, resolved.DiskGB)        // from default profile
+	assert.Equal(t, 4, resolved.VCPU)        // from default profile
+	assert.Equal(t, 8192, resolved.MemoryMB) // overridden (8G = 8192MB)
+	assert.Equal(t, 20, resolved.DiskGB)     // from default profile
 	assert.Equal(t, "auto", resolved.SSHPort)
 	assert.Len(t, resolved.Ports, 1)
 	assert.Equal(t, 8080, resolved.Ports[0].Host)
@@ -503,8 +503,8 @@ func TestResolveProjectConfig_ProfileOverrides(t *testing.T) {
 		Cage:    "heavy-project",
 		Image:   "ubuntu-24.04",
 		Profile: "heavy",
-		VCPU:    16,    // override heavy profile VCPU
-		DiskGB:  100,   // override heavy profile disk
+		VCPU:    16,  // override heavy profile VCPU
+		DiskGB:  100, // override heavy profile disk
 		// Memory not set, should use heavy profile value
 		Network: ProjectNetwork{
 			SSH: "2222",
@@ -514,9 +514,9 @@ func TestResolveProjectConfig_ProfileOverrides(t *testing.T) {
 	resolved, err := ResolveProjectConfig(globalCfg, projectCfg, "/home/user/project")
 	require.NoError(t, err)
 
-	assert.Equal(t, 16, resolved.VCPU)          // overridden
-	assert.Equal(t, 8192, resolved.MemoryMB)    // from heavy profile
-	assert.Equal(t, 100, resolved.DiskGB)       // overridden
+	assert.Equal(t, 16, resolved.VCPU)       // overridden
+	assert.Equal(t, 8192, resolved.MemoryMB) // from heavy profile
+	assert.Equal(t, 100, resolved.DiskGB)    // overridden
 	assert.Equal(t, "2222", resolved.SSHPort)
 }
 
@@ -546,9 +546,9 @@ func TestResolveProjectConfig_DefaultProfile(t *testing.T) {
 	resolved, err := ResolveProjectConfig(globalCfg, projectCfg, "/home/user/project")
 	require.NoError(t, err)
 
-	assert.Equal(t, 4, resolved.VCPU)        // default profile
-	assert.Equal(t, 4096, resolved.MemoryMB) // default profile
-	assert.Equal(t, 20, resolved.DiskGB)     // default profile
+	assert.Equal(t, 4, resolved.VCPU)         // default profile
+	assert.Equal(t, 4096, resolved.MemoryMB)  // default profile
+	assert.Equal(t, 20, resolved.DiskGB)      // default profile
 	assert.Equal(t, "auto", resolved.SSHPort) // default SSH port
 }
 
@@ -602,4 +602,3 @@ func TestResolveProjectConfig_InvalidPortMapping(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "port mapping")
 }
-

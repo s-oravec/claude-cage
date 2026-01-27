@@ -455,7 +455,7 @@ func (e *Executor) scpDir(src, dest string) error {
 		"-o", fmt.Sprintf("UserKnownHostsFile=%s", knownHostsPath),
 		"-o", "LogLevel=ERROR",
 		"-P", fmt.Sprintf("%d", e.sshPort),
-		"-r", // recursive
+		"-r",       // recursive
 		src + "/.", // copy contents, not directory itself
 		fmt.Sprintf("cage@127.0.0.1:%s", dest),
 	}
