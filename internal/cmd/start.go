@@ -192,14 +192,26 @@ func createCageFromConfig(cmd *cobra.Command, name string, resolved *config.Reso
 		}
 	}
 
-	// Create cloud-init ISO with UseRuntimeEnv=true
+	// Create cloud-init ISO with UseRuntimeEnv=true and network isolation
 	fmt.Fprintln(cmd.OutOrStdout(), "  Creating cloud-init...")
+	
+	// Enable network isolation by default for SLIRP networking
+	// The SLIRP network (10.0.2.0/24) is allowed, but other private ranges are blocked
+	networkIsolation := networkMode == cage.NetworkAuto
+	allowedSubnets := []string{"10.0.2.0/24"} // QEMU SLIRP default network
+
+	if networkIsolation {
+		fmt.Fprintln(cmd.OutOrStdout(), "  Enabling network isolation (blocking LAN access)...")
+	}
+
 	cloudInitPath, err := cloudinit.GenerateISOWithConfig(cageDir, &cloudinit.CloudInitConfig{
-		CageName:      name,
-		PubKey:        pubKey,
-		MountVirtiofs: false, // Will be set at start time if virtiofsd is available
-		UseRuntimeEnv: true,  // Use runtime env via virtiofs
-		InstallSSH:    sshPort > 0,
+		CageName:         name,
+		PubKey:           pubKey,
+		MountVirtiofs:    false, // Will be set at start time if virtiofsd is available
+		UseRuntimeEnv:    true,  // Use runtime env via virtiofs
+		InstallSSH:       sshPort > 0,
+		NetworkIsolation: networkIsolation,
+		AllowedSubnets:   allowedSubnets,
 	})
 	if err != nil {
 		cage.DeleteState(name)
@@ -346,6 +358,21 @@ func startCage(cmd *cobra.Command, name string, ports []string, cfg *config.Conf
 	} else {
 		// Auto mode (SLIRP) - no IP from libvirt
 		fmt.Fprintln(cmd.OutOrStdout(), "  User-mode networking: use 'cage console' to access")
+	}
+
+	// Setup firewall rules for bridge networking to block LAN access
+	if state.NetworkMode == cage.NetworkBridge {
+		fmt.Fprintln(cmd.OutOrStdout(), "  Setting up network isolation firewall...")
+		firewallCfg := &network.FirewallConfig{
+			BridgeName:        network.BridgeName(name),
+			BlockedInterfaces: cfg.Network.BlockedInterfaces,
+			BlockedSubnets:    cfg.Network.BlockedSubnets,
+			AllowedDNS:        cfg.Network.DNS,
+		}
+		if err := network.SetupFirewall(name, firewallCfg); err != nil {
+			fmt.Fprintf(cmd.OutOrStdout(), "  Warning: firewall setup failed: %v\n", err)
+			fmt.Fprintln(cmd.OutOrStdout(), "  Network isolation may not be enforced.")
+		}
 	}
 
 	// Update state

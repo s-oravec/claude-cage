@@ -365,3 +365,40 @@ func TestGenerateCloudConfig_RuntimeEnvWithVirtiofs(t *testing.T) {
 	assert.Contains(t, userData, "cage-runtime")
 	assert.Contains(t, userData, "/cage/runtime")
 }
+
+func TestGenerateUserDataWithConfig_NetworkIsolation(t *testing.T) {
+	cfg := &CloudInitConfig{
+		CageName:         "test-cage",
+		PubKey:           "ssh-ed25519 AAAA test@test",
+		NetworkIsolation: true,
+		AllowedSubnets:   []string{"10.0.2.0/24"},
+	}
+
+	userData := GenerateUserDataWithConfig(cfg)
+
+	// Should contain network isolation comments
+	assert.Contains(t, userData, "Network isolation: block access to private IP ranges")
+
+	// Should contain unreachable routes for RFC 1918 ranges
+	assert.Contains(t, userData, "ip route add unreachable 10.0.0.0/8")
+	assert.Contains(t, userData, "ip route add unreachable 172.16.0.0/12")
+	assert.Contains(t, userData, "ip route add unreachable 192.168.0.0/16")
+	assert.Contains(t, userData, "ip route add unreachable 169.254.0.0/16")
+
+	// Should create persistence scripts
+	assert.Contains(t, userData, "cage-isolation")
+}
+
+func TestGenerateUserDataWithConfig_NetworkIsolation_Disabled(t *testing.T) {
+	cfg := &CloudInitConfig{
+		CageName:         "test-cage",
+		PubKey:           "ssh-ed25519 AAAA test@test",
+		NetworkIsolation: false,
+	}
+
+	userData := GenerateUserDataWithConfig(cfg)
+
+	// Should NOT contain network isolation
+	assert.NotContains(t, userData, "Network isolation")
+	assert.NotContains(t, userData, "ip route add unreachable")
+}
