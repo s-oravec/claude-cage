@@ -16,6 +16,7 @@ type IsolationConfig struct {
 	CageName       string
 	SocketPath     string   // Path for passt socket
 	BlockedSubnets []string // Subnets to block (RFC 1918, etc.)
+	SSHPort        int      // Host port to forward to guest SSH (port 22)
 }
 
 // IsolatedNetwork represents a running isolated network namespace with passt
@@ -28,6 +29,7 @@ type IsolatedNetwork struct {
 	NamespaceIP  string // IP address in namespace
 	HostIP       string // IP address on host side
 	OutInterface string // Outbound interface for NAT
+	SSHPort      int    // SSH port forwarding (host -> namespace -> guest)
 }
 
 // GetDefaultInterface returns the interface with the default route
@@ -99,13 +101,13 @@ func SetupIsolatedNetwork(cfg *IsolationConfig) (*IsolatedNetwork, error) {
 		}
 	}
 
-	// Start passt in the namespace
+	// Start passt in the namespace with SSH port forwarding
 	socketPath := cfg.SocketPath
 	if socketPath == "" {
 		socketPath = filepath.Join(os.TempDir(), fmt.Sprintf("cage-%s-passt.socket", cfg.CageName))
 	}
 
-	pid, err := startPasstInNamespace(nsName, socketPath)
+	pid, err := startPasstInNamespace(nsName, socketPath, cfg.SSHPort)
 	if err != nil {
 		cleanupNAT(vethHost, nsIP, outIface)
 		deleteVethPair(vethHost)
@@ -121,6 +123,17 @@ func SetupIsolatedNetwork(cfg *IsolationConfig) (*IsolatedNetwork, error) {
 		time.Sleep(100 * time.Millisecond)
 	}
 
+	// Set up SSH port forwarding from host to namespace
+	if cfg.SSHPort > 0 {
+		if err := setupSSHForward(cfg.SSHPort, nsIP, vethHost); err != nil {
+			syscall.Kill(pid, syscall.SIGTERM)
+			cleanupNAT(vethHost, nsIP, outIface)
+			deleteVethPair(vethHost)
+			deleteNetworkNamespace(nsName)
+			return nil, fmt.Errorf("failed to setup SSH forwarding: %w", err)
+		}
+	}
+
 	return &IsolatedNetwork{
 		Namespace:    nsName,
 		SocketPath:   socketPath,
@@ -130,6 +143,7 @@ func SetupIsolatedNetwork(cfg *IsolationConfig) (*IsolatedNetwork, error) {
 		NamespaceIP:  nsIP,
 		HostIP:       hostIP,
 		OutInterface: outIface,
+		SSHPort:      cfg.SSHPort,
 	}, nil
 }
 
@@ -144,6 +158,9 @@ func (n *IsolatedNetwork) Cleanup() error {
 
 	// Remove socket
 	os.Remove(n.SocketPath)
+
+	// Cleanup SSH forwarding
+	cleanupSSHForward(n.SSHPort, n.NamespaceIP)
 
 	// Cleanup NAT
 	cleanupNAT(n.VethHost, n.NamespaceIP, n.OutInterface)
@@ -296,15 +313,23 @@ func addBlackholeRoute(nsName, subnet string) error {
 }
 
 // startPasstInNamespace starts passt inside a network namespace
-func startPasstInNamespace(nsName, socketPath string) (int, error) {
+func startPasstInNamespace(nsName, socketPath string, sshPort int) (int, error) {
 	os.Remove(socketPath)
 
-	// Start passt in the namespace
-	cmd := exec.Command("ip", "netns", "exec", nsName,
+	// Build passt command with optional port forwarding
+	args := []string{"netns", "exec", nsName,
 		"passt",
 		"--socket", socketPath,
 		"--foreground",
-	)
+	}
+
+	// Add SSH port forwarding if specified
+	// -t host_port:guest_port forwards TCP from namespace to VM
+	if sshPort > 0 {
+		args = append(args, "-t", fmt.Sprintf("%d:22", sshPort))
+	}
+
+	cmd := exec.Command("ip", args...)
 
 	// Redirect output to prevent blocking
 	cmd.Stdout = nil
@@ -317,6 +342,48 @@ func startPasstInNamespace(nsName, socketPath string) (int, error) {
 	return cmd.Process.Pid, nil
 }
 
+// setupSSHForward sets up port forwarding from host to namespace for SSH
+func setupSSHForward(sshPort int, nsIP, vethHost string) error {
+	if sshPort <= 0 {
+		return nil
+	}
+
+	// DNAT: Forward incoming SSH connections to the namespace
+	cmd := exec.Command("iptables", "-t", "nat", "-I", "PREROUTING", "1",
+		"-p", "tcp", "--dport", strconv.Itoa(sshPort),
+		"-j", "DNAT", "--to-destination", fmt.Sprintf("%s:%d", nsIP, sshPort))
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to add DNAT rule: %s", string(out))
+	}
+
+	// Also handle local connections (from the host itself)
+	cmd = exec.Command("iptables", "-t", "nat", "-I", "OUTPUT", "1",
+		"-p", "tcp", "--dport", strconv.Itoa(sshPort),
+		"-j", "DNAT", "--to-destination", fmt.Sprintf("%s:%d", nsIP, sshPort))
+	if out, err := cmd.CombinedOutput(); err != nil {
+		// Clean up PREROUTING rule
+		exec.Command("iptables", "-t", "nat", "-D", "PREROUTING",
+			"-p", "tcp", "--dport", strconv.Itoa(sshPort),
+			"-j", "DNAT", "--to-destination", fmt.Sprintf("%s:%d", nsIP, sshPort)).Run()
+		return fmt.Errorf("failed to add OUTPUT DNAT rule: %s", string(out))
+	}
+
+	return nil
+}
+
+// cleanupSSHForward removes SSH port forwarding rules
+func cleanupSSHForward(sshPort int, nsIP string) {
+	if sshPort <= 0 {
+		return
+	}
+	exec.Command("iptables", "-t", "nat", "-D", "PREROUTING",
+		"-p", "tcp", "--dport", strconv.Itoa(sshPort),
+		"-j", "DNAT", "--to-destination", fmt.Sprintf("%s:%d", nsIP, sshPort)).Run()
+	exec.Command("iptables", "-t", "nat", "-D", "OUTPUT",
+		"-p", "tcp", "--dport", strconv.Itoa(sshPort),
+		"-j", "DNAT", "--to-destination", fmt.Sprintf("%s:%d", nsIP, sshPort)).Run()
+}
+
 // VerifyNamespaceIsolation verifies that the namespace cannot reach private IPs but can reach internet
 func VerifyNamespaceIsolation(nsName string) ([]VerificationResult, error) {
 	var results []VerificationResult
@@ -325,7 +392,9 @@ func VerifyNamespaceIsolation(nsName string) ([]VerificationResult, error) {
 	result := VerificationResult{
 		TestName: "Internet access (TCP)",
 	}
-	cmd := exec.Command("ip", "netns", "exec", nsName, "curl", "-s", "--connect-timeout", "5", "http://example.com")
+	// Use netcat for TCP connectivity test - avoids DNS issues and HTTP redirects
+	// Test TCP connection to Google (142.250.180.100:80)
+	cmd := exec.Command("ip", "netns", "exec", nsName, "timeout", "5", "nc", "-zv", "142.250.180.100", "80")
 	if _, err := cmd.CombinedOutput(); err == nil {
 		result.Passed = true
 		result.Message = "OK"

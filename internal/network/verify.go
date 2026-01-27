@@ -22,7 +22,7 @@ func VerifyIsolation(cageName, cageIP string, sshKeyPath string) ([]Verification
 	// Test 1: Can reach public internet
 	result := runSSHTest(cageName, cageIP, sshKeyPath,
 		"Internet access",
-		"curl -s --max-time 10 https://google.com > /dev/null && echo OK",
+		"wget -q -O /dev/null --timeout=10 https://google.com && echo OK",
 		true)
 	results = append(results, result)
 
@@ -68,10 +68,11 @@ func VerifyIsolation(cageName, cageIP string, sshKeyPath string) ([]Verification
 func VerifyIsolationWithPort(cageName, host string, port int, sshKeyPath string) ([]VerificationResult, error) {
 	var results []VerificationResult
 
-	// Test 1: Can reach public internet
+	// Test 1: Can reach public internet (use netcat to avoid DNS/redirect issues)
+	// Test TCP connection to Google's IP
 	result := runSSHTestWithPort(host, port, sshKeyPath,
 		"Internet access (VM)",
-		"curl -s --max-time 10 https://example.com > /dev/null && echo OK",
+		"timeout 5 nc -zv 142.250.180.100 80 2>&1 && echo OK",
 		true)
 	results = append(results, result)
 

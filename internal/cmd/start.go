@@ -334,6 +334,7 @@ func startCage(cmd *cobra.Command, name string, ports []string, cfg *config.Conf
 		isolatedNet, err = network.SetupIsolatedNetwork(&network.IsolationConfig{
 			CageName:       name,
 			BlockedSubnets: cfg.Network.BlockedSubnets,
+			SSHPort:        state.SSHPort,
 		})
 		if err != nil {
 			fmt.Fprintf(cmd.OutOrStdout(), "  Warning: isolated networking failed: %v\n", err)
@@ -437,6 +438,7 @@ func startCage(cmd *cobra.Command, name string, ports []string, cfg *config.Conf
 		state.IsolationNS = isolatedNet.Namespace
 		state.IsolationPasst = isolatedNet.PasstPID
 		state.IsolationSocket = isolatedNet.SocketPath
+		state.IsolationIP = isolatedNet.NamespaceIP
 	}
 
 	// Parse and setup port forwarding

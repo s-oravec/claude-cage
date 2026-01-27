@@ -72,10 +72,14 @@ func verifyCage(cmd *cobra.Command, name string) error {
 			}
 		}
 	} else if state.SSHPort > 0 {
-		// For SLIRP mode, try SSH via localhost port
+		// For SLIRP mode, try SSH via namespace IP (if isolated) or localhost
+		sshHost := "127.0.0.1"
+		if state.IsolationIP != "" {
+			sshHost = state.IsolationIP
+		}
 		keyPath := ssh.KeyPath(name)
 		if ssh.KeyExists(name) {
-			vmResults, err := network.VerifyIsolationWithPort(name, "127.0.0.1", state.SSHPort, keyPath)
+			vmResults, err := network.VerifyIsolationWithPort(name, sshHost, state.SSHPort, keyPath)
 			if err != nil {
 				fmt.Fprintf(cmd.OutOrStdout(), "Warning: VM verification failed: %v\n", err)
 			} else {

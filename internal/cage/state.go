@@ -37,6 +37,7 @@ type State struct {
 	IsolationNS     string `json:"isolation_ns,omitempty"`      // Network namespace name
 	IsolationPasst  int    `json:"isolation_passt_pid,omitempty"` // Passt process PID
 	IsolationSocket string `json:"isolation_socket,omitempty"`  // Passt socket path
+	IsolationIP     string `json:"isolation_ip,omitempty"`      // Namespace IP for SSH access
 }
 
 // Port represents a port forwarding rule
