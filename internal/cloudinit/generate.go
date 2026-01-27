@@ -25,8 +25,8 @@ type CloudInitConfig struct {
 // GenerateUserData generates cloud-init user-data content
 func GenerateUserData(cageName, pubKey string) string {
 	return GenerateUserDataWithConfig(&CloudInitConfig{
-		CageName:     cageName,
-		PubKey:       pubKey,
+		CageName:      cageName,
+		PubKey:        pubKey,
 		MountVirtiofs: false,
 	})
 }

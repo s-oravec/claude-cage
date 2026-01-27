@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/s-oravec/claude-cage/internal/cage"
 	"github.com/s-oravec/claude-cage/internal/libvirt"
 	"github.com/s-oravec/claude-cage/internal/network"
 	"github.com/s-oravec/claude-cage/internal/virtiofs"
+	"github.com/spf13/cobra"
 )
 
 // NewStopCmd creates the stop command
@@ -108,9 +108,9 @@ func stopCage(cmd *cobra.Command, name string, force bool) error {
 	if state.IsolationNS != "" {
 		fmt.Fprintln(cmd.OutOrStdout(), "  Cleaning up network isolation...")
 		isolatedNet := &network.IsolatedNetwork{
-			Namespace:   state.IsolationNS,
-			PasstPID:    state.IsolationPasst,
-			SocketPath:  state.IsolationSocket,
+			Namespace:    state.IsolationNS,
+			PasstPID:     state.IsolationPasst,
+			SocketPath:   state.IsolationSocket,
 			OutInterface: network.GetDefaultInterface(),
 		}
 		isolatedNet.Cleanup()

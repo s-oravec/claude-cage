@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/s-oravec/claude-cage/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/s-oravec/claude-cage/internal/config"
 )
 
 func TestResolveCageName_WithArgs(t *testing.T) {

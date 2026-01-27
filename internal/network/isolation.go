@@ -55,7 +55,7 @@ func SetupIsolatedNetwork(cfg *IsolationConfig) (*IsolatedNetwork, error) {
 	vethHost := fmt.Sprintf("cv-%s-h", shortName(cfg.CageName, 10))
 	vethNS := fmt.Sprintf("cv-%s-n", shortName(cfg.CageName, 10))
 	outIface := GetDefaultInterface()
-	
+
 	// Use a unique /30 subnet for this cage
 	hostIP := "192.168.250.1"
 	nsIP := "192.168.250.2"
@@ -67,21 +67,21 @@ func SetupIsolatedNetwork(cfg *IsolationConfig) (*IsolatedNetwork, error) {
 
 	// Create veth pair
 	if err := createVethPair(vethHost, vethNS, nsName); err != nil {
-		deleteNetworkNamespace(nsName)
+		_ = deleteNetworkNamespace(nsName)
 		return nil, fmt.Errorf("failed to create veth pair: %w", err)
 	}
 
 	// Configure IP addresses
 	if err := configureVeth(vethHost, vethNS, nsName, hostIP, nsIP); err != nil {
 		deleteVethPair(vethHost)
-		deleteNetworkNamespace(nsName)
+		_ = deleteNetworkNamespace(nsName)
 		return nil, fmt.Errorf("failed to configure veth: %w", err)
 	}
 
 	// Set up NAT on host for namespace traffic
 	if err := setupNAT(vethHost, nsIP, outIface); err != nil {
 		deleteVethPair(vethHost)
-		deleteNetworkNamespace(nsName)
+		_ = deleteNetworkNamespace(nsName)
 		return nil, fmt.Errorf("failed to setup NAT: %w", err)
 	}
 
@@ -89,7 +89,7 @@ func SetupIsolatedNetwork(cfg *IsolationConfig) (*IsolatedNetwork, error) {
 	if err := addDefaultRoute(nsName, hostIP); err != nil {
 		cleanupNAT(vethHost, nsIP, outIface)
 		deleteVethPair(vethHost)
-		deleteNetworkNamespace(nsName)
+		_ = deleteNetworkNamespace(nsName)
 		return nil, fmt.Errorf("failed to add default route: %w", err)
 	}
 
@@ -111,7 +111,7 @@ func SetupIsolatedNetwork(cfg *IsolationConfig) (*IsolatedNetwork, error) {
 	if err != nil {
 		cleanupNAT(vethHost, nsIP, outIface)
 		deleteVethPair(vethHost)
-		deleteNetworkNamespace(nsName)
+		_ = deleteNetworkNamespace(nsName)
 		return nil, fmt.Errorf("failed to start passt: %w", err)
 	}
 
@@ -129,7 +129,7 @@ func SetupIsolatedNetwork(cfg *IsolationConfig) (*IsolatedNetwork, error) {
 			syscall.Kill(pid, syscall.SIGTERM)
 			cleanupNAT(vethHost, nsIP, outIface)
 			deleteVethPair(vethHost)
-			deleteNetworkNamespace(nsName)
+			_ = deleteNetworkNamespace(nsName)
 			return nil, fmt.Errorf("failed to setup SSH forwarding: %w", err)
 		}
 	}
@@ -419,7 +419,7 @@ func VerifyNamespaceIsolation(nsName string) ([]VerificationResult, error) {
 		result := VerificationResult{
 			TestName: test.Name,
 		}
-		
+
 		// Try TCP connection (more reliable than ping in nested NAT)
 		cmd := exec.Command("ip", "netns", "exec", nsName, "timeout", "2", "nc", "-zv", test.IP, "80")
 		_, err := cmd.CombinedOutput()

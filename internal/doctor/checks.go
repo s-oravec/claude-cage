@@ -12,11 +12,11 @@ import (
 type Distro string
 
 const (
-	DistroDebian  Distro = "debian"  // Debian, Ubuntu, etc.
-	DistroFedora  Distro = "fedora"  // Fedora, RHEL, Rocky, Alma
-	DistroArch    Distro = "arch"    // Arch Linux
+	DistroDebian   Distro = "debian" // Debian, Ubuntu, etc.
+	DistroFedora   Distro = "fedora" // Fedora, RHEL, Rocky, Alma
+	DistroArch     Distro = "arch"   // Arch Linux
 	DistroOpenSUSE Distro = "opensuse"
-	DistroUnknown Distro = "unknown"
+	DistroUnknown  Distro = "unknown"
 )
 
 // DetectDistro detects the current Linux distribution
@@ -298,7 +298,7 @@ func checkUserInGroup(groupName string) error {
 
 // Common locations for virtiofsd
 var virtiofsdPaths = []string{
-	"virtiofsd",              // In PATH
+	"virtiofsd",               // In PATH
 	"/usr/lib/qemu/virtiofsd", // Ubuntu/Debian
 	"/usr/libexec/virtiofsd",  // Fedora/RHEL
 }
@@ -341,7 +341,6 @@ func checkCloudLocalds() error {
 	}
 	return nil
 }
-
 
 func checkVirtCustomize() error {
 	_, err := exec.LookPath("virt-customize")

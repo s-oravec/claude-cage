@@ -35,10 +35,10 @@ func DefaultBlockedInterfaces() []string {
 // DefaultBlockedSubnets returns the default RFC 1918 and link-local subnets to block
 func DefaultBlockedSubnets() []string {
 	return []string{
-		"10.0.0.0/8",      // RFC 1918 Class A
-		"172.16.0.0/12",   // RFC 1918 Class B
-		"192.168.0.0/16",  // RFC 1918 Class C
-		"169.254.0.0/16",  // Link-local
+		"10.0.0.0/8",     // RFC 1918 Class A
+		"172.16.0.0/12",  // RFC 1918 Class B
+		"192.168.0.0/16", // RFC 1918 Class C
+		"169.254.0.0/16", // Link-local
 	}
 }
 

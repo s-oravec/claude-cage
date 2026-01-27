@@ -130,7 +130,7 @@ func TestStatusFormat(t *testing.T) {
 	}{
 		{30 * time.Second, "30s"},
 		{5 * time.Minute, "5m"},
-		{2 * time.Hour + 15 * time.Minute, "2h15m"},
+		{2*time.Hour + 15*time.Minute, "2h15m"},
 		{25 * time.Hour, "1d1h"},
 	}
 

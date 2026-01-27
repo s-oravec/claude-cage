@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/s-oravec/claude-cage/internal/cage"
 	"github.com/s-oravec/claude-cage/internal/cloudinit"
 	"github.com/s-oravec/claude-cage/internal/config"
@@ -17,6 +16,7 @@ import (
 	"github.com/s-oravec/claude-cage/internal/runtime"
 	"github.com/s-oravec/claude-cage/internal/ssh"
 	"github.com/s-oravec/claude-cage/internal/virtiofs"
+	"github.com/spf13/cobra"
 )
 
 // NewStartCmd creates the start command
@@ -194,7 +194,7 @@ func createCageFromConfig(cmd *cobra.Command, name string, resolved *config.Reso
 
 	// Create cloud-init ISO with UseRuntimeEnv=true and network isolation
 	fmt.Fprintln(cmd.OutOrStdout(), "  Creating cloud-init...")
-	
+
 	// Enable network isolation by default for SLIRP networking
 	// The SLIRP network (10.0.2.0/24) is allowed, but other private ranges are blocked
 	networkIsolation := networkMode == cage.NetworkAuto
@@ -341,7 +341,7 @@ func startCage(cmd *cobra.Command, name string, ports []string, cfg *config.Conf
 			fmt.Fprintln(cmd.OutOrStdout(), "  Falling back to standard SLIRP (without host-level isolation)...")
 		} else {
 			fmt.Fprintf(cmd.OutOrStdout(), "  Passt socket: %s\n", isolatedNet.SocketPath)
-			
+
 			// Redefine domain with passt socket
 			cageDir := cage.Dir(name)
 			runtimeDir := runtime.RuntimeDir(cageDir)
@@ -357,13 +357,13 @@ func startCage(cmd *cobra.Command, name string, ports []string, cfg *config.Conf
 				SSHPort:        state.SSHPort,
 				PasstSocket:    isolatedNet.SocketPath,
 			}
-			
+
 			xml, err := libvirt.GenerateDomainXML(domainCfg)
 			if err != nil {
 				isolatedNet.Cleanup()
 				return fmt.Errorf("failed to generate domain XML: %w", err)
 			}
-			
+
 			if err := client.RedefineDomain(name, xml); err != nil {
 				isolatedNet.Cleanup()
 				return fmt.Errorf("failed to redefine domain with isolation: %w", err)

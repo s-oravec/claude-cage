@@ -213,7 +213,7 @@ func Delete(imageName string, force bool) error {
 	}
 
 	// Delete metadata
-	DeleteMetadata(imageName)
+	_ = DeleteMetadata(imageName)
 
 	return nil
 }

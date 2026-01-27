@@ -8,26 +8,26 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/s-oravec/claude-cage/internal/cage"
 	"github.com/s-oravec/claude-cage/internal/config"
 	"github.com/s-oravec/claude-cage/internal/network"
 	"github.com/s-oravec/claude-cage/internal/ssh"
+	"github.com/spf13/cobra"
 )
 
 // StatusInfo holds detailed cage status information
 type StatusInfo struct {
-	Name      string         `json:"name"`
-	Status    string         `json:"status"`
-	Image     string         `json:"image"`
-	Profile   string         `json:"profile"`
-	Uptime    string         `json:"uptime"`
-	StartedAt time.Time      `json:"started_at"`
-	Network   NetworkInfo    `json:"network"`
-	Resources ResourceInfo   `json:"resources,omitempty"`
-	Docker    *DockerInfo    `json:"docker,omitempty"`
-	Shares    []ShareInfo    `json:"shares,omitempty"`
-	Processes []ProcessInfo  `json:"processes,omitempty"`
+	Name      string        `json:"name"`
+	Status    string        `json:"status"`
+	Image     string        `json:"image"`
+	Profile   string        `json:"profile"`
+	Uptime    string        `json:"uptime"`
+	StartedAt time.Time     `json:"started_at"`
+	Network   NetworkInfo   `json:"network"`
+	Resources ResourceInfo  `json:"resources,omitempty"`
+	Docker    *DockerInfo   `json:"docker,omitempty"`
+	Shares    []ShareInfo   `json:"shares,omitempty"`
+	Processes []ProcessInfo `json:"processes,omitempty"`
 }
 
 // NetworkInfo holds network status
@@ -309,7 +309,7 @@ func sshExecCapture(cageName, command string) (string, error) {
 
 func parseIntOrZero(s string) int {
 	var n int
-	fmt.Sscanf(trimSpace(s), "%d", &n)
+	_, _ = fmt.Sscanf(trimSpace(s), "%d", &n)
 	return n
 }
 

@@ -3,9 +3,9 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"github.com/s-oravec/claude-cage/internal/cage"
 	"github.com/s-oravec/claude-cage/internal/snapshot"
+	"github.com/spf13/cobra"
 )
 
 // NewSnapshotCmd creates the snapshot command with subcommands

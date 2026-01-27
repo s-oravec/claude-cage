@@ -37,11 +37,11 @@ type Snapshot struct {
 
 // domainSnapshot is the XML structure for libvirt snapshots
 type domainSnapshot struct {
-	XMLName     xml.Name `xml:"domainsnapshot"`
-	Name        string   `xml:"name"`
-	Description string   `xml:"description,omitempty"`
-	State       string   `xml:"state,omitempty"`
-	CreationTime int64   `xml:"creationTime,omitempty"`
+	XMLName      xml.Name `xml:"domainsnapshot"`
+	Name         string   `xml:"name"`
+	Description  string   `xml:"description,omitempty"`
+	State        string   `xml:"state,omitempty"`
+	CreationTime int64    `xml:"creationTime,omitempty"`
 }
 
 // Create creates a new snapshot of a cage

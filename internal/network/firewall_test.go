@@ -7,7 +7,7 @@ import (
 
 func TestGenerateFirewallRules(t *testing.T) {
 	cfg := &FirewallConfig{
-		BridgeName: "cage-test",
+		BridgeName:        "cage-test",
 		BlockedInterfaces: []string{"tun+", "tailscale+", "wg+"},
 		BlockedSubnets: []string{
 			"10.0.0.0/8",
@@ -80,7 +80,7 @@ func TestBridgeName(t *testing.T) {
 		expected string
 	}{
 		{"test", "cage-test"},
-		{"myproject", "cage-myproject"}, // 14 chars, fits
+		{"myproject", "cage-myproject"},         // 14 chars, fits
 		{"verylongcagename", "cage-verylongca"}, // truncated to 15 chars total
 		{"a", "cage-a"},
 	}

@@ -120,3 +120,13 @@ install: build
 # Remove build artifacts
 clean:
 	rm -f cage $(COVERAGE_FILE) $(COVERAGE_HTML)
+
+# Lint with golangci-lint
+lint:
+	@echo "Running linters..."
+	@which golangci-lint > /dev/null || (echo "Install golangci-lint: https://golangci-lint.run/usage/install/" && exit 1)
+	golangci-lint run ./...
+
+# Fix common lint issues
+lint-fix:
+	golangci-lint run --fix ./...

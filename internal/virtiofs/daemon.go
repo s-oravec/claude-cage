@@ -205,7 +205,7 @@ func (d *Daemon) Stop() error {
 	}
 
 	// Cleanup socket
-	CleanupSocket(d.CageName)
+	_ = CleanupSocket(d.CageName)
 
 	return nil
 }

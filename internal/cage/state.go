@@ -22,22 +22,22 @@ const (
 
 // State holds the runtime state of a cage
 type State struct {
-	Name            string    `json:"name"`
-	Status          string    `json:"status"`
-	Image           string    `json:"image"`
-	Profile         string    `json:"profile"`
-	NetworkMode     string    `json:"network_mode,omitempty"`
-	SSHPort         int       `json:"ssh_port,omitempty"`
-	IP              string    `json:"ip,omitempty"`
-	Ports           []Port    `json:"ports,omitempty"`
-	StartedAt       time.Time `json:"started_at"`
-	VirtiofsPID     int       `json:"virtiofs_pid,omitempty"`
-	ForwarderPID    int       `json:"forwarder_pid,omitempty"`
+	Name         string    `json:"name"`
+	Status       string    `json:"status"`
+	Image        string    `json:"image"`
+	Profile      string    `json:"profile"`
+	NetworkMode  string    `json:"network_mode,omitempty"`
+	SSHPort      int       `json:"ssh_port,omitempty"`
+	IP           string    `json:"ip,omitempty"`
+	Ports        []Port    `json:"ports,omitempty"`
+	StartedAt    time.Time `json:"started_at"`
+	VirtiofsPID  int       `json:"virtiofs_pid,omitempty"`
+	ForwarderPID int       `json:"forwarder_pid,omitempty"`
 	// Network isolation fields
-	IsolationNS     string `json:"isolation_ns,omitempty"`      // Network namespace name
+	IsolationNS     string `json:"isolation_ns,omitempty"`        // Network namespace name
 	IsolationPasst  int    `json:"isolation_passt_pid,omitempty"` // Passt process PID
-	IsolationSocket string `json:"isolation_socket,omitempty"`  // Passt socket path
-	IsolationIP     string `json:"isolation_ip,omitempty"`      // Namespace IP for SSH access
+	IsolationSocket string `json:"isolation_socket,omitempty"`    // Passt socket path
+	IsolationIP     string `json:"isolation_ip,omitempty"`        // Namespace IP for SSH access
 }
 
 // Port represents a port forwarding rule
