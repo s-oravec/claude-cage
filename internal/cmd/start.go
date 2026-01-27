@@ -149,12 +149,8 @@ func createCageFromConfig(cmd *cobra.Command, name string, resolved *config.Reso
 		}
 	}
 
-	// Auto mode network setup
-	if network.HasPasst() {
-		fmt.Fprintln(cmd.OutOrStdout(), "  Using passt networking (auto-detected)...")
-	} else {
-		fmt.Fprintln(cmd.OutOrStdout(), "  Using SLIRP networking (passt not found)...")
-	}
+	// Auto mode uses SLIRP user-mode networking
+	fmt.Fprintln(cmd.OutOrStdout(), "  Using SLIRP user-mode networking...")
 
 	// Create qcow2 overlay with specified disk size
 	baseImage := images.ImagePath(imageName)
@@ -348,7 +344,7 @@ func startCage(cmd *cobra.Command, name string, ports []string, cfg *config.Conf
 			fmt.Fprintf(cmd.OutOrStdout(), "  IP: %s\n", ip)
 		}
 	} else {
-		// Auto mode (passt/slirp) - no IP from libvirt
+		// Auto mode (SLIRP) - no IP from libvirt
 		fmt.Fprintln(cmd.OutOrStdout(), "  User-mode networking: use 'cage console' to access")
 	}
 

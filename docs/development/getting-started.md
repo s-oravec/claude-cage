@@ -14,7 +14,6 @@ This guide helps developers set up their environment for contributing to Claude 
 ### Optional
 
 - **virtiofsd** - File sharing (recommended)
-- **passt** - Fast user-mode networking
 - **cloud-localds** - Cloud-init ISO generation
 
 ## Quick Setup
@@ -42,8 +41,7 @@ sudo apt install -y \
     libvirt-clients \
     virtiofsd \
     qemu-utils \
-    cloud-image-utils \
-    passt
+    cloud-image-utils
 
 # Add user to required groups
 sudo usermod -aG kvm,libvirt $USER
@@ -71,7 +69,7 @@ Binary is created at `./cage`.
 ./cage doctor
 ```
 
-All checks should pass (virtiofsd and passt are optional).
+All checks should pass (virtiofsd is optional but recommended).
 
 ## Project Structure
 

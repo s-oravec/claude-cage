@@ -4,30 +4,35 @@ This document details the network isolation mechanisms in Claude Cage.
 
 ## Network Modes Overview
 
-| Mode | Root Required | Speed | Isolation Mechanism |
-|------|---------------|-------|---------------------|
-| `auto` | No | Fast* | Routing + NAT |
-| `bridge` | Yes | Fast | iptables firewall |
+| Mode | Root Required | Speed | LAN Isolation |
+|------|---------------|-------|---------------|
+| `auto` | No | Moderate | ⚠️ Partial |
+| `bridge` | Yes | Fast | ✅ Full |
 
-\* passt is fast, SLIRP fallback is slower
+> **Security Note**: For full network isolation (blocking access to local network),
+> use `bridge` mode. The `auto` mode provides convenience without root but cannot
+> fully prevent access to LAN addresses via the router/switch.
 
-## Auto Mode (User-Mode Networking)
+## Auto Mode (SLIRP User-Mode Networking)
 
 ### How It Works
 
-User-mode networking runs entirely in userspace, requiring no root privileges.
+User-mode networking uses QEMU's built-in SLIRP stack, running entirely in userspace
+without requiring root privileges.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                        Host System                           │
 │                                                              │
 │  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐  │
-│  │   Guest VM   │    │ passt/SLIRP  │    │   Internet   │  │
+│  │   Guest VM   │    │    SLIRP     │    │   Internet   │  │
 │  │              │◄──►│   (NAT)      │◄──►│              │  │
 │  │  10.0.2.x    │    │  10.0.2.2    │    │              │  │
 │  └──────────────┘    └──────────────┘    └──────────────┘  │
-│                                                              │
-│                       X──── Local Network (not routed)       │
+│                             │                                │
+│                        Router/Switch                         │
+│                             │                                │
+│                       ⚠️ LAN (reachable via router)          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -36,25 +41,24 @@ User-mode networking runs entirely in userspace, requiring no root privileges.
 1. **No direct network access** - Guest uses internal 10.0.2.0/24 network
 2. **NAT translation** - All outgoing traffic NAT'd through host
 3. **No incoming connections** - Except explicitly forwarded ports
-4. **Local subnets unreachable** - Not in routing table
 
-### passt vs SLIRP
+### ⚠️ Auto Mode Limitations
 
-| Feature | passt | SLIRP |
-|---------|-------|-------|
-| Speed | Near-native | Slow |
-| Protocol support | Full | Limited |
-| Memory usage | Low | Higher |
-| Availability | Newer tool | Built into QEMU |
+**Important**: Auto mode does NOT fully isolate the guest from the local network.
 
-Detection:
-```go
-if network.HasPasst() {
-    // Use passt (faster)
-} else {
-    // Fall back to SLIRP
-}
+The guest can reach LAN addresses (e.g., 192.168.x.x, 10.x.x.x) via the router/switch:
+
 ```
+Guest → SLIRP → Host NIC → Router/Switch → LAN devices
+```
+
+| What's blocked | What's NOT blocked |
+|----------------|-------------------|
+| Direct host access (10.0.2.2) | LAN via router (192.168.x.x) |
+| Host-only services | Other devices on network |
+
+**For full LAN isolation, use `bridge` mode** which applies iptables rules to block
+private subnets (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16)
 
 ### SSH Port Forwarding
 

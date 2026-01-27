@@ -2,14 +2,7 @@ package network
 
 import (
 	"net"
-	"os/exec"
 )
-
-// HasPasst checks if passt is available on the system
-func HasPasst() bool {
-	_, err := exec.LookPath("passt")
-	return err == nil
-}
 
 // FindFreePort finds an available TCP port on localhost
 func FindFreePort() (int, error) {

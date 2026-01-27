@@ -16,7 +16,7 @@ const (
 
 // Network modes
 const (
-	NetworkAuto   = "auto"   // auto-detect: passt > slirp (default, no root)
+	NetworkAuto   = "auto"   // SLIRP user-mode networking (default, no root)
 	NetworkBridge = "bridge" // libvirt bridge with firewall (requires root)
 )
 
@@ -33,7 +33,6 @@ type State struct {
 	StartedAt    time.Time `json:"started_at"`
 	VirtiofsPID  int       `json:"virtiofs_pid,omitempty"`
 	ForwarderPID int       `json:"forwarder_pid,omitempty"`
-	PasstPID     int       `json:"passt_pid,omitempty"`
 }
 
 // Port represents a port forwarding rule

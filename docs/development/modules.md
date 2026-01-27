@@ -183,10 +183,9 @@ Network configuration and isolation.
 - `SetupFirewall()` / `CleanupFirewall()` - iptables rules
 - `GenerateFirewallRules()` - Generate iptables rule set
 - `VerifyIsolation()` - Run network isolation tests
-- `HasPasst()` - Check if passt is available
 - `FindFreePort()` - Find available TCP port
 
-**Files:** `internal/network/libvirt.go`, `internal/network/firewall.go`, `internal/network/verify.go`, `internal/network/passt.go`
+**Files:** `internal/network/libvirt.go`, `internal/network/firewall.go`, `internal/network/verify.go`, `internal/network/port.go`
 
 ### internal/progress
 

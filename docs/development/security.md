@@ -85,20 +85,19 @@ See [Network Isolation](security-network.md) for details.
 
 ### Auto Mode (Default)
 
-**No root required.** Uses user-mode networking.
+**No root required.** Uses SLIRP user-mode networking.
 
 ```
-Guest VM ─── passt/SLIRP ─── Internet
-                 │
-                 X─── Local Network (blocked by routing)
+Guest VM ─── SLIRP ─── Internet
+                │
+                ⚠️ LAN (reachable via router)
 ```
 
-- **passt** (preferred): Fast user-mode networking
-- **SLIRP** (fallback): Slower but universally available
+- Uses QEMU's built-in SLIRP networking
+- SSH access via port forwarding: `localhost:<port> → VM:22`
+- **⚠️ Note**: Does NOT fully isolate from LAN - traffic can reach local network via router
 
-SSH access via port forwarding: `localhost:<port> → VM:22`
-
-### Bridge Mode
+### Bridge Mode (Recommended for Full Isolation)
 
 **Requires root.** Uses libvirt NAT bridge with iptables.
 

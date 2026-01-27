@@ -133,12 +133,6 @@ func DefaultChecks() []Check {
 			FixHint:   fixHintCloudLocalds(distro),
 		},
 		{
-			Name:      "passt installed",
-			CheckFunc: checkPasst,
-			Required:  false, // Optional - provides faster user-mode networking, falls back to SLIRP
-			FixHint:   fixHintPasst(distro),
-		},
-		{
 			Name:      "virt-customize installed",
 			CheckFunc: checkVirtCustomize,
 			Required:  false, // Optional - needed for proper image save cleanup
@@ -222,21 +216,6 @@ func fixHintCloudLocalds(d Distro) string {
 	}
 }
 
-func fixHintPasst(d Distro) string {
-	switch d {
-	case DistroDebian:
-		return "sudo apt install passt"
-	case DistroFedora:
-		return "sudo dnf install passt"
-	case DistroArch:
-		return "sudo pacman -S passt"
-	case DistroOpenSUSE:
-		return "sudo zypper install passt"
-	default:
-		return "Install passt for faster user-mode networking"
-	}
-}
-
 func fixHintVirtCustomize(d Distro) string {
 	switch d {
 	case DistroDebian:
@@ -257,15 +236,15 @@ func InstallAllHint() string {
 	distro := DetectDistro()
 	switch distro {
 	case DistroDebian:
-		return "sudo apt install -y qemu-kvm libvirt-daemon-system libvirt-clients virtiofsd qemu-utils cloud-image-utils passt libguestfs-tools && sudo usermod -aG kvm,libvirt $USER && sudo systemctl enable --now libvirtd"
+		return "sudo apt install -y qemu-kvm libvirt-daemon-system libvirt-clients virtiofsd qemu-utils cloud-image-utils libguestfs-tools && sudo usermod -aG kvm,libvirt $USER && sudo systemctl enable --now libvirtd"
 	case DistroFedora:
-		return "sudo dnf install -y qemu-kvm libvirt-daemon libvirt-client virtiofsd qemu-img cloud-utils passt guestfs-tools && sudo usermod -aG kvm,libvirt $USER && sudo systemctl enable --now libvirtd"
+		return "sudo dnf install -y qemu-kvm libvirt-daemon libvirt-client virtiofsd qemu-img cloud-utils guestfs-tools && sudo usermod -aG kvm,libvirt $USER && sudo systemctl enable --now libvirtd"
 	case DistroArch:
-		return "sudo pacman -S qemu-base libvirt virtiofsd qemu-img passt libguestfs && sudo usermod -aG kvm,libvirt $USER && sudo systemctl enable --now libvirtd"
+		return "sudo pacman -S qemu-base libvirt virtiofsd qemu-img libguestfs && sudo usermod -aG kvm,libvirt $USER && sudo systemctl enable --now libvirtd"
 	case DistroOpenSUSE:
-		return "sudo zypper install qemu-kvm libvirt-daemon virtiofsd qemu-tools cloud-utils passt guestfs-tools && sudo usermod -aG kvm,libvirt $USER && sudo systemctl enable --now libvirtd"
+		return "sudo zypper install qemu-kvm libvirt-daemon virtiofsd qemu-tools cloud-utils guestfs-tools && sudo usermod -aG kvm,libvirt $USER && sudo systemctl enable --now libvirtd"
 	default:
-		return "Install: qemu-kvm, libvirt, virtiofsd, qemu-img, cloud-image-utils, passt, libguestfs-tools\nAdd user to groups: sudo usermod -aG kvm,libvirt $USER\nEnable libvirtd: sudo systemctl enable --now libvirtd"
+		return "Install: qemu-kvm, libvirt, virtiofsd, qemu-img, cloud-image-utils, libguestfs-tools\nAdd user to groups: sudo usermod -aG kvm,libvirt $USER\nEnable libvirtd: sudo systemctl enable --now libvirtd"
 	}
 }
 
@@ -363,13 +342,6 @@ func checkCloudLocalds() error {
 	return nil
 }
 
-func checkPasst() error {
-	_, err := exec.LookPath("passt")
-	if err != nil {
-		return errors.New("passt not found (SLIRP will be used as fallback)")
-	}
-	return nil
-}
 
 func checkVirtCustomize() error {
 	_, err := exec.LookPath("virt-customize")

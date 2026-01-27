@@ -28,7 +28,7 @@ Claude Cage follows a layered architecture with clear separation of concerns. Th
           ▼                   ▼                   ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    External Tools Layer                          │
-│  QEMU/KVM · libvirtd · virtiofsd · iptables · qemu-img · passt  │
+│  QEMU/KVM · libvirtd · virtiofsd · iptables · qemu-img           │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -52,7 +52,7 @@ Claude Cage follows a layered architecture with clear separation of concerns. Th
 
 ### Network Layer
 - **network** (`internal/network/`) - Network modes, firewall, port forwarding
-- Supports two modes: `auto` (passt/slirp) and `bridge` (libvirt NAT with iptables)
+- Supports two modes: `auto` (SLIRP) and `bridge` (libvirt NAT with iptables)
 
 ### Storage Layer
 - **images** (`internal/images/`) - Base image download and management
@@ -85,8 +85,8 @@ VMs are configured at first boot via cloud-init:
 - Distro-agnostic package installation
 
 ### 4. Multiple Network Modes
-- **auto**: User-mode networking (passt > slirp fallback), no root required
-- **bridge**: NAT bridge with iptables isolation, requires root
+- **auto**: User-mode networking (SLIRP), no root required, partial LAN isolation
+- **bridge**: NAT bridge with iptables isolation, requires root, full LAN isolation
 
 ### 5. State Files over Database
 Each cage has a `state.json` in `~/.claude-cage/cages/<name>/`:
@@ -122,7 +122,6 @@ Each cage has a `state.json` in `~/.claude-cage/cages/<name>/`:
 | qemu-img | Disk operations | Yes |
 | virtiofsd | File sharing | No (optional) |
 | cloud-localds | Cloud-init ISO | No (fallback available) |
-| passt | Fast user-mode networking | No (slirp fallback) |
 | iptables | Firewall rules | Only for bridge mode |
 
 ## See Also

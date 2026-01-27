@@ -21,7 +21,6 @@ type State struct {
     StartedAt    time.Time `json:"started_at"`
     VirtiofsPID  int       `json:"virtiofs_pid,omitempty"`
     ForwarderPID int       `json:"forwarder_pid,omitempty"`
-    PasstPID     int       `json:"passt_pid,omitempty"`
 }
 ```
 
@@ -40,7 +39,6 @@ type State struct {
 | `StartedAt` | Timestamp when started |
 | `VirtiofsPID` | virtiofsd process ID |
 | `ForwarderPID` | Port forwarder process ID |
-| `PasstPID` | passt process ID |
 
 ### Status Constants
 
@@ -55,7 +53,7 @@ const (
 
 ```go
 const (
-    NetworkAuto   = "auto"   // passt > slirp (no root)
+    NetworkAuto   = "auto"   // SLIRP user-mode (no root)
     NetworkBridge = "bridge" // libvirt NAT (requires root)
 )
 ```
@@ -122,8 +120,7 @@ Complete `state.json` example:
     ],
     "started_at": "2024-01-15T10:30:00Z",
     "virtiofs_pid": 12345,
-    "forwarder_pid": 0,
-    "passt_pid": 0
+    "forwarder_pid": 0
 }
 ```
 
