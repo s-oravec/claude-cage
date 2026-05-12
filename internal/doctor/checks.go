@@ -232,9 +232,16 @@ func fixHintVirtCustomize(d Distro) string {
 }
 
 // InstallAllHint returns a single command to install all required packages
+// for the host's detected distribution.
 func InstallAllHint() string {
-	distro := DetectDistro()
-	switch distro {
+	return installAllHintFor(DetectDistro())
+}
+
+// installAllHintFor returns the install-everything hint for a specific distro.
+// Split out from InstallAllHint so tests can exercise every branch without
+// depending on the host OS.
+func installAllHintFor(d Distro) string {
+	switch d {
 	case DistroDebian:
 		return "sudo apt install -y qemu-kvm libvirt-daemon-system libvirt-clients virtiofsd qemu-utils cloud-image-utils libguestfs-tools && sudo usermod -aG kvm,libvirt $USER && sudo systemctl enable --now libvirtd"
 	case DistroFedora:

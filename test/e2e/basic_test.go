@@ -24,7 +24,12 @@ func TestCageDoctor(t *testing.T) {
 		// Doctor may return error if dependencies missing, but should still run
 		t.Logf("doctor returned error (may be expected): %v", err)
 	}
-	if !strings.Contains(output, "Checking") && !strings.Contains(output, "✓") {
+	// Accept any recognizable doctor marker. ✗ counts as evidence the
+	// checks ran just as much as ✓ does — many hosts (CI macOS, fresh
+	// Linux without KVM) report all-failures, and that's still valid output.
+	if !strings.Contains(output, "Checking") &&
+		!strings.Contains(output, "✓") &&
+		!strings.Contains(output, "✗") {
 		t.Errorf("expected doctor output, got: %s", output)
 	}
 }

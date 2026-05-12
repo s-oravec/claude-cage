@@ -81,25 +81,38 @@ func TestDefaultChecks_ContainsExpected(t *testing.T) {
 	assert.Contains(t, names, "qemu-img installed")
 }
 
-func TestInstallAllHint(t *testing.T) {
-	hint := InstallAllHint()
+func TestInstallAllHintFor(t *testing.T) {
+	// Common substrings every distro hint should mention.
+	common := []string{"qemu", "libvirt", "virtiofsd", "usermod", "kvm"}
 
-	// Should contain key packages
-	assert.Contains(t, hint, "qemu-kvm")
-	assert.Contains(t, hint, "libvirt-daemon-system")
-	assert.Contains(t, hint, "virtiofsd")
-	assert.Contains(t, hint, "qemu-utils")
-	assert.Contains(t, hint, "cloud-image-utils")
+	tests := []struct {
+		distro   Distro
+		mustHave []string // distro-specific package names in addition to common
+	}{
+		{DistroDebian, []string{"apt", "libvirt-daemon-system", "qemu-utils", "cloud-image-utils", "systemctl", "libvirtd"}},
+		{DistroFedora, []string{"dnf", "libvirt-daemon", "qemu-img", "guestfs-tools", "systemctl", "libvirtd"}},
+		{DistroArch, []string{"pacman", "libguestfs", "qemu-img", "systemctl", "libvirtd"}},
+		{DistroOpenSUSE, []string{"zypper", "libvirt-daemon", "qemu-tools", "systemctl", "libvirtd"}},
+		{DistroUnknown, []string{"qemu-kvm", "cloud-image-utils", "systemctl", "libvirtd"}},
+	}
 
-	// Should contain group setup
-	assert.Contains(t, hint, "usermod")
-	assert.Contains(t, hint, "kvm")
-	assert.Contains(t, hint, "libvirt")
+	for _, tc := range tests {
+		t.Run(string(tc.distro), func(t *testing.T) {
+			hint := installAllHintFor(tc.distro)
+			for _, s := range common {
+				assert.Contains(t, hint, s, "common substring missing for %s", tc.distro)
+			}
+			for _, s := range tc.mustHave {
+				assert.Contains(t, hint, s, "distro-specific substring missing for %s", tc.distro)
+			}
+		})
+	}
+}
 
-	// Should enable libvirtd
-	assert.Contains(t, hint, "systemctl")
-	assert.Contains(t, hint, "enable")
-	assert.Contains(t, hint, "libvirtd")
+func TestInstallAllHint_DispatchesByDistro(t *testing.T) {
+	// The public entrypoint should produce the same string as the per-distro
+	// helper for whichever distro the host happens to be.
+	assert.Equal(t, installAllHintFor(DetectDistro()), InstallAllHint())
 }
 
 func TestDefaultChecks_AllHaveCheckFunc(t *testing.T) {

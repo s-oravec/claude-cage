@@ -111,9 +111,15 @@ cage: test-cage
 		os.Chdir(oldWd)
 	})
 
-	// Verify we're in the right place
+	// Verify we're in the right place. On macOS /var is a symlink to
+	// /private/var, so the path returned by Getwd() may not be byte-equal
+	// to t.TempDir(); resolve both sides before comparing.
 	cwd, _ := os.Getwd()
-	require.Equal(t, tmpDir, cwd, "Should be in tmpDir")
+	wantDir, err := filepath.EvalSymlinks(tmpDir)
+	require.NoError(t, err)
+	gotDir, err := filepath.EvalSymlinks(cwd)
+	require.NoError(t, err)
+	require.Equal(t, wantDir, gotDir, "Should be in tmpDir")
 
 	cmd := NewRootCmd()
 	buf := new(bytes.Buffer)
