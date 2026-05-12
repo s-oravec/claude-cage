@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/s-oravec/claude-cage/internal/cage"
+	"github.com/s-oravec/claude-cage/internal/logging"
 )
 
 var (
@@ -57,7 +58,7 @@ func SSHExecWithPort(cageName, host string, port int, command string, interactiv
 		"-i", keyPath,
 		"-o", fmt.Sprintf("StrictHostKeyChecking=%s", strictHostKey),
 		"-o", fmt.Sprintf("UserKnownHostsFile=%s", knownHostsPath),
-		"-o", "LogLevel=ERROR",
+		"-o", fmt.Sprintf("LogLevel=%s", logging.SSHLogLevel()),
 		"-o", "ConnectTimeout=5",
 		"-p", fmt.Sprintf("%d", port),
 	}
@@ -134,7 +135,7 @@ func ExecCaptureWithPort(cageName, host string, port int, command string) (strin
 		"-i", keyPath,
 		"-o", fmt.Sprintf("StrictHostKeyChecking=%s", strictHostKey),
 		"-o", fmt.Sprintf("UserKnownHostsFile=%s", knownHostsPath),
-		"-o", "LogLevel=ERROR",
+		"-o", fmt.Sprintf("LogLevel=%s", logging.SSHLogLevel()),
 		"-o", "ConnectTimeout=5",
 		"-o", "BatchMode=yes",
 		"-p", fmt.Sprintf("%d", port),

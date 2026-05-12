@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/s-oravec/claude-cage/internal/cage"
+	"github.com/s-oravec/claude-cage/internal/logging"
 	"github.com/s-oravec/claude-cage/internal/ssh"
 	"github.com/spf13/cobra"
 )
@@ -91,7 +92,7 @@ func execInCage(cmd *cobra.Command, name string, command []string) error {
 		"-i", keyPath,
 		"-o", "StrictHostKeyChecking=accept-new",
 		"-o", fmt.Sprintf("UserKnownHostsFile=%s", knownHostsPath),
-		"-o", "LogLevel=ERROR",
+		"-o", fmt.Sprintf("LogLevel=%s", logging.SSHLogLevel()),
 		"-o", "ConnectTimeout=10",
 		"-p", fmt.Sprintf("%d", port),
 		fmt.Sprintf("cage@%s", host),

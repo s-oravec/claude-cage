@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"syscall"
 
+	"github.com/s-oravec/claude-cage/internal/logging"
 	"github.com/s-oravec/claude-cage/internal/ssh"
 )
 
@@ -47,7 +48,7 @@ func StartForwarding(cageName, ip string, forwards []PortForward) (*Forwarder, e
 		"-o", "ExitOnForwardFailure=yes",
 		"-o", "ServerAliveInterval=30",
 		"-o", "ServerAliveCountMax=3",
-		"-o", "LogLevel=ERROR",
+		"-o", fmt.Sprintf("LogLevel=%s", logging.SSHLogLevel()),
 	}
 
 	// Add local port forwards

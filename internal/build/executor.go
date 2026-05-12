@@ -15,6 +15,7 @@ import (
 	"github.com/s-oravec/claude-cage/internal/config"
 	"github.com/s-oravec/claude-cage/internal/images"
 	"github.com/s-oravec/claude-cage/internal/libvirt"
+	"github.com/s-oravec/claude-cage/internal/logging"
 	"github.com/s-oravec/claude-cage/internal/network"
 	"github.com/s-oravec/claude-cage/internal/runtime"
 	"github.com/s-oravec/claude-cage/internal/ssh"
@@ -424,7 +425,7 @@ func (e *Executor) scpFile(src, dest string) error {
 		"-i", keyPath,
 		"-o", "StrictHostKeyChecking=accept-new",
 		"-o", fmt.Sprintf("UserKnownHostsFile=%s", knownHostsPath),
-		"-o", "LogLevel=ERROR",
+		"-o", fmt.Sprintf("LogLevel=%s", logging.SSHLogLevel()),
 		"-P", fmt.Sprintf("%d", e.sshPort),
 		src,
 		fmt.Sprintf("cage@127.0.0.1:%s", dest),
@@ -453,7 +454,7 @@ func (e *Executor) scpDir(src, dest string) error {
 		"-i", keyPath,
 		"-o", "StrictHostKeyChecking=accept-new",
 		"-o", fmt.Sprintf("UserKnownHostsFile=%s", knownHostsPath),
-		"-o", "LogLevel=ERROR",
+		"-o", fmt.Sprintf("LogLevel=%s", logging.SSHLogLevel()),
 		"-P", fmt.Sprintf("%d", e.sshPort),
 		"-r",       // recursive
 		src + "/.", // copy contents, not directory itself

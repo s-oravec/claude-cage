@@ -2,6 +2,7 @@ package network
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -97,7 +98,7 @@ func SetupIsolatedNetwork(cfg *IsolationConfig) (*IsolatedNetwork, error) {
 	// These override the default route for private IP ranges
 	for _, subnet := range cfg.BlockedSubnets {
 		if err := addBlackholeRoute(nsName, subnet); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to add blackhole route for %s: %v\n", subnet, err)
+			slog.Warn("failed to add blackhole route", "subnet", subnet, "error", err)
 		}
 	}
 
