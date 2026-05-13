@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,13 +35,12 @@ func TestInitStartWorkflow(t *testing.T) {
 	t.Logf("Using project directory: %s", projectDir)
 
 	// Generate unique cage name based on project dir name
-	cageName := fmt.Sprintf("e2e-init-%d", time.Now().UnixNano()%10000)
+	cageName := uniqueName(t)
 
 	// Cleanup on exit
 	t.Cleanup(func() {
 		t.Log("Cleaning up...")
-		runCage("stop", cageName, "--force")
-		runCage("remove", cageName, "--force")
+		cleanupCage(t, cageName)
 		time.Sleep(2 * time.Second)
 	})
 

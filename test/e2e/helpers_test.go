@@ -2,10 +2,13 @@ package e2e
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -109,7 +112,35 @@ func runCageInDirWithTimeout(dir string, timeout time.Duration, args ...string) 
 	}
 }
 
-// uniqueName generates a unique cage name for testing
-func uniqueName(t *testing.T) string {
-	return fmt.Sprintf("e2e-%s-%d", t.Name(), time.Now().UnixNano()%10000)
+// uniqueName generates a unique cage name for testing.
+// Pass optional parts to distinguish multiple cages within the same test
+// (e.g. uniqueName(t, "save"), uniqueName(t, "reuse")).
+func uniqueName(t *testing.T, parts ...string) string {
+	name := strings.ReplaceAll(t.Name(), "/", "-")
+	var rb [4]byte
+	if _, err := rand.Read(rb[:]); err != nil {
+		// crypto/rand can't fail on Linux; if it does, fall back to nano time
+		return fmt.Sprintf("e2e-%s-%s-%d", name, strings.Join(parts, "-"), time.Now().UnixNano())
+	}
+	suffix := hex.EncodeToString(rb[:])
+	if len(parts) > 0 {
+		return "e2e-" + name + "-" + strings.Join(parts, "-") + "-" + suffix
+	}
+	return "e2e-" + name + "-" + suffix
+}
+
+// cleanupCage tears down a test cage robustly: it tries the normal `cage stop`
+// + `cage remove --force` path first, then falls back to a direct
+// `virsh undefine` so that an orphan libvirt domain (e.g. when `cage init`
+// failed mid-flight and never wrote state.json) does not block future test
+// runs with "domain ... already exists".
+func cleanupCage(t *testing.T, name string) {
+	t.Helper()
+	runCage("stop", name, "--force")
+	runCage("remove", name, "--force")
+	cmd := exec.Command("virsh", "-c", "qemu:///session", "undefine",
+		"--nvram", "--remove-all-storage",
+		"--snapshots-metadata", "--checkpoints-metadata",
+		"cage-"+name)
+	_ = cmd.Run()
 }

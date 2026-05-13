@@ -48,8 +48,7 @@ func TestCageStartDuplicate(t *testing.T) {
 	name := uniqueName(t)
 
 	t.Cleanup(func() {
-		runCage("stop", name, "--force")
-		runCage("remove", name, "--force")
+		cleanupCage(t, name)
 		time.Sleep(2 * time.Second)
 	})
 

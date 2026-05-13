@@ -37,7 +37,7 @@ func TestCageLifecycle(t *testing.T) {
 	// Cleanup on exit
 	t.Cleanup(func() {
 		t.Log("Cleaning up...")
-		runCage("remove", name, "--force")
+		cleanupCage(t, name)
 		// Give libvirt time to cleanup
 		time.Sleep(2 * time.Second)
 	})

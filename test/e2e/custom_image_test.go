@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -34,9 +33,9 @@ func TestCustomImageSaveAndReuse(t *testing.T) {
 	projectDir1 := t.TempDir()
 	projectDir2 := t.TempDir()
 
-	cageName1 := fmt.Sprintf("e2e-save-%d", time.Now().UnixNano()%10000)
-	cageName2 := fmt.Sprintf("e2e-reuse-%d", time.Now().UnixNano()%10000)
-	customImageName := fmt.Sprintf("e2e-custom-%d", time.Now().UnixNano()%10000)
+	cageName1 := uniqueName(t, "save")
+	cageName2 := uniqueName(t, "reuse")
+	customImageName := uniqueName(t, "custom")
 
 	t.Logf("Project dir 1: %s (cage: %s)", projectDir1, cageName1)
 	t.Logf("Project dir 2: %s (cage: %s)", projectDir2, cageName2)
@@ -45,10 +44,8 @@ func TestCustomImageSaveAndReuse(t *testing.T) {
 	// Cleanup on exit
 	t.Cleanup(func() {
 		t.Log("Cleaning up...")
-		runCage("stop", cageName1, "--force")
-		runCage("remove", cageName1, "--force")
-		runCage("stop", cageName2, "--force")
-		runCage("remove", cageName2, "--force")
+		cleanupCage(t, cageName1)
+		cleanupCage(t, cageName2)
 		runCage("image", "remove", customImageName, "--force")
 		time.Sleep(2 * time.Second)
 	})
