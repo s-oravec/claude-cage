@@ -119,13 +119,10 @@ func TestCustomImageSaveAndReuse(t *testing.T) {
 		}
 		t.Logf("Image save output: %s", stdout)
 
-		// Verify image was created
-		stdout, _, err = runCage("image", "list")
-		if err != nil {
-			t.Fatalf("cage image list failed: %v", err)
-		}
-		if !strings.Contains(stdout, customImageName) {
-			t.Errorf("custom image %s not in list: %s", customImageName, stdout)
+		// Verify image was created. Use `image inspect` rather than `image list`
+		// because list truncates names to 20 chars in its table layout.
+		if _, stderr, err := runCage("image", "inspect", customImageName); err != nil {
+			t.Errorf("custom image %s not found via inspect: %v (stderr: %s)", customImageName, err, stderr)
 		}
 	})
 
