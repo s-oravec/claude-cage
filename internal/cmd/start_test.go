@@ -2,11 +2,13 @@ package cmd
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/s-oravec/claude-cage/internal/config"
 	"github.com/stretchr/testify/assert"
@@ -53,35 +55,42 @@ func TestStartCmd_NonExistentCage(t *testing.T) {
 }
 
 func TestStartCmd_UsesProjectConfig(t *testing.T) {
-	// Use unique cage name to avoid collisions
-	cageName := fmt.Sprintf("test-start-%d", time.Now().UnixNano()%10000)
+	// This is a unit test for project-config name resolution. It must NOT
+	// reach libvirt. We point the project config at a nonexistent image so
+	// that `cage start` exits at the IsDownloaded() check (start.go) before
+	// any virsh/QEMU call. Previous version used `image: alpine-3.21`, which
+	// in environments where alpine-3.21 happened to be installed caused the
+	// test to define real libvirt domains, race with parallel packages, and
+	// leak orphan `cage-test-start-XXXX` domains.
+	var rb [6]byte
+	_, _ = rand.Read(rb[:])
+	cageName := "test-start-" + hex.EncodeToString(rb[:])
+	imageName := "cage-test-nonexistent-image"
 
-	// Create a temp directory with a project config
 	tmpDir := t.TempDir()
-
-	// Create project config file
-	configContent := fmt.Sprintf(`image: alpine-3.21
-cage: %s
-`, cageName)
+	configContent := fmt.Sprintf("image: %s\ncage: %s\n", imageName, cageName)
 	err := os.WriteFile(filepath.Join(tmpDir, config.ProjectConfigFile), []byte(configContent), 0644)
 	require.NoError(t, err)
 
-	// Change to temp directory
 	oldWd, _ := os.Getwd()
 	os.Chdir(tmpDir)
 	defer os.Chdir(oldWd)
 
-	// Cleanup any created cage on exit
+	// Safety net: if start.go ever changes so this test does reach libvirt,
+	// clean up cage state and any orphan domain instead of leaving artifacts
+	// that block subsequent runs.
 	t.Cleanup(func() {
-		// Stop and remove cage if it was created
 		cleanupCmd := NewRootCmd()
 		cleanupCmd.SetOut(&bytes.Buffer{})
 		cleanupCmd.SetErr(&bytes.Buffer{})
 		cleanupCmd.SetArgs([]string{"remove", cageName, "--force"})
-		cleanupCmd.Execute() // Ignore errors - cage might not exist
+		_ = cleanupCmd.Execute()
+		_ = exec.Command("virsh", "-c", "qemu:///session", "undefine",
+			"--nvram", "--remove-all-storage",
+			"--snapshots-metadata", "--checkpoints-metadata",
+			"cage-"+cageName).Run()
 	})
 
-	// Run start without name - should pick up cage name from config
 	cmd := NewRootCmd()
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
@@ -89,11 +98,11 @@ cage: %s
 	cmd.SetArgs([]string{"start"})
 
 	err = cmd.Execute()
-	// Will fail because global config doesn't exist, but it should not be
-	// a "name required" error - it should be a config loading error or similar
-	if err != nil {
-		// Should not complain about missing name
-		assert.NotContains(t, err.Error(), "cage name required")
-	}
-	// If no error, the command started successfully which means config was read
+	// We expect an error (image is bogus) but the error must come from
+	// image resolution, not from the CLI failing to find the cage name -
+	// that would mean project-config resolution is broken.
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "cage name required")
+	assert.Contains(t, err.Error(), imageName,
+		"start should fail at image-not-found check, after resolving name from project config")
 }
