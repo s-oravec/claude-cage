@@ -15,9 +15,10 @@
 #   make e2e-user       - Run E2E tests with user-mode networking (no root)
 #   make e2e-ubuntu     - Run E2E tests with Ubuntu image
 #   make install        - Install cage to ~/.local/bin/
+#   make install-system - Install cage to /usr/local/bin/ (needs sudo; available to sudo cage)
 #   make clean          - Remove build artifacts
 
-.PHONY: build test test-quick test-verbose coverage coverage-html coverage-check e2e e2e-short e2e-user e2e-ubuntu install clean
+.PHONY: build test test-quick test-verbose coverage coverage-html coverage-check e2e e2e-short e2e-user e2e-ubuntu install install-system clean
 
 VERSION := 0.1.0
 LDFLAGS := -ldflags "-X github.com/s-oravec/claude-cage/internal/cmd.Version=$(VERSION)"
@@ -116,6 +117,11 @@ e2e-ubuntu: build
 # Install cage binary to user's local bin directory
 install: build
 	install -m 755 cage ~/.local/bin/cage
+
+# Install cage binary system-wide so it lives on sudo's default secure_path
+# (required for `sudo cage` to work in root mode). Run with sudo.
+install-system: build
+	install -m 755 cage /usr/local/bin/cage
 
 # Remove build artifacts
 clean:

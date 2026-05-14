@@ -71,6 +71,13 @@ make build
 make install  # installs to ~/.local/bin/
 ```
 
+For root mode (`sudo cage`), install system-wide instead so sudo's
+default `secure_path` can find the binary:
+
+```bash
+sudo make install-system  # installs to /usr/local/bin/
+```
+
 ### Using Go
 
 ```bash
