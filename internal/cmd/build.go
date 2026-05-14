@@ -18,6 +18,7 @@ func NewBuildCmd() *cobra.Command {
 	var cagefilePath string
 	var buildArgs []string
 	var keepOnError bool
+	var interactive bool
 
 	cmd := &cobra.Command{
 		Use:   "build <context>",
@@ -46,21 +47,22 @@ Usage:
   cage build -t my-image --build-arg VERSION=2.0 .`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runBuild(cmd, args[0], tag, cagefilePath, buildArgs, keepOnError)
+			return runBuild(cmd, args[0], tag, cagefilePath, buildArgs, keepOnError, interactive)
 		},
 	}
 
 	cmd.Flags().StringVarP(&tag, "tag", "t", "", "Name for the built image (required)")
 	cmd.Flags().StringVarP(&cagefilePath, "file", "f", "", "Path to Cagefile (default: <context>/Cagefile)")
 	cmd.Flags().StringArrayVar(&buildArgs, "build-arg", nil, "Build argument (KEY=VALUE)")
-	cmd.Flags().BoolVar(&keepOnError, "keep-on-error", false, "Keep temporary cage on build failure")
+	cmd.Flags().BoolVar(&keepOnError, "keep-on-error", false, "Keep temporary cage defined on build failure")
+	cmd.Flags().BoolVar(&interactive, "interactive", false, "On failure, leave the temp cage running and print SSH instructions for debugging")
 
 	cmd.MarkFlagRequired("tag")
 
 	return cmd
 }
 
-func runBuild(cmd *cobra.Command, context, tag, cagefilePath string, buildArgsList []string, keepOnError bool) error {
+func runBuild(cmd *cobra.Command, context, tag, cagefilePath string, buildArgsList []string, keepOnError, interactive bool) error {
 	// Validate tag
 	if tag == "" {
 		return fmt.Errorf("--tag is required")
@@ -115,6 +117,7 @@ func runBuild(cmd *cobra.Command, context, tag, cagefilePath string, buildArgsLi
 		CagefilePath: cagefilePath,
 		BuildArgs:    buildArgs,
 		KeepOnError:  keepOnError,
+		Interactive:  interactive,
 		Output:       cmd.OutOrStdout(),
 	})
 

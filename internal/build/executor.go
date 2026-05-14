@@ -27,7 +27,8 @@ type BuildConfig struct {
 	ContextDir   string            // Build context directory
 	CagefilePath string            // Path to Cagefile
 	BuildArgs    map[string]string // Build arguments
-	KeepOnError  bool              // Keep temp cage on error
+	KeepOnError  bool              // Keep temp cage defined on error (don't undefine)
+	Interactive  bool              // Like KeepOnError, but also keep the cage running and print SSH instructions for debugging
 	Output       io.Writer         // Output writer for progress
 }
 
@@ -62,9 +63,11 @@ func (e *Executor) Build() error {
 		return err
 	}
 
-	// Ensure cleanup unless KeepOnError
+	// Ensure cleanup unless KeepOnError or Interactive.
+	// Interactive additionally keeps the cage *running* so the user can SSH
+	// in and inspect the failed state; that's handled in executeInstructions.
 	defer func() {
-		if e.tempCage != "" && !e.config.KeepOnError {
+		if e.tempCage != "" && !e.config.KeepOnError && !e.config.Interactive {
 			e.cleanup()
 		}
 	}()
@@ -76,6 +79,15 @@ func (e *Executor) Build() error {
 
 	// Step 4: Execute instructions
 	if err := e.executeInstructions(); err != nil {
+		if e.config.Interactive {
+			e.log("")
+			e.log("=== Build failed — interactive debug mode ===")
+			e.log("Temp cage '%s' is still running. Connect with:", e.tempCage)
+			e.log("  cage ssh %s", e.tempCage)
+			e.log("When you're done debugging, clean up with:")
+			e.log("  cage remove %s --force", e.tempCage)
+			e.log("")
+		}
 		return err
 	}
 
