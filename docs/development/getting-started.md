@@ -232,7 +232,7 @@ virsh -c qemu:///system console cage-<name>
 ```bash
 # Create a test directory with project config
 mkdir /tmp/test-net && cd /tmp/test-net
-cat > .claude-cage.yml << 'EOF'
+cat > .cage.yml << 'EOF'
 image: alpine
 network:
   ssh: auto
@@ -250,7 +250,7 @@ cd ~ && rm -rf /tmp/test-net
 # Create project with custom shares
 mkdir /tmp/test-share && cd /tmp/test-share
 mkdir -p src data
-cat > .claude-cage.yml << 'EOF'
+cat > .cage.yml << 'EOF'
 image: alpine
 network:
   ssh: auto

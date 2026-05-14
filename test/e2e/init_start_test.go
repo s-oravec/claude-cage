@@ -54,10 +54,10 @@ func TestInitStartWorkflow(t *testing.T) {
 		}
 		t.Logf("Init output: %s", stdout)
 
-		// 3. Verify .claude-cage.yml was created
-		configPath := filepath.Join(projectDir, ".claude-cage.yml")
+		// 3. Verify .cage.yml was created
+		configPath := filepath.Join(projectDir, ".cage.yml")
 		if _, err := os.Stat(configPath); os.IsNotExist(err) {
-			t.Fatal(".claude-cage.yml was not created")
+			t.Fatal(".cage.yml was not created")
 		}
 
 		// Read and verify config content
@@ -141,9 +141,9 @@ func TestInitStartWorkflow(t *testing.T) {
 		t.Logf("Stop output: %s", stdout)
 	})
 
-	// 7. Modify .claude-cage.yml - add env var
+	// 7. Modify .cage.yml - add env var
 	t.Run("ModifyConfig", func(t *testing.T) {
-		configPath := filepath.Join(projectDir, ".claude-cage.yml")
+		configPath := filepath.Join(projectDir, ".cage.yml")
 		content, err := os.ReadFile(configPath)
 		if err != nil {
 			t.Fatalf("failed to read config: %v", err)

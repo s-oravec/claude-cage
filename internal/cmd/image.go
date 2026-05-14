@@ -50,7 +50,7 @@ func newImageSaveCmd() *cobra.Command {
 The image can then be used to create new cages with the same
 software and configuration.
 
-When run from a directory with .claude-cage.yml, the cage name is optional.`,
+When run from a directory with .cage.yml, the cage name is optional.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cageName, _, err := resolveCageName(args)

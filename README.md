@@ -43,7 +43,7 @@ then `sudo cage start`. Root mode requires libvirt-qemu apparmor
 compatibility (handled automatically when state lives under
 `/var/lib/libvirt/images/`).
 
-Cage **enforces the mode at start time**: if your `.claude-cage.yml`
+Cage **enforces the mode at start time**: if your `.cage.yml`
 includes `shares:`, `env:`, or `network: bridge`, running plain `cage
 start` errors out with a hint to use `sudo cage start`.
 
@@ -160,7 +160,7 @@ cage stop myvm
 
 ### cage init
 
-Initialize a `.claude-cage.yml` configuration file in the current directory. This file defines how `cage start` will create and run the cage.
+Initialize a `.cage.yml` configuration file in the current directory. This file defines how `cage start` will create and run the cage.
 
 ```bash
 cage init [options]
@@ -198,7 +198,7 @@ cage init --image alpine --cage my-sandbox
 
 ### cage start
 
-Start a cage. If run in a directory with `.claude-cage.yml` and the cage doesn't exist, it will be created automatically.
+Start a cage. If run in a directory with `.cage.yml` and the cage doesn't exist, it will be created automatically.
 
 ```bash
 cage start [name] [options]
@@ -208,7 +208,7 @@ cage start [name] [options]
 
 | Argument | Description |
 |----------|-------------|
-| `name` | Cage name (optional if `.claude-cage.yml` exists in current directory) |
+| `name` | Cage name (optional if `.cage.yml` exists in current directory) |
 
 **Options:**
 
@@ -218,8 +218,8 @@ cage start [name] [options]
 
 **Behavior:**
 - If `name` is provided: starts the specified cage
-- If `name` is omitted: reads cage name from `.claude-cage.yml` in current directory
-- If cage doesn't exist and `.claude-cage.yml` is present: creates the cage first
+- If `name` is omitted: reads cage name from `.cage.yml` in current directory
+- If cage doesn't exist and `.cage.yml` is present: creates the cage first
 - If cage exists: validates configuration and reconfigures if stopped
 
 **Examples:**
@@ -552,7 +552,7 @@ cage image <subcommand>
 
 **Notes:**
 - `save` requires the cage to be stopped to avoid corrupted disk state
-- When run from a project directory with `.claude-cage.yml`, cage-name is optional
+- When run from a project directory with `.cage.yml`, cage-name is optional
 - Saved images are prepared for reuse (SSH keys cleared, cloud-init reset)
 - For full image preparation, install `virt-customize` (from `libguestfs-tools`)
 
@@ -784,9 +784,9 @@ cage verify myproject
 
 ### Project Configuration
 
-Create a `.claude-cage.yml` file in your project directory with `cage init` or manually. This file defines the cage for your project.
+Create a `.cage.yml` file in your project directory with `cage init` or manually. This file defines the cage for your project.
 
-**File:** `.claude-cage.yml` (in project root)
+**File:** `.cage.yml` (in project root)
 
 **Example:**
 ```yaml
@@ -893,7 +893,7 @@ env:
 When `cage start` runs, configuration is resolved in this order:
 
 1. **Global config** (`~/.claude-cage/config.yaml`) - provides defaults and profiles
-2. **Project config** (`.claude-cage.yml`) - specifies image, overrides resources
+2. **Project config** (`.cage.yml`) - specifies image, overrides resources
 3. **Command line** - port forwarding flags
 
 Project config `profile` field references a global profile, then `memory`/`vcpu`/`disk` override specific values.

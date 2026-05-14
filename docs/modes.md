@@ -82,7 +82,7 @@ command exits with:
 
 ```
 Error: this cage config requires root mode (shares/env/bridge):
-run 'sudo cage start' instead, or remove those fields from .claude-cage.yml
+run 'sudo cage start' instead, or remove those fields from .cage.yml
 ```
 
 You can also switch a user-mode cagefile to root mode by adding a

@@ -31,7 +31,7 @@ This stops the VM (if running) and removes:
 - Network configuration
 - Firewall rules
 
-When run from a directory with .claude-cage.yml, the cage name is optional.
+When run from a directory with .cage.yml, the cage name is optional.
 
 The cage's data is permanently deleted.`,
 		Args: cobra.MaximumNArgs(1),

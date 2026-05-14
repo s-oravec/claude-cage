@@ -33,7 +33,7 @@ func NewStartCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start [name]",
 		Short: "Start a cage VM (creates if needed)",
-		Long: `Start a cage VM. If the cage doesn't exist and a .claude-cage.yml
+		Long: `Start a cage VM. If the cage doesn't exist and a .cage.yml
 config file is present, the cage will be created automatically.
 
 Use 'cage init' to create a project configuration.

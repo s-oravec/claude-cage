@@ -48,9 +48,9 @@ func NewRootCmd() *cobra.Command {
 Initializes project configuration.
 
 **Flow:**
-1. Check if `.claude-cage.yml` already exists
+1. Check if `.cage.yml` already exists
 2. Load default image from global config (if --image not specified)
-3. Create `.claude-cage.yml` with image, shares, and options
+3. Create `.cage.yml` with image, shares, and options
 
 **Flags:**
 - `--image` - Base image (default: from `~/.claude-cage/config.yaml`)
@@ -66,7 +66,7 @@ Initializes project configuration.
 Starts a cage, creating it if needed.
 
 **Flow:**
-1. Resolve cage name (from args or `.claude-cage.yml`)
+1. Resolve cage name (from args or `.cage.yml`)
 2. If cage doesn't exist and project config exists: create cage
 3. If cage stopped: reconfigure if project config changed
 4. Start virtiofsd (if configured)

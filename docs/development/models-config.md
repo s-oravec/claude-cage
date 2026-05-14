@@ -7,7 +7,7 @@ This document describes the configuration data structures and YAML schema.
 | File | Purpose | Priority |
 |------|---------|----------|
 | `~/.claude-cage/config.yaml` | Global configuration | Base |
-| `./.claude-cage.yml` | Project-specific overrides | Higher |
+| `./.cage.yml` | Project-specific overrides | Higher |
 
 ## Config Structure
 
@@ -221,7 +221,7 @@ env:
 ## Project Configuration Example
 
 ```yaml
-# ./.claude-cage.yml (in project directory)
+# ./.cage.yml (in project directory)
 
 # Override default profile for this project
 profiles:

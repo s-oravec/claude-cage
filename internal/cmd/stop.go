@@ -25,7 +25,7 @@ func NewStopCmd() *cobra.Command {
 By default, performs a graceful shutdown. Use --force for immediate termination.
 The cage's resources (disk, network, keys) are preserved and can be restarted.
 
-When run from a directory with .claude-cage.yml, the cage name is optional.
+When run from a directory with .cage.yml, the cage name is optional.
 
 To remove a cage and all its resources, use 'cage remove'.`,
 		Args: cobra.MaximumNArgs(1),

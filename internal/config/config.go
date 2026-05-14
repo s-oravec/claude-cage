@@ -146,8 +146,24 @@ func Path() string {
 	return filepath.Join(Dir(), "config.yaml")
 }
 
-// ProjectConfigFile is the name of the project-level config file
-const ProjectConfigFile = ".claude-cage.yml"
+// ProjectConfigFile is the canonical name written by `cage init`.
+const ProjectConfigFile = ".cage.yml"
+
+// ProjectConfigFiles are the project-config filenames cage will read,
+// in priority order. Writes always use ProjectConfigFile.
+var ProjectConfigFiles = []string{".cage.yml", ".cage.yaml"}
+
+// FindProjectConfig returns the absolute path to whichever
+// ProjectConfigFiles entry exists in dir, or empty string if none does.
+func FindProjectConfig(dir string) string {
+	for _, name := range ProjectConfigFiles {
+		path := filepath.Join(dir, name)
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+	return ""
+}
 
 // ProjectNetwork holds network settings for a project
 type ProjectNetwork struct {
@@ -155,7 +171,7 @@ type ProjectNetwork struct {
 	Ports []string `yaml:"ports,omitempty"` // "host:guest" format
 }
 
-// ProjectConfig holds project-level configuration from .claude-cage.yml
+// ProjectConfig holds project-level configuration from .cage.yml
 type ProjectConfig struct {
 	Cage    string            `yaml:"cage,omitempty"`    // cage name, optional, defaults to directory name
 	Image   string            `yaml:"image"`             // required, base image
@@ -168,21 +184,22 @@ type ProjectConfig struct {
 	Env     map[string]string `yaml:"env,omitempty"`
 }
 
-// LoadProjectConfig loads the project-level config from a directory
+// LoadProjectConfig loads the project-level config from a directory.
+// Tries ProjectConfigFiles in order; reports the canonical name in errors.
 func LoadProjectConfig(dir string) (*ProjectConfig, error) {
-	path := filepath.Join(dir, ProjectConfigFile)
+	path := FindProjectConfig(dir)
+	if path == "" {
+		return nil, fmt.Errorf("project config file %s not found in %s", ProjectConfigFile, dir)
+	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("project config file %s not found in %s", ProjectConfigFile, dir)
-		}
 		return nil, err
 	}
 
 	var cfg ProjectConfig
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("failed to parse %s: %w", ProjectConfigFile, err)
+		return nil, fmt.Errorf("failed to parse %s: %w", filepath.Base(path), err)
 	}
 
 	// Default cage name to directory name if not specified
@@ -192,17 +209,16 @@ func LoadProjectConfig(dir string) (*ProjectConfig, error) {
 
 	// Validate required fields
 	if cfg.Image == "" {
-		return nil, fmt.Errorf("image is required in %s", ProjectConfigFile)
+		return nil, fmt.Errorf("image is required in %s", filepath.Base(path))
 	}
 
 	return &cfg, nil
 }
 
-// ProjectConfigExists returns true if the project config file exists in the directory
+// ProjectConfigExists returns true if any accepted project config file
+// (`.cage.yml` or `.cage.yaml`) exists in the directory.
 func ProjectConfigExists(dir string) bool {
-	path := filepath.Join(dir, ProjectConfigFile)
-	_, err := os.Stat(path)
-	return err == nil
+	return FindProjectConfig(dir) != ""
 }
 
 // PortMapping represents a host:guest port mapping

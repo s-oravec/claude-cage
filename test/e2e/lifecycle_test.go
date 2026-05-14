@@ -42,7 +42,7 @@ func TestCageLifecycle(t *testing.T) {
 		time.Sleep(2 * time.Second)
 	})
 
-	// Init cage (creates .claude-cage.yml)
+	// Init cage (creates .cage.yml)
 	var startFailed bool
 	t.Run("Init", func(t *testing.T) {
 		stdout, stderr, err := runCageInDir(projectDir, "init", "--image", testImage, "--cage", name, "--ssh", "auto")

@@ -21,7 +21,7 @@ func NewSSHCmd() *cobra.Command {
 Without a command, opens an interactive shell.
 With a command, executes it and returns.
 
-When run from a directory with .claude-cage.yml, the cage name is optional.
+When run from a directory with .cage.yml, the cage name is optional.
 In that case, all arguments are treated as the command to execute.`,
 		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {

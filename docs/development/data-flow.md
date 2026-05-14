@@ -5,7 +5,7 @@ This document describes how data flows through Claude Cage during key operations
 ## Cage Start Flow (with Auto-Creation)
 
 The `cage start` command handles both cage creation and starting. When run in a directory
-with `.claude-cage.yml`, it will create the cage if it doesn't exist.
+with `.cage.yml`, it will create the cage if it doesn't exist.
 
 ```
 cage start (in project directory)
@@ -14,7 +14,7 @@ cage start (in project directory)
 ┌───────────────────────────────────────────────────────────────┐
 │ 1. Resolve Cage Name                                           │
 │    - If name provided as argument: use it                      │
-│    - If no argument: load from .claude-cage.yml                │
+│    - If no argument: load from .cage.yml                │
 │    - Cage name defaults to directory name if not in config     │
 └───────────────────────────────────────────────────────────────┘
         │
@@ -22,7 +22,7 @@ cage start (in project directory)
 ┌───────────────────────────────────────────────────────────────┐
 │ 2. Load Configuration                                          │
 │    - Load ~/.claude-cage/config.yaml (global)                 │
-│    - Load .claude-cage.yml (project)                          │
+│    - Load .cage.yml (project)                          │
 │    - Resolve config (merge profile + overrides)               │
 │    - Resolve image alias (alpine → alpine-3.21)               │
 └───────────────────────────────────────────────────────────────┘
@@ -75,7 +75,7 @@ cage init --image ubuntu-24.04
 ┌───────────────────────────────────────────────────────────────┐
 │ 1. Validate                                                    │
 │    - --image is required                                      │
-│    - Check if .claude-cage.yml already exists                 │
+│    - Check if .cage.yml already exists                 │
 │    - If exists and no --force: error                          │
 └───────────────────────────────────────────────────────────────┘
         │
@@ -91,7 +91,7 @@ cage init --image ubuntu-24.04
         │
         ▼
 ┌───────────────────────────────────────────────────────────────┐
-│ 3. Write .claude-cage.yml                                      │
+│ 3. Write .cage.yml                                      │
 │    - Add header comment                                       │
 │    - Marshal config to YAML                                   │
 │    - Write to file                                            │
@@ -126,7 +126,7 @@ cage ssh myvm
 ## Configuration Resolution Flow
 
 ```
-cage start (with .claude-cage.yml)
+cage start (with .cage.yml)
         │
         ▼
 ┌───────────────────────────────────────────────────────────────┐
@@ -146,7 +146,7 @@ cage start (with .claude-cage.yml)
         ▼
 ┌───────────────────────────────────────────────────────────────┐
 │ 2. Load Project Config                                         │
-│    ./.claude-cage.yml                                         │
+│    ./.cage.yml                                         │
 │    ┌─────────────────────────────────────┐                    │
 │    │ image: ubuntu-24.04                  │ (required)        │
 │    │ profile: default                     │ (reference)       │

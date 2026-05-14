@@ -122,7 +122,7 @@ claude --dangerously-skip-permissions
 cd ~/projects/myapp
 cage init --image ubuntu-24.04 --memory 8G --vcpu 8
 
-# Add port forwards to .claude-cage.yml if needed regularly:
+# Add port forwards to .cage.yml if needed regularly:
 # network:
 #   ssh: auto
 #   ports:

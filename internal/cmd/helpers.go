@@ -10,7 +10,7 @@ import (
 // resolveCageName returns cage name from args or project config.
 // Returns:
 // - If args provided: (args[0], nil, nil)
-// - If no args: load .claude-cage.yml from cwd, return (cfg.Cage, cfg, nil)
+// - If no args: load .cage.yml from cwd, return (cfg.Cage, cfg, nil)
 // - Error if no args and no config file
 func resolveCageName(args []string) (string, *config.ProjectConfig, error) {
 	if len(args) > 0 {

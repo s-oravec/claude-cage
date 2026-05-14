@@ -62,7 +62,7 @@ private subnets (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16)
 
 ### SSH Port Forwarding
 
-In `.claude-cage.yml`:
+In `.cage.yml`:
 ```yaml
 network:
   ssh: auto       # Find free port

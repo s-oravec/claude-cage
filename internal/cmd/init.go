@@ -28,7 +28,7 @@ func NewInitCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Initialize a new cage configuration in the current directory",
-		Long: `Initialize a new .claude-cage.yml configuration file.
+		Long: `Initialize a new .cage.yml configuration file.
 
 By default the config is for user mode: image, SSH and resources only. The
 cage runs under your regular user with libvirt session mode. Use --root to
