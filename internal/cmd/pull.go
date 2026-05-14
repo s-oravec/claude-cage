@@ -9,13 +9,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// NewSetupCmd creates the setup command
-func NewSetupCmd() *cobra.Command {
+// NewPullCmd creates the pull command
+func NewPullCmd() *cobra.Command {
 	var base string
 	var list bool
 
 	cmd := &cobra.Command{
-		Use:   "setup",
+		Use:   "pull",
 		Short: "Download and prepare base images",
 		Long: `Download and prepare base images for cage VMs.
 
@@ -31,7 +31,7 @@ Use --list to see available images.`,
 				base = "alpine" // default
 			}
 
-			return setupImage(cmd, base)
+			return pullImage(cmd, base)
 		},
 	}
 
@@ -69,11 +69,11 @@ func listImages(cmd *cobra.Command) error {
 
 	fmt.Fprintln(cmd.OutOrStdout())
 	fmt.Fprintln(cmd.OutOrStdout(), "Aliases: alpine, ubuntu, debian, rocky, alma, fedora, opensuse, centos")
-	fmt.Fprintln(cmd.OutOrStdout(), "Use 'cage setup --base <name>' to download an image")
+	fmt.Fprintln(cmd.OutOrStdout(), "Use 'cage pull --base <name>' to download an image")
 	return nil
 }
 
-func setupImage(cmd *cobra.Command, name string) error {
+func pullImage(cmd *cobra.Command, name string) error {
 	// Check if already downloaded
 	if images.IsDownloaded(name) {
 		fmt.Fprintf(cmd.OutOrStdout(), "✓ Image already downloaded: %s\n", name)

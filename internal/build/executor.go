@@ -136,7 +136,7 @@ func (e *Executor) createTempCage() error {
 
 	// Check image exists
 	if !images.IsDownloaded(imageName) {
-		return fmt.Errorf("base image '%s' not found, run 'cage setup --base %s' first", imageName, imageName)
+		return fmt.Errorf("base image '%s' not found, run 'cage pull --base %s' first", imageName, imageName)
 	}
 
 	e.log(" ---> Using base image: %s", imageName)

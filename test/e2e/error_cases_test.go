@@ -38,7 +38,7 @@ func TestCageStartDuplicate(t *testing.T) {
 	runCage("config", "init", "--force")
 
 	// Check if image is available (look for ✓ before image name)
-	stdout, _, _ := runCage("setup", "--list")
+	stdout, _, _ := runCage("pull", "--list")
 	if !strings.Contains(stdout, "✓") || !strings.Contains(stdout, testImage) {
 		t.Skipf("skipping: image %s not downloaded", testImage)
 	}

@@ -18,7 +18,7 @@ func TestRootCmd_HasSubcommands(t *testing.T) {
 	assert.Contains(t, names, "version")
 	assert.Contains(t, names, "doctor")
 	assert.Contains(t, names, "config")
-	assert.Contains(t, names, "setup")
+	assert.Contains(t, names, "pull")
 	assert.Contains(t, names, "init")
 	assert.Contains(t, names, "start")
 	assert.Contains(t, names, "stop")

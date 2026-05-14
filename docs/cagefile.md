@@ -43,7 +43,7 @@ FROM <image>
 
 Sets the base image. **Required** and must be the **first instruction**.
 
-The image must be available locally (downloaded via `cage setup`).
+The image must be available locally (downloaded via `cage pull`).
 
 ```dockerfile
 FROM ubuntu-24.04
@@ -51,7 +51,7 @@ FROM alpine-3.21
 FROM debian-12
 ```
 
-Use `cage setup --list` to see available images.
+Use `cage pull --list` to see available images.
 
 ---
 

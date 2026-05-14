@@ -120,7 +120,7 @@ func createCageFromConfig(cmd *cobra.Command, name string, resolved *config.Reso
 
 	// Check image exists
 	if !images.IsDownloaded(imageName) {
-		return fmt.Errorf("image '%s' not found, run 'cage setup --base %s' first", imageName, imageName)
+		return fmt.Errorf("image '%s' not found, run 'cage pull --base %s' first", imageName, imageName)
 	}
 
 	fmt.Fprintf(cmd.OutOrStdout(), "Creating cage '%s'...\n", name)

@@ -107,7 +107,7 @@ func listAvailableImages(cmd *cobra.Command) error {
 	}
 
 	if len(imgList) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No images found. Run 'cage setup' to download base images.")
+		fmt.Fprintln(cmd.OutOrStdout(), "No images found. Run 'cage pull' to download base images.")
 		return nil
 	}
 

@@ -131,7 +131,7 @@ make e2e
 ./cage config init
 
 # Download a base image
-./cage setup --base alpine
+./cage pull --base alpine
 
 # Test with project config workflow
 mkdir /tmp/test-cage && cd /tmp/test-cage

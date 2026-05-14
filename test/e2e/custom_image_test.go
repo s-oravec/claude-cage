@@ -24,9 +24,9 @@ func TestCustomImageSaveAndReuse(t *testing.T) {
 	}
 
 	// Check if image is available
-	stdout, _, _ := runCage("setup", "--list")
+	stdout, _, _ := runCage("pull", "--list")
 	if !strings.Contains(stdout, "✓") || !strings.Contains(stdout, testImage) {
-		t.Skipf("skipping: image %s not downloaded (run 'cage setup --base %s' first)", testImage, testImage)
+		t.Skipf("skipping: image %s not downloaded (run 'cage pull --base %s' first)", testImage, testImage)
 	}
 
 	// Create two project directories

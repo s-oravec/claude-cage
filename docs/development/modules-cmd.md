@@ -209,7 +209,7 @@ Manages base and custom images.
 
 ### Setup Commands
 
-#### setup (`setup.go`)
+#### pull (`pull.go`)
 Downloads base images.
 
 **Flow:**

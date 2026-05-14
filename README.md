@@ -53,7 +53,7 @@ cage doctor
 cage config init
 
 # Download a base image
-cage setup --base ubuntu-24.04
+cage pull --base ubuntu-24.04
 
 # In your project directory, create a cage configuration
 cd ~/projects/myapp
@@ -113,7 +113,7 @@ cage stop myvm
 - [`cage build`](#cage-build) - Build an image from a Cagefile
 
 ### Setup Commands
-- [`cage setup`](#cage-setup) - Download base images
+- [`cage pull`](#cage-pull) - Download base images
 - [`cage config`](#cage-config) - Manage configuration
 - [`cage doctor`](#cage-doctor) - Check system requirements
 - [`cage verify`](#cage-verify) - Verify network isolation
@@ -596,12 +596,12 @@ cage build -t my-image --keep-on-error .
 
 ---
 
-### cage setup
+### cage pull
 
 Download and prepare base images.
 
 ```bash
-cage setup [options]
+cage pull [options]
 ```
 
 **Options:**
@@ -634,16 +634,16 @@ cage setup [options]
 **Examples:**
 ```bash
 # Download default image (alpine)
-cage setup
+cage pull
 
 # List available images
-cage setup --list
+cage pull --list
 
 # Download specific image
-cage setup --base ubuntu-24.04
+cage pull --base ubuntu-24.04
 
 # Use alias
-cage setup --base ubuntu
+cage pull --base ubuntu
 ```
 
 ---

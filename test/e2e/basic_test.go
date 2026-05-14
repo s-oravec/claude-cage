@@ -46,11 +46,11 @@ func TestCageConfigInit(t *testing.T) {
 	}
 }
 
-// TestCageSetupList tests listing available images
-func TestCageSetupList(t *testing.T) {
-	stdout, _, err := runCage("setup", "--list")
+// TestCagePullList tests listing available images
+func TestCagePullList(t *testing.T) {
+	stdout, _, err := runCage("pull", "--list")
 	if err != nil {
-		t.Fatalf("setup --list failed: %v", err)
+		t.Fatalf("pull --list failed: %v", err)
 	}
 	if !strings.Contains(stdout, "alpine") && !strings.Contains(stdout, "ubuntu") {
 		t.Errorf("expected image list, got: %s", stdout)

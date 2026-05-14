@@ -204,7 +204,7 @@ profiles:
 
 - KVM available
 - libvirtd running
-- Base image downloaded (`cage setup`)
+- Base image downloaded (`cage pull`)
 - User in kvm/libvirt groups
 
 ### User-Mode E2E Tests
