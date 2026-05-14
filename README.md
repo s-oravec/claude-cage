@@ -597,7 +597,8 @@ cage build -t <name> <context>
 | `-t, --tag` | Name for the built image (required) |
 | `-f, --file` | Path to Cagefile (default: `<context>/Cagefile`) |
 | `--build-arg` | Build argument KEY=VALUE (can be repeated) |
-| `--keep-on-error` | Keep temporary cage on build failure for debugging |
+| `--keep-on-error` | Keep temporary cage **defined** on build failure (stopped) |
+| `--interactive` | On failure, leave the temp cage **running** with SSH instructions for live debugging |
 
 **Cagefile Instructions:**
 
@@ -641,8 +642,11 @@ cage build -t my-image -f ./docker/Cagefile ./project
 # Build with build arguments
 cage build -t my-image --build-arg VERSION=2.0 --build-arg DEBUG=true .
 
-# Keep temp cage on failure for debugging
+# Keep temp cage on failure for debugging (stopped, files preserved)
 cage build -t my-image --keep-on-error .
+
+# Like --keep-on-error but cage stays RUNNING; SSH in to inspect live state
+cage build -t my-image --interactive .
 ```
 
 ---
