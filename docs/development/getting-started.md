@@ -218,13 +218,13 @@ rootCmd.AddCommand(NewMyCmd())
 journalctl -u libvirtd
 
 # Check domain status
-virsh -c qemu:///session list --all
+virsh -c qemu:///system list --all
 
 # View domain XML
-virsh -c qemu:///session dumpxml cage-<name>
+virsh -c qemu:///system dumpxml cage-<name>
 
 # Console access
-virsh -c qemu:///session console cage-<name>
+virsh -c qemu:///system console cage-<name>
 ```
 
 ### Testing Network Isolation
@@ -309,9 +309,9 @@ sudo systemctl enable --now libvirtd
 
 ### virsh commands fail
 
-Ensure using session connection:
+Ensure using the system connection (cage requires it):
 ```bash
-virsh -c qemu:///session list
+virsh -c qemu:///system list
 ```
 
 ### Tests fail with "cage already exists"

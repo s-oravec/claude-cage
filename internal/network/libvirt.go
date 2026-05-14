@@ -6,14 +6,13 @@ import (
 	"fmt"
 	"os/exec"
 	"text/template"
+
+	"github.com/s-oravec/claude-cage/internal/mode"
 )
 
-// libvirtURI is the connection URI for libvirt
-const libvirtURI = "qemu:///session"
-
-// virsh runs a virsh command with the session connection
+// virsh runs a virsh command against the libvirt URI for the current mode.
 func virsh(args ...string) *exec.Cmd {
-	fullArgs := append([]string{"-c", libvirtURI}, args...)
+	fullArgs := append([]string{"-c", mode.Current().URI()}, args...)
 	return exec.Command("virsh", fullArgs...)
 }
 

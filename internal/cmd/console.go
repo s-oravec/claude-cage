@@ -6,6 +6,7 @@ import (
 	"os/exec"
 
 	"github.com/s-oravec/claude-cage/internal/cage"
+	"github.com/s-oravec/claude-cage/internal/mode"
 	"github.com/spf13/cobra"
 )
 
@@ -55,7 +56,7 @@ func runConsole(name string) error {
 	fmt.Println()
 
 	// Use virsh console
-	virsh := exec.Command("virsh", "-c", "qemu:///session", "console", domainName)
+	virsh := exec.Command("virsh", "-c", mode.Current().URI(), "console", domainName)
 	virsh.Stdin = os.Stdin
 	virsh.Stdout = os.Stdout
 	virsh.Stderr = os.Stderr

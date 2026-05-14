@@ -14,14 +14,15 @@ import (
 // NewInitCmd creates the init command
 func NewInitCmd() *cobra.Command {
 	var (
-		image  string
-		cage   string
-		memory string
-		vcpu   int
-		disk   int
-		ssh    string
-		force  bool
-		dir    string
+		image    string
+		cage     string
+		memory   string
+		vcpu     int
+		disk     int
+		ssh      string
+		force    bool
+		dir      string
+		rootMode bool
 	)
 
 	cmd := &cobra.Command{
@@ -29,18 +30,20 @@ func NewInitCmd() *cobra.Command {
 		Short: "Initialize a new cage configuration in the current directory",
 		Long: `Initialize a new .claude-cage.yml configuration file.
 
-This creates a project-level configuration that defines the cage settings
-for this directory. The configuration includes the base image, resources,
-and a default share mapping the current directory to /workspace.
+By default the config is for user mode: image, SSH and resources only. The
+cage runs under your regular user with libvirt session mode. Use --root to
+add a default share that maps the current directory to /workspace (this
+requires running the cage with 'sudo cage start' — see docs/modes.md).
 
 If --image is not specified, uses the default image from ~/.claude-cage/config.yaml.
 
 Example:
-  cage init                              # uses default image from config
+  cage init                              # user-mode cagefile (no shares)
+  cage init --root                       # root-mode cagefile (workspace share, sudo)
   cage init --image ubuntu-24.04
   cage init --image debian-12 --memory 8G --vcpu 4`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runInit(cmd, image, cage, memory, vcpu, disk, ssh, force, dir)
+			return runInit(cmd, image, cage, memory, vcpu, disk, ssh, force, dir, rootMode)
 		},
 	}
 
@@ -52,11 +55,12 @@ Example:
 	cmd.Flags().StringVar(&ssh, "ssh", "auto", "SSH port or 'auto'")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Overwrite existing configuration")
 	cmd.Flags().StringVar(&dir, "dir", "", "Target directory (default: current directory)")
+	cmd.Flags().BoolVar(&rootMode, "root", false, "Generate a root-mode cagefile (adds workspace share, requires sudo cage start)")
 
 	return cmd
 }
 
-func runInit(cmd *cobra.Command, image, cage, memory string, vcpu, disk int, ssh string, force bool, dir string) error {
+func runInit(cmd *cobra.Command, image, cage, memory string, vcpu, disk int, ssh string, force bool, dir string, rootMode bool) error {
 	// If no image specified, try to get default from global config
 	if image == "" {
 		cfg, err := config.Load()
@@ -92,12 +96,12 @@ func runInit(cmd *cobra.Command, image, cage, memory string, vcpu, disk int, ssh
 		Network: config.ProjectNetwork{
 			SSH: ssh,
 		},
-		Shares: []config.ShareConfig{
-			{
-				Host:  ".",
-				Guest: "/workspace",
-			},
-		},
+	}
+
+	if rootMode {
+		cfg.Shares = []config.ShareConfig{
+			{Host: ".", Guest: "/workspace"},
+		}
 	}
 
 	// Set optional fields only if provided
@@ -123,6 +127,10 @@ func runInit(cmd *cobra.Command, image, cage, memory string, vcpu, disk int, ssh
 	// Add header comment
 	header := `# Cage configuration for this project
 # See: https://github.com/s-oravec/claude-cage
+#
+# User mode (this file, default): no shares, no env injection. Run with 'cage start'.
+# Root mode: add 'shares:' or 'env:' below. Then run 'sudo cage start' (required
+# for virtiofs). See docs/modes.md for details.
 
 `
 	content := header + string(data)

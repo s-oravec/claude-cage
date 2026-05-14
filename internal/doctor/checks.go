@@ -2,6 +2,7 @@ package doctor
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"os/user"
@@ -51,7 +52,8 @@ type Check struct {
 	Name      string
 	CheckFunc func() error
 	Required  bool
-	FixHint   string // Installation/fix hint for the user
+	FixHint   string       // Installation/fix hint for the user (always populated)
+	FixFunc   func() error // Optional: auto-applies the fix without sudo
 }
 
 // CheckResult holds the result of running a check
@@ -59,6 +61,13 @@ type CheckResult struct {
 	Check  Check
 	Passed bool
 	Error  error
+}
+
+// FixResult holds the result of attempting an auto-fix
+type FixResult struct {
+	Check   Check
+	Applied bool  // true if FixFunc ran successfully
+	Error   error // FixFunc error, or nil if no FixFunc was available
 }
 
 // RunChecks executes all checks and returns results
@@ -75,6 +84,24 @@ func RunChecks(checks []Check) []CheckResult {
 	return results
 }
 
+// RunFixes invokes FixFunc on each failed check that has one. Returns a
+// FixResult per fix attempted. Checks without a FixFunc are skipped silently.
+func RunFixes(results []CheckResult) []FixResult {
+	var fixes []FixResult
+	for _, r := range results {
+		if r.Passed || r.Check.FixFunc == nil {
+			continue
+		}
+		err := r.Check.FixFunc()
+		fixes = append(fixes, FixResult{
+			Check:   r.Check,
+			Applied: err == nil,
+			Error:   err,
+		})
+	}
+	return fixes
+}
+
 // AllRequiredPassed returns true if all required checks passed
 func AllRequiredPassed(results []CheckResult) bool {
 	for _, r := range results {
@@ -85,7 +112,8 @@ func AllRequiredPassed(results []CheckResult) bool {
 	return true
 }
 
-// DefaultChecks returns the standard set of checks
+// DefaultChecks returns the prerequisite checks for user mode (regular user,
+// libvirt session). This is the default surface that `cage doctor` validates.
 func DefaultChecks() []Check {
 	distro := DetectDistro()
 
@@ -115,12 +143,6 @@ func DefaultChecks() []Check {
 			FixHint:   "sudo usermod -aG libvirt $USER && newgrp libvirt",
 		},
 		{
-			Name:      "virtiofsd installed",
-			CheckFunc: checkVirtiofsd,
-			Required:  false, // Optional - only needed for bridge mode file sharing
-			FixHint:   fixHintVirtiofsd(distro),
-		},
-		{
 			Name:      "qemu-img installed",
 			CheckFunc: checkQemuImg,
 			Required:  true,
@@ -139,6 +161,43 @@ func DefaultChecks() []Check {
 			FixHint:   fixHintVirtCustomize(distro),
 		},
 	}
+}
+
+// RootChecks returns DefaultChecks plus the prerequisites for root mode
+// (sudo): libvirt system mode connectivity, home-dir traversability by
+// libvirt-qemu, and virtiofsd for shares.
+func RootChecks() []Check {
+	checks := DefaultChecks()
+	distro := DetectDistro()
+
+	qemuUser := QemuUser()
+	displayQemuUser := qemuUser
+	if displayQemuUser == "" {
+		displayQemuUser = "libvirt-qemu"
+	}
+	home, _ := os.UserHomeDir()
+
+	return append(checks,
+		Check{
+			Name:      "libvirt system mode reachable",
+			CheckFunc: checkLibvirtSystemMode,
+			Required:  true,
+			FixHint:   "Run 'newgrp libvirt' (or log out/in) so libvirt group membership takes effect; ensure /var/run/libvirt/libvirt-sock exists",
+		},
+		Check{
+			Name:      "Home dir traversable by QEMU",
+			CheckFunc: checkHomeAccessibleToQemu,
+			Required:  true,
+			FixHint:   fmt.Sprintf("setfacl -m u:%s:x %s", displayQemuUser, home),
+			FixFunc:   fixHomeACL,
+		},
+		Check{
+			Name:      "virtiofsd installed",
+			CheckFunc: checkVirtiofsd,
+			Required:  true, // Required for shares in root mode
+			FixHint:   fixHintVirtiofsd(distro),
+		},
+	)
 }
 
 func fixHintKVM(d Distro) string {
@@ -270,6 +329,82 @@ func checkLibvirtd() error {
 	}
 	if strings.TrimSpace(string(output)) != "active" {
 		return errors.New("libvirtd not active")
+	}
+	return nil
+}
+
+func checkLibvirtSystemMode() error {
+	cmd := exec.Command("virsh", "-c", "qemu:///system", "version")
+	if err := cmd.Run(); err != nil {
+		return errors.New("cannot connect to qemu:///system")
+	}
+	return nil
+}
+
+// QemuUser returns the system user QEMU runs as under libvirt system mode.
+// Returns "libvirt-qemu" (Debian/Ubuntu) or "qemu" (Fedora/Arch/openSUSE)
+// whichever is present in /etc/passwd, or empty string if neither exists.
+func QemuUser() string {
+	for _, name := range []string{"libvirt-qemu", "qemu"} {
+		if _, err := user.Lookup(name); err == nil {
+			return name
+		}
+	}
+	return ""
+}
+
+func checkHomeAccessibleToQemu() error {
+	qemuUser := QemuUser()
+	if qemuUser == "" {
+		return errors.New("could not detect qemu user (libvirt-qemu or qemu)")
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	info, err := os.Stat(home)
+	if err != nil {
+		return fmt.Errorf("cannot stat %s: %w", home, err)
+	}
+	// Others has execute (anyone can traverse)
+	if info.Mode().Perm()&0o001 != 0 {
+		return nil
+	}
+
+	if _, err := exec.LookPath("getfacl"); err != nil {
+		return fmt.Errorf("%s not traversable by %s (install 'acl' to auto-fix, or chmod o+x %s)", home, qemuUser, home)
+	}
+
+	out, err := exec.Command("getfacl", "--absolute-names", "-p", home).Output()
+	if err != nil {
+		return fmt.Errorf("getfacl failed on %s: %w", home, err)
+	}
+
+	prefix := "user:" + qemuUser + ":"
+	for _, line := range strings.Split(string(out), "\n") {
+		if strings.HasPrefix(line, prefix) && strings.Contains(line[len(prefix):], "x") {
+			return nil
+		}
+	}
+	return fmt.Errorf("%s not traversable by %s (qemu cannot reach files under it)", home, qemuUser)
+}
+
+func fixHomeACL() error {
+	qemuUser := QemuUser()
+	if qemuUser == "" {
+		return errors.New("could not detect qemu user (libvirt-qemu or qemu)")
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	if _, err := exec.LookPath("setfacl"); err != nil {
+		return errors.New("setfacl not found; install the 'acl' package first")
+	}
+	out, err := exec.Command("setfacl", "-m", fmt.Sprintf("u:%s:x", qemuUser), home).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("setfacl failed: %s", strings.TrimSpace(string(out)))
 	}
 	return nil
 }

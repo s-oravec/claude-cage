@@ -12,12 +12,19 @@ import (
 	"github.com/s-oravec/claude-cage/internal/config"
 	"github.com/s-oravec/claude-cage/internal/images"
 	"github.com/s-oravec/claude-cage/internal/libvirt"
+	"github.com/s-oravec/claude-cage/internal/mode"
 	"github.com/s-oravec/claude-cage/internal/network"
 	"github.com/s-oravec/claude-cage/internal/runtime"
 	"github.com/s-oravec/claude-cage/internal/ssh"
 	"github.com/s-oravec/claude-cage/internal/virtiofs"
 	"github.com/spf13/cobra"
 )
+
+// hintDoctor wraps libvirt/system failures with a hint to run `cage doctor`.
+// Used for failures rooted in environment/component issues, not user input.
+func hintDoctor(err error) error {
+	return fmt.Errorf("%w\n\nRun 'cage doctor' to check your environment", err)
+}
 
 // NewStartCmd creates the start command
 func NewStartCmd() *cobra.Command {
@@ -64,6 +71,13 @@ func runStartCmd(cmd *cobra.Command, args []string, ports []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to resolve config: %w", err)
 		}
+	}
+
+	// Enforce mode: if the cagefile uses features that require root mode
+	// (shares, env injection, bridge networking), the cage must be started
+	// with sudo.
+	if required := mode.RequiredFromConfig(resolved); required == mode.Root && mode.Current() == mode.User {
+		return fmt.Errorf("this cage config requires root mode (shares/env/bridge): run 'sudo cage start' instead, or remove those fields from %s", config.ProjectConfigFile)
 	}
 
 	// Check if cage exists
@@ -204,11 +218,16 @@ func createCageFromConfig(cmd *cobra.Command, name string, resolved *config.Reso
 		fmt.Fprintln(cmd.OutOrStdout(), "  Enabling network isolation (blocking LAN access)...")
 	}
 
+	// Inject runtime env via virtiofs only when the config actually has env
+	// vars. Empty env means no virtiofs mount, which lets libvirt session
+	// mode work (virtiofs is only supported in system mode).
+	useRuntimeEnv := len(resolved.Env) > 0
+
 	cloudInitPath, err := cloudinit.GenerateISOWithConfig(cageDir, &cloudinit.CloudInitConfig{
 		CageName:         name,
 		PubKey:           pubKey,
 		MountVirtiofs:    false, // Will be set at start time if virtiofsd is available
-		UseRuntimeEnv:    true,  // Use runtime env via virtiofs
+		UseRuntimeEnv:    useRuntimeEnv,
 		InstallSSH:       sshPort > 0,
 		NetworkIsolation: networkIsolation,
 		AllowedSubnets:   allowedSubnets,
@@ -218,8 +237,11 @@ func createCageFromConfig(cmd *cobra.Command, name string, resolved *config.Reso
 		return fmt.Errorf("failed to create cloud-init: %w", err)
 	}
 
-	// Generate domain XML with RuntimeDir set
-	runtimeDir := runtime.RuntimeDir(cageDir)
+	// Generate domain XML; RuntimeDir is only set when env injection is needed.
+	var runtimeDir string
+	if useRuntimeEnv {
+		runtimeDir = runtime.RuntimeDir(cageDir)
+	}
 	domainCfg := &libvirt.DomainConfig{
 		Name:           name,
 		MemoryMB:       resolved.MemoryMB,
@@ -243,7 +265,7 @@ func createCageFromConfig(cmd *cobra.Command, name string, resolved *config.Reso
 	if err := client.DefineDomain(xml); err != nil {
 		ssh.DeleteKeys(name)
 		cage.DeleteState(name)
-		return fmt.Errorf("failed to define domain: %w", err)
+		return hintDoctor(fmt.Errorf("failed to define domain: %w", err))
 	}
 
 	// Save state as stopped with Image field
@@ -366,7 +388,7 @@ func startCage(cmd *cobra.Command, name string, ports []string, cfg *config.Conf
 
 			if err := client.RedefineDomain(name, xml); err != nil {
 				isolatedNet.Cleanup()
-				return fmt.Errorf("failed to redefine domain with isolation: %w", err)
+				return hintDoctor(fmt.Errorf("failed to redefine domain with isolation: %w", err))
 			}
 		}
 	} else if state.NetworkMode == cage.NetworkAuto {
@@ -382,7 +404,7 @@ func startCage(cmd *cobra.Command, name string, ports []string, cfg *config.Conf
 		if isolatedNet != nil {
 			isolatedNet.Cleanup()
 		}
-		return fmt.Errorf("failed to start VM: %w", err)
+		return hintDoctor(fmt.Errorf("failed to start VM: %w", err))
 	}
 
 	// Wait for VM to get an IP (only for bridge networking)

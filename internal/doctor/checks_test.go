@@ -77,8 +77,25 @@ func TestDefaultChecks_ContainsExpected(t *testing.T) {
 	assert.Contains(t, names, "libvirtd running")
 	assert.Contains(t, names, "User in kvm group")
 	assert.Contains(t, names, "User in libvirt group")
-	assert.Contains(t, names, "virtiofsd installed")
 	assert.Contains(t, names, "qemu-img installed")
+}
+
+func TestRootChecks_ExtendsDefault(t *testing.T) {
+	checks := RootChecks()
+
+	names := make([]string, len(checks))
+	for i, c := range checks {
+		names[i] = c.Name
+	}
+
+	// Includes user-mode checks
+	assert.Contains(t, names, "KVM available")
+	assert.Contains(t, names, "libvirtd running")
+
+	// Plus root-mode extras
+	assert.Contains(t, names, "libvirt system mode reachable")
+	assert.Contains(t, names, "Home dir traversable by QEMU")
+	assert.Contains(t, names, "virtiofsd installed")
 }
 
 func TestInstallAllHintFor(t *testing.T) {

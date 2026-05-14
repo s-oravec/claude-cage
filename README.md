@@ -7,11 +7,46 @@ A lightweight QEMU/KVM-based VM sandbox CLI for running Claude Code in isolation
 - **VM Isolation**: Run Claude Code in a secure, isolated VM environment
 - **QEMU/KVM Backend**: Uses libvirt for VM management
 - **Copy-on-Write Disks**: Changes don't affect base images
-- **File Sharing**: Share directories with the VM using virtio-fs
+- **File Sharing**: Share directories with the VM using virtio-fs (root mode)
 - **Port Forwarding**: Forward ports between host and VM
 - **Snapshots**: Create and restore VM snapshots
 - **Multiple Profiles**: Light, default, and heavy resource profiles
 - **Multiple Distros**: Alpine, Ubuntu, Debian, Rocky, Alma, Fedora, openSUSE, CentOS
+
+## Operating Modes
+
+Claude Cage runs in one of two modes, distinguished by whether the cage
+process has root privileges. The mode determines which features are
+available:
+
+| Feature | User mode (`cage`) | Root mode (`sudo cage`) |
+|---|---|---|
+| SSH into the VM | ✅ | ✅ |
+| SLIRP / user-mode networking | ✅ | ✅ |
+| VM-side network blocking (cloud-init) | ✅ | ✅ |
+| Snapshots | ✅ | ✅ |
+| Host-level network isolation (netns + passt) | ❌ | ✅ |
+| Bridge networking (libvirt-managed) | ❌ | ✅ |
+| Shared folders (virtiofs) | ❌ | ✅ |
+| Injected env via virtiofs | ❌ | ✅ |
+| libvirt backend | session | system |
+| State path | `~/.claude-cage/` | `/var/lib/libvirt/images/cage/` |
+
+**User mode** is the default and what most users want: a sandboxed VM
+with SSH and SLIRP networking, no host configuration required. Run `cage
+init` to create a user-mode cagefile.
+
+**Root mode** unlocks shared folders, environment injection, and stronger
+network isolation. Run `cage init --root` to create a root-mode cagefile,
+then `sudo cage start`. Root mode requires libvirt-qemu apparmor
+compatibility (handled automatically when state lives under
+`/var/lib/libvirt/images/`).
+
+Cage **enforces the mode at start time**: if your `.claude-cage.yml`
+includes `shares:`, `env:`, or `network: bridge`, running plain `cage
+start` errors out with a hint to use `sudo cage start`.
+
+See [docs/modes.md](docs/modes.md) for the full design rationale.
 
 ## Installation
 

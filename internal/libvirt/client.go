@@ -5,6 +5,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/s-oravec/claude-cage/internal/mode"
 )
 
 // Client wraps libvirt operations using virsh CLI
@@ -13,10 +15,11 @@ type Client struct {
 	uri string
 }
 
-// NewClient creates a new libvirt client
+// NewClient creates a new libvirt client using the URI for the current mode
+// (session for user mode, system for root mode).
 func NewClient() *Client {
 	return &Client{
-		uri: "qemu:///session",
+		uri: mode.Current().URI(),
 	}
 }
 

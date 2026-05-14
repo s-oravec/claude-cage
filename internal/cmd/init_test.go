@@ -44,12 +44,34 @@ func TestInitCommand_CreatesConfigFile(t *testing.T) {
 
 	assert.Equal(t, "ubuntu-24.04", cfg.Image)
 	assert.Equal(t, "auto", cfg.Network.SSH)
-	assert.Len(t, cfg.Shares, 1)
-	assert.Equal(t, ".", cfg.Shares[0].Host)
-	assert.Equal(t, "/workspace", cfg.Shares[0].Guest)
+	// Lite cagefile by default: no shares
+	assert.Empty(t, cfg.Shares)
 
 	// Check success message
 	assert.Contains(t, buf.String(), "Created")
+}
+
+func TestInitCommand_RootAddsShares(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	buf := new(bytes.Buffer)
+	cmd := NewInitCmd()
+	cmd.SetOut(buf)
+	cmd.SetArgs([]string{"--image", "ubuntu-24.04", "--root", "--dir", tmpDir})
+
+	err := cmd.Execute()
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(filepath.Join(tmpDir, config.ProjectConfigFile))
+	require.NoError(t, err)
+
+	var cfg config.ProjectConfig
+	err = yaml.Unmarshal(data, &cfg)
+	require.NoError(t, err)
+
+	require.Len(t, cfg.Shares, 1)
+	assert.Equal(t, ".", cfg.Shares[0].Host)
+	assert.Equal(t, "/workspace", cfg.Shares[0].Guest)
 }
 
 func TestInitCommand_FailsIfConfigExists(t *testing.T) {

@@ -64,10 +64,21 @@ type SecurityConfig struct {
 	VirtiofsSandbox bool `yaml:"virtiofsd_sandbox"`
 }
 
-// Dir returns the cage config directory
+// Dir returns the cage state/config directory for the current mode.
+//
+//   - User mode (regular user): $HOME/.claude-cage
+//   - Root mode (sudo cage): /var/lib/libvirt/images/cage
+//
+// The root-mode path lives under /var/lib/libvirt/images/** which is
+// permitted by the default libvirt virt-aa-helper apparmor profile, so
+// disk overlays and cloud-init ISOs created there are readable by
+// libvirt-qemu without any apparmor surgery.
 func Dir() string {
 	if configDir != "" {
 		return configDir
+	}
+	if os.Geteuid() == 0 {
+		return "/var/lib/libvirt/images/cage"
 	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".claude-cage")
