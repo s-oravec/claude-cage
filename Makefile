@@ -119,9 +119,10 @@ install: build
 	install -m 755 cage ~/.local/bin/cage
 
 # Install cage binary system-wide so it lives on sudo's default secure_path
-# (required for `sudo cage` to work in root mode). Run with sudo.
+# (required for `sudo cage` to work in root mode). Uses sudo internally so
+# you can run plain `make install-system`; if already root, sudo is a no-op.
 install-system: build
-	install -m 755 cage /usr/local/bin/cage
+	sudo install -m 755 cage /usr/local/bin/cage
 
 # Remove build artifacts
 clean:
