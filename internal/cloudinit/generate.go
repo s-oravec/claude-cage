@@ -213,6 +213,14 @@ runcmd:
   # Ensure sudoers is configured (for distros with sudo)
   - echo "cage ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/cage 2>/dev/null || true
   - chmod 440 /etc/sudoers.d/cage 2>/dev/null || true
+  # Locales — generate en_US.UTF-8 so SSH-forwarded LC_*/LANG don't trigger
+  # perl/dpkg/locale "Setting locale failed" warnings on every command.
+  # C.UTF-8 is the safe fallback (always present on Debian/Ubuntu); en_US.UTF-8
+  # covers the most common SSH SendEnv defaults.
+  - which apt-get && DEBIAN_FRONTEND=noninteractive apt-get install -y locales >/dev/null 2>&1 || true
+  - which locale-gen && locale-gen en_US.UTF-8 >/dev/null 2>&1 || true
+  - which update-locale && update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 >/dev/null 2>&1 || true
+  - which apk && apk add --no-cache musl-locales musl-locales-lang >/dev/null 2>&1 || true
   # Docker setup (systemd-based distros)
   - systemctl enable docker || true
   - systemctl start docker || true
