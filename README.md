@@ -166,6 +166,7 @@ cage init [options]
 ```
 
 **Options:**
+
 | Option | Description |
 |--------|-------------|
 | `--image` | Base image name (default: from `~/.claude-cage/config.yaml`) |
@@ -203,11 +204,13 @@ cage start [name] [options]
 ```
 
 **Arguments:**
+
 | Argument | Description |
 |----------|-------------|
 | `name` | Cage name (optional if `.claude-cage.yml` exists in current directory) |
 
 **Options:**
+
 | Option | Description |
 |--------|-------------|
 | `--port` | Port forwarding (e.g., `8080:80`), can be specified multiple times |
@@ -242,6 +245,7 @@ cage stop --all
 ```
 
 **Options:**
+
 | Option | Description |
 |--------|-------------|
 | `-f, --force` | Force immediate shutdown (default: graceful) |
@@ -272,6 +276,7 @@ cage remove --all
 ```
 
 **Options:**
+
 | Option | Description |
 |--------|-------------|
 | `-f, --force` | Force removal even if running |
@@ -300,6 +305,7 @@ cage restart <name> [options]
 ```
 
 **Options:**
+
 | Option | Description |
 |--------|-------------|
 | `-f, --force` | Force immediate shutdown before restart |
@@ -388,6 +394,7 @@ cage ls [options]
 ```
 
 **Options:**
+
 | Option | Description |
 |--------|-------------|
 | `--json` | Output as JSON |
@@ -412,6 +419,7 @@ cage status <name> [options]
 ```
 
 **Options:**
+
 | Option | Description |
 |--------|-------------|
 | `--json` | Output as JSON |
@@ -440,6 +448,7 @@ cage logs <name> [options]
 ```
 
 **Options:**
+
 | Option | Description |
 |--------|-------------|
 | `-n, --lines` | Number of lines to show (default: 100) |
@@ -468,6 +477,7 @@ cage snapshot <subcommand>
 ```
 
 **Subcommands:**
+
 | Subcommand | Description |
 |------------|-------------|
 | `create` | Create a snapshot |
@@ -501,6 +511,7 @@ cage port <subcommand>
 ```
 
 **Subcommands:**
+
 | Subcommand | Description |
 |------------|-------------|
 | `add` | Add a port forward |
@@ -530,6 +541,7 @@ cage image <subcommand>
 ```
 
 **Subcommands:**
+
 | Subcommand | Description |
 |------------|-------------|
 | `list` | List available images (alias: `ls`) |
@@ -572,11 +584,13 @@ cage build -t <name> <context>
 ```
 
 **Arguments:**
+
 | Argument | Description |
 |----------|-------------|
 | `context` | Build context directory (for COPY operations) |
 
 **Options:**
+
 | Option | Description |
 |--------|-------------|
 | `-t, --tag` | Name for the built image (required) |
@@ -585,6 +599,7 @@ cage build -t <name> <context>
 | `--keep-on-error` | Keep temporary cage on build failure for debugging |
 
 **Cagefile Instructions:**
+
 | Instruction | Description |
 |-------------|-------------|
 | `FROM <image>` | Base image (required, must be first) |
@@ -640,6 +655,7 @@ cage pull [options]
 ```
 
 **Options:**
+
 | Option | Description |
 |--------|-------------|
 | `-b, --base` | Base image to download |
@@ -692,6 +708,7 @@ cage config <subcommand>
 ```
 
 **Subcommands:**
+
 | Subcommand | Description |
 |------------|-------------|
 | `init` | Create default configuration |
@@ -725,6 +742,7 @@ cage doctor [options]
 ```
 
 **Options:**
+
 | Option | Description |
 |--------|-------------|
 | `--fix` | Show installation commands for missing dependencies |
