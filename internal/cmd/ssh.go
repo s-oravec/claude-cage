@@ -13,6 +13,8 @@ import (
 
 // NewSSHCmd creates the ssh command
 func NewSSHCmd() *cobra.Command {
+	var forwardAgent bool
+
 	cmd := &cobra.Command{
 		Use:   "ssh [name] [command...]",
 		Short: "SSH into a running cage",
@@ -22,16 +24,23 @@ Without a command, opens an interactive shell.
 With a command, executes it and returns.
 
 When run from a directory with .cage.yml, the cage name is optional.
-In that case, all arguments are treated as the command to execute.`,
+In that case, all arguments are treated as the command to execute.
+
+Use -A to forward your local ssh-agent into the cage so git/ssh inside
+the cage can authenticate against private hosts (Gitea, GitHub, …) with
+your existing keys, without ever copying them in.`,
 		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name, command, err := resolveSSHArgs(args)
 			if err != nil {
 				return err
 			}
-			return sshToCage(cmd, name, command)
+			return sshToCage(cmd, name, command, forwardAgent)
 		},
 	}
+
+	cmd.Flags().BoolVarP(&forwardAgent, "forward-agent", "A", false,
+		"Forward the local ssh-agent into the cage (for git clone / ssh to upstream hosts from inside)")
 
 	return cmd
 }
@@ -76,7 +85,7 @@ func resolveSSHArgs(args []string) (name string, command string, err error) {
 	return "", "", fmt.Errorf("cage '%s' not found", args[0])
 }
 
-func sshToCage(cmd *cobra.Command, name, command string) error {
+func sshToCage(cmd *cobra.Command, name, command string, forwardAgent bool) error {
 	// Check cage exists
 	if !cage.Exists(name) {
 		return fmt.Errorf("cage '%s' not found", name)
@@ -114,5 +123,8 @@ func sshToCage(cmd *cobra.Command, name, command string) error {
 	}
 
 	// Connect
-	return ssh.SSHExecWithPort(name, host, port, command, command == "")
+	return ssh.SSHExecWithOpts(name, host, port, command, ssh.SSHOptions{
+		Interactive:  command == "",
+		ForwardAgent: forwardAgent,
+	})
 }

@@ -337,8 +337,14 @@ cage restart myproject --force
 Connect to a running cage via SSH.
 
 ```bash
-cage ssh <name> [command]
+cage ssh [-A] <name> [command]
 ```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `-A, --forward-agent` | Forward the local ssh-agent into the cage (for `git clone`/`ssh` to private hosts from inside, without copying keys in) |
 
 **Examples:**
 ```bash
@@ -350,6 +356,10 @@ cage ssh myproject ls -la
 
 # Run multiple commands
 cage ssh myproject "cd /workspace && make build"
+
+# Clone a private Gitea repo from inside the cage using your host's ssh-agent
+cage ssh -A myproject
+# (inside cage): git clone gitea.internal.example.com:org/repo.git
 ```
 
 ---

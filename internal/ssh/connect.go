@@ -34,13 +34,25 @@ func Connect(cageName string, command string) error {
 	return SSHExec(cageName, state.IP, command, true)
 }
 
+// SSHOptions tunes optional behaviour of an SSH invocation. Zero-value is
+// safe (non-interactive, no agent forwarding).
+type SSHOptions struct {
+	Interactive  bool
+	ForwardAgent bool // adds `-A` — only meaningful with Interactive
+}
+
 // SSHExec executes SSH with the given parameters (default port 22)
 func SSHExec(cageName, ip, command string, interactive bool) error {
 	return SSHExecWithPort(cageName, ip, 22, command, interactive)
 }
 
-// SSHExecWithPort executes SSH with explicit port
+// SSHExecWithPort executes SSH with explicit port (no agent forwarding).
 func SSHExecWithPort(cageName, host string, port int, command string, interactive bool) error {
+	return SSHExecWithOpts(cageName, host, port, command, SSHOptions{Interactive: interactive})
+}
+
+// SSHExecWithOpts is the full-options variant of SSHExecWithPort.
+func SSHExecWithOpts(cageName, host string, port int, command string, opts SSHOptions) error {
 	keyPath := KeyPath(cageName)
 	knownHostsPath := KnownHostsPath()
 
@@ -63,12 +75,16 @@ func SSHExecWithPort(cageName, host string, port int, command string, interactiv
 		"-p", fmt.Sprintf("%d", port),
 	}
 
-	if !interactive {
+	if !opts.Interactive {
 		// Disable PTY allocation and redirect stdin from /dev/null so SSH
 		// can never modify the parent terminal's tty modes. Without this,
 		// a timing-out SSH probe leaves the controlling tty in raw mode
 		// (no ONLCR), making subsequent newlines render without a CR.
 		args = append(args, "-T", "-n", "-o", "BatchMode=yes")
+	}
+
+	if opts.ForwardAgent {
+		args = append(args, "-A")
 	}
 
 	args = append(args, fmt.Sprintf("cage@%s", host))
@@ -81,7 +97,7 @@ func SSHExecWithPort(cageName, host string, port int, command string, interactiv
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	if interactive {
+	if opts.Interactive {
 		cmd.Stdin = os.Stdin
 	}
 
