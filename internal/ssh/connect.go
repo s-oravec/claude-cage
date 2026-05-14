@@ -141,6 +141,12 @@ func ExecCapture(cageName, ip, command string) (string, error) {
 
 // ExecCaptureWithPort executes a command via SSH with explicit port and captures the output
 func ExecCaptureWithPort(cageName, host string, port int, command string) (string, error) {
+	return ExecCaptureWithOpts(cageName, host, port, command, SSHOptions{})
+}
+
+// ExecCaptureWithOpts is the full-options variant; only ForwardAgent is
+// honoured (Interactive is implicitly false — capture mode never has a tty).
+func ExecCaptureWithOpts(cageName, host string, port int, command string, opts SSHOptions) (string, error) {
 	keyPath := KeyPath(cageName)
 	knownHostsPath := KnownHostsPath()
 
@@ -161,9 +167,16 @@ func ExecCaptureWithPort(cageName, host string, port int, command string) (strin
 		"-o", "ConnectTimeout=5",
 		"-o", "BatchMode=yes",
 		"-p", fmt.Sprintf("%d", port),
+	}
+
+	if opts.ForwardAgent {
+		args = append(args, "-A")
+	}
+
+	args = append(args,
 		fmt.Sprintf("cage@%s", host),
 		command,
-	}
+	)
 
 	cmd := exec.Command("ssh", args...)
 	out, err := cmd.CombinedOutput()

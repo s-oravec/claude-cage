@@ -619,6 +619,7 @@ cage build -t <name> <context>
 | `--build-arg` | Build argument KEY=VALUE (can be repeated) |
 | `--keep-on-error` | Keep temporary cage **defined** on build failure (stopped) |
 | `--interactive` | On failure, leave the temp cage **running** with SSH instructions for live debugging |
+| `-A, --forward-agent` | Forward host ssh-agent into RUN steps (for `git clone` over SSH from inside the build) |
 
 **Cagefile Instructions:**
 
@@ -668,6 +669,10 @@ cage build -t my-image --keep-on-error .
 
 # Like --keep-on-error but cage stays RUNNING; SSH in to inspect live state
 cage build -t my-image --interactive .
+
+# Clone a private Gitea repo during the build using your host's ssh-agent
+cage build -t my-image -A .
+# (Cagefile: RUN git clone gitea.internal.example.com:org/repo.git)
 ```
 
 ---

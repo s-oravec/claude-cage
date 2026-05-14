@@ -29,6 +29,7 @@ type BuildConfig struct {
 	BuildArgs    map[string]string // Build arguments
 	KeepOnError  bool              // Keep temp cage defined on error (don't undefine)
 	Interactive  bool              // Like KeepOnError, but also keep the cage running and print SSH instructions for debugging
+	ForwardAgent bool              // Forward host ssh-agent into RUN steps (for git clone over SSH etc.)
 	Output       io.Writer         // Output writer for progress
 }
 
@@ -391,7 +392,9 @@ func (e *Executor) executeRun(inst Instruction) error {
 	cmd := e.wrapAsUser(inner)
 
 	// Execute and stream output
-	output, err := ssh.ExecCaptureWithPort(e.tempCage, "127.0.0.1", e.sshPort, cmd)
+	output, err := ssh.ExecCaptureWithOpts(e.tempCage, "127.0.0.1", e.sshPort, cmd, ssh.SSHOptions{
+		ForwardAgent: e.config.ForwardAgent,
+	})
 	if output != "" {
 		// Print output line by line
 		for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
