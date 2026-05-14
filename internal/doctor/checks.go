@@ -197,6 +197,12 @@ func RootChecks() []Check {
 			Required:  true, // Required for shares in root mode
 			FixHint:   fixHintVirtiofsd(distro),
 		},
+		Check{
+			Name:      "QEMU supports -netdev stream (7.2+)",
+			CheckFunc: checkQemuStreamNetdev,
+			Required:  false, // Optional - cage falls back to SLIRP without host-side netns isolation
+			FixHint:   "Update QEMU to 7.2+ for full host-side network isolation via passt+netns (Ubuntu 24.04+ / Debian 13+ / current Fedora); older QEMU still works with VM-side cloud-init blocking",
+		},
 	)
 }
 
@@ -488,6 +494,17 @@ func checkVirtCustomize() error {
 	_, err := exec.LookPath("virt-customize")
 	if err != nil {
 		return errors.New("virt-customize not found (saved images may need manual cleanup)")
+	}
+	return nil
+}
+
+func checkQemuStreamNetdev() error {
+	out, err := exec.Command("qemu-system-x86_64", "-netdev", "help").CombinedOutput()
+	if err != nil {
+		return errors.New("could not query QEMU netdev support")
+	}
+	if !strings.Contains(string(out), "stream") {
+		return errors.New("QEMU lacks -netdev stream (need 7.2+); host-side netns isolation will fall back to SLIRP")
 	}
 	return nil
 }

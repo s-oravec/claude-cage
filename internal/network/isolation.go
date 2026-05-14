@@ -46,8 +46,22 @@ func GetDefaultInterface() string {
 	return "eth0"
 }
 
+// QemuSupportsStreamNetdev reports whether the local qemu-system-x86_64
+// understands `-netdev stream,...`. The stream netdev type backs cage's
+// passt-based isolation and was added in QEMU 7.2 (Dec 2022).
+func QemuSupportsStreamNetdev() bool {
+	out, err := exec.Command("qemu-system-x86_64", "-netdev", "help").CombinedOutput()
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(out), "stream")
+}
+
 // SetupIsolatedNetwork creates a network namespace with passt for isolated networking
 func SetupIsolatedNetwork(cfg *IsolationConfig) (*IsolatedNetwork, error) {
+	if !QemuSupportsStreamNetdev() {
+		return nil, fmt.Errorf("qemu is too old for passt-based isolation (need QEMU 7.2+ for -netdev stream)")
+	}
 	if cfg.BlockedSubnets == nil {
 		cfg.BlockedSubnets = DefaultBlockedSubnets()
 	}

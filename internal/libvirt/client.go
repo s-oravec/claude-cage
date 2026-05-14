@@ -2,6 +2,7 @@ package libvirt
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -33,13 +34,20 @@ func (c *Client) virsh(args ...string) (string, error) {
 
 // DefineDomain defines a domain from XML
 func (c *Client) DefineDomain(xml string) error {
-	// Write XML to temp file
-	tmpFile := "/tmp/cage-domain.xml"
-	if err := exec.Command("bash", "-c", fmt.Sprintf("cat > %s << 'EOFXML'\n%s\nEOFXML", tmpFile, xml)).Run(); err != nil {
+	f, err := os.CreateTemp("", "cage-domain-*.xml")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file for domain XML: %w", err)
+	}
+	defer os.Remove(f.Name())
+	if _, err := f.WriteString(xml); err != nil {
+		f.Close()
 		return fmt.Errorf("failed to write domain XML: %w", err)
 	}
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("failed to close domain XML: %w", err)
+	}
 
-	out, err := c.virsh("define", tmpFile)
+	out, err := c.virsh("define", f.Name())
 	if err != nil {
 		return fmt.Errorf("failed to define domain: %s", out)
 	}
