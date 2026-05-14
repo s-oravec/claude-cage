@@ -362,6 +362,15 @@ cage ssh -A myproject
 # (inside cage): git clone gitea.internal.example.com:org/repo.git
 ```
 
+**SSH agent forwarding under `sudo`:** `sudo` resets the environment by
+default, so `SSH_AUTH_SOCK` gets stripped before cage runs. To make
+`sudo cage … -A` "just work" without per-host sudoers tweaks, cage
+auto-discovers the invoking user's ssh-agent socket via `$SUDO_USER`
+and the standard runtime-dir layout (`/run/user/<uid>/keyring/ssh`,
+`ssh-agent.socket`, `openssh_agent`). See
+[docs/agent-forwarding.md](docs/agent-forwarding.md) for the security
+model.
+
 ---
 
 ### cage exec
@@ -674,6 +683,10 @@ cage build -t my-image --interactive .
 cage build -t my-image -A .
 # (Cagefile: RUN git clone gitea.internal.example.com:org/repo.git)
 ```
+
+Under `sudo cage build -A`, cage auto-discovers the invoking user's
+ssh-agent socket from `$SUDO_USER` (no sudoers tweak needed). See
+[docs/agent-forwarding.md](docs/agent-forwarding.md).
 
 ---
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/s-oravec/claude-cage/internal/cage"
 	"github.com/s-oravec/claude-cage/internal/logging"
+	"github.com/s-oravec/claude-cage/internal/sshagent"
 )
 
 var (
@@ -101,7 +102,34 @@ func SSHExecWithOpts(cageName, host string, port int, command string, opts SSHOp
 		cmd.Stdin = os.Stdin
 	}
 
+	applyAgentEnv(cmd, opts)
 	return cmd.Run()
+}
+
+// applyAgentEnv sets SSH_AUTH_SOCK on the child SSH process when the user
+// asked for agent forwarding but the current process doesn't already have
+// SSH_AUTH_SOCK in its env. This is the sudo case: sudoers strips
+// SSH_AUTH_SOCK by default, so we re-discover the invoking user's
+// ssh-agent socket via SUDO_USER and the standard runtime-dir paths.
+func applyAgentEnv(cmd *exec.Cmd, opts SSHOptions) {
+	if !opts.ForwardAgent {
+		return
+	}
+	if os.Getenv("SSH_AUTH_SOCK") != "" {
+		// Already in env — child inherits it, nothing to do.
+		return
+	}
+	sock := sshagent.Discover()
+	if sock == "" {
+		// Couldn't find one. Let SSH fail with its own "could not open
+		// a connection to your authentication agent" so the user sees a
+		// recognisable error rather than a silent missed-forward.
+		return
+	}
+	if cmd.Env == nil {
+		cmd.Env = os.Environ()
+	}
+	cmd.Env = append(cmd.Env, "SSH_AUTH_SOCK="+sock)
 }
 
 // WaitForSSH waits for SSH to become available
@@ -179,6 +207,7 @@ func ExecCaptureWithOpts(cageName, host string, port int, command string, opts S
 	)
 
 	cmd := exec.Command("ssh", args...)
+	applyAgentEnv(cmd, opts)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return string(out), err
