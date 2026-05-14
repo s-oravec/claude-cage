@@ -104,7 +104,7 @@ func parseLine(line string, lineNum int) (Instruction, error) {
 	}
 
 	switch instType {
-	case "FROM", "RUN", "ENV", "ARG", "WORKDIR":
+	case "FROM", "RUN", "ENV", "ARG", "WORKDIR", "USER":
 		if value == "" {
 			return Instruction{}, fmt.Errorf("line %d: %s requires an argument", lineNum, instType)
 		}

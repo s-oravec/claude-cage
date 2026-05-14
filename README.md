@@ -615,6 +615,7 @@ cage build -t <name> <context>
 | `ARG <name>=<value>` | Build-time argument |
 | `ENV <key>=<value>` | Environment variable |
 | `WORKDIR <path>` | Set working directory |
+| `USER <username>` | Identity for subsequent `RUN`/`COPY` (default: `root`) |
 | `COPY <src> <dest>` | Copy files from build context |
 | `RUN <command>` | Execute shell command (supports `\` line continuation) |
 

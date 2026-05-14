@@ -122,6 +122,33 @@ The directory is created if it doesn't exist.
 
 ---
 
+### USER
+
+```dockerfile
+USER <username>
+```
+
+Sets the user identity for subsequent `RUN` and `COPY` instructions.
+Defaults to `root` (matches Docker).
+
+```dockerfile
+FROM ubuntu-24.04
+RUN apt-get update && apt-get install -y curl   # as root by default
+USER cage
+RUN whoami      # outputs 'cage'
+USER root
+RUN tar -C /usr/local -xzf go.tar.gz            # back to root for privileged work
+USER cage       # leave runtime as the unprivileged user
+```
+
+Implementation: cage SSHs in as the `cage` user (the only one with the
+cage-managed key) and wraps each instruction with `sudo` / `sudo -u <user>`
+as needed. cloud-init grants `cage` passwordless `sudo` on every image,
+so any username that exists in `/etc/passwd` works. For `COPY`, files
+are staged in `/tmp` and then moved into place with `chown -R <user>`.
+
+---
+
 ### RUN
 
 ```dockerfile
@@ -393,7 +420,7 @@ RUN rustc --version && cargo --version
 |---------|----------|------------|
 | Multi-stage builds | ❌ Not supported | ✅ Supported |
 | LABEL | ❌ Not supported | ✅ Supported |
-| USER | ❌ Not supported | ✅ Supported |
+| USER | ✅ Supported (default: `root`) | ✅ Supported |
 | EXPOSE | ❌ Not supported | ✅ Supported |
 | ENTRYPOINT | ❌ Not supported | ✅ Supported |
 | CMD | ❌ Not supported | ✅ Supported |

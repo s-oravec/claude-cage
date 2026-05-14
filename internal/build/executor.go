@@ -40,6 +40,7 @@ type Executor struct {
 	sshPort  int               // SSH port for temp cage
 	workdir  string            // Current WORKDIR in cage
 	env      map[string]string // Current ENV vars
+	user     string            // Current USER ("root" by default, or any user with sudo NOPASSWD via cage)
 }
 
 // NewExecutor creates a new build executor
@@ -48,6 +49,7 @@ func NewExecutor(config *BuildConfig) *Executor {
 		config:  config,
 		workdir: "/",
 		env:     make(map[string]string),
+		user:    "root", // Cagefile default: instructions run as root (matches Docker)
 	}
 }
 
@@ -318,6 +320,8 @@ func (e *Executor) executeInstructions() error {
 			err = e.executeEnv(inst)
 		case "WORKDIR":
 			err = e.executeWorkdir(inst)
+		case "USER":
+			err = e.executeUser(inst)
 		case "RUN":
 			err = e.executeRun(inst)
 		case "COPY":
@@ -364,8 +368,18 @@ func (e *Executor) executeWorkdir(inst Instruction) error {
 	return nil
 }
 
+func (e *Executor) executeUser(inst Instruction) error {
+	user := strings.TrimSpace(inst.Value)
+	if user == "" {
+		return fmt.Errorf("USER requires a username")
+	}
+	e.user = user
+	e.log(" ---> USER %s", user)
+	return nil
+}
+
 func (e *Executor) executeRun(inst Instruction) error {
-	e.log(" ---> Running in %s", e.tempCage)
+	e.log(" ---> Running in %s (as %s)", e.tempCage, e.user)
 
 	// Build command with ENV and WORKDIR
 	var envExports string
@@ -373,7 +387,8 @@ func (e *Executor) executeRun(inst Instruction) error {
 		envExports += fmt.Sprintf("export %s=%q; ", k, v)
 	}
 
-	cmd := fmt.Sprintf("cd %q && %s%s", e.workdir, envExports, inst.Value)
+	inner := fmt.Sprintf("cd %q && %s%s", e.workdir, envExports, inst.Value)
+	cmd := e.wrapAsUser(inner)
 
 	// Execute and stream output
 	output, err := ssh.ExecCaptureWithPort(e.tempCage, "127.0.0.1", e.sshPort, cmd)
@@ -389,6 +404,27 @@ func (e *Executor) executeRun(inst Instruction) error {
 	}
 
 	return nil
+}
+
+// wrapAsUser wraps a shell command so it runs as e.user inside the temp
+// cage. The SSH connection itself is always the cage user (the only one
+// with our key); USER changes are implemented via sudo NOPASSWD, which
+// cloud-init grants cage on every image.
+func (e *Executor) wrapAsUser(inner string) string {
+	switch e.user {
+	case "cage", "":
+		return inner
+	case "root":
+		return "sudo bash -c " + shellQuote(inner)
+	default:
+		return "sudo -u " + e.user + " bash -c " + shellQuote(inner)
+	}
+}
+
+// shellQuote returns s wrapped in single-quotes, with any embedded
+// single-quote escaped.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 func (e *Executor) executeCopy(inst Instruction) error {
@@ -420,16 +456,41 @@ func (e *Executor) executeCopy(inst Instruction) error {
 		dest = filepath.Join(e.workdir, dest)
 	}
 
-	e.log(" ---> Copying %s to %s", src, dest)
+	e.log(" ---> Copying %s to %s (owner: %s)", src, dest, e.user)
 
-	// Use SCP to copy files
+	// Use SCP via a staging dir so we can land into root-owned destinations
+	// and chown the result to the active USER (matches Docker COPY semantics).
 	if srcInfo.IsDir() {
 		return e.scpDir(srcPath, dest)
 	}
 	return e.scpFile(srcPath, dest)
 }
 
+// stagedDest returns a temp staging path inside the cage for the given dest.
+func (e *Executor) stagedDest(dest string) string {
+	return fmt.Sprintf("/tmp/cage-copy-%d-%s", time.Now().UnixNano(), filepath.Base(dest))
+}
+
+// moveStagedIntoPlace moves /tmp/staging → dest as root and chowns to the
+// active USER. Always runs via sudo (cage user has NOPASSWD).
+func (e *Executor) moveStagedIntoPlace(staged, dest string) error {
+	parent := filepath.Dir(dest)
+	owner := e.user
+	if owner == "" {
+		owner = "root"
+	}
+	// mkdir -p parent, mv staging → dest, chown owner.
+	cmd := fmt.Sprintf(
+		"sudo mkdir -p %s && sudo rm -rf %s && sudo mv %s %s && sudo chown -R %s:%s %s",
+		shellQuote(parent), shellQuote(dest), shellQuote(staged), shellQuote(dest),
+		owner, owner, shellQuote(dest),
+	)
+	_, err := ssh.ExecCaptureWithPort(e.tempCage, "127.0.0.1", e.sshPort, cmd)
+	return err
+}
+
 func (e *Executor) scpFile(src, dest string) error {
+	staged := e.stagedDest(dest)
 	keyPath := ssh.KeyPath(e.tempCage)
 	knownHostsPath := ssh.KnownHostsPath()
 
@@ -440,7 +501,7 @@ func (e *Executor) scpFile(src, dest string) error {
 		"-o", fmt.Sprintf("LogLevel=%s", logging.SSHLogLevel()),
 		"-P", fmt.Sprintf("%d", e.sshPort),
 		src,
-		fmt.Sprintf("cage@127.0.0.1:%s", dest),
+		fmt.Sprintf("cage@127.0.0.1:%s", staged),
 	}
 
 	cmd := exec.Command("scp", args...)
@@ -448,18 +509,19 @@ func (e *Executor) scpFile(src, dest string) error {
 		return fmt.Errorf("scp failed: %s", string(out))
 	}
 
-	return nil
+	return e.moveStagedIntoPlace(staged, dest)
 }
 
 func (e *Executor) scpDir(src, dest string) error {
+	staged := e.stagedDest(dest)
 	keyPath := ssh.KeyPath(e.tempCage)
 	knownHostsPath := ssh.KnownHostsPath()
 
-	// Create destination directory first
-	mkdirCmd := fmt.Sprintf("mkdir -p %q", dest)
-	_, err := ssh.ExecCaptureWithPort(e.tempCage, "127.0.0.1", e.sshPort, mkdirCmd)
-	if err != nil {
-		return fmt.Errorf("failed to create destination directory: %w", err)
+	// Create the staging directory (cage user owns /tmp). We copy contents
+	// into it, then sudo mv it into dest.
+	mkdirCmd := fmt.Sprintf("mkdir -p %s", shellQuote(staged))
+	if _, err := ssh.ExecCaptureWithPort(e.tempCage, "127.0.0.1", e.sshPort, mkdirCmd); err != nil {
+		return fmt.Errorf("failed to create staging directory: %w", err)
 	}
 
 	args := []string{
@@ -470,7 +532,7 @@ func (e *Executor) scpDir(src, dest string) error {
 		"-P", fmt.Sprintf("%d", e.sshPort),
 		"-r",       // recursive
 		src + "/.", // copy contents, not directory itself
-		fmt.Sprintf("cage@127.0.0.1:%s", dest),
+		fmt.Sprintf("cage@127.0.0.1:%s", staged),
 	}
 
 	cmd := exec.Command("scp", args...)
@@ -478,7 +540,7 @@ func (e *Executor) scpDir(src, dest string) error {
 		return fmt.Errorf("scp failed: %s", string(out))
 	}
 
-	return nil
+	return e.moveStagedIntoPlace(staged, dest)
 }
 
 func truncate(s string, maxLen int) string {
