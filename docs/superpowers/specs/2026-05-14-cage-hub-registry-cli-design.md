@@ -38,8 +38,10 @@ server implements.
 - Image signing (cosign, notary).
 - Pull/push by explicit digest (`@sha256:...`). MVP is tag-based only;
   digests are an internal concern.
-- Resumable / chunked layer uploads (full-blob PUT only; retry sends
-  whole layer again).
+- Resumable layer uploads on the CLI side (full-blob PUT only;
+  retry sends whole layer again). The server already implements the
+  multipart endpoints needed for resume; the CLI just doesn't drive
+  them in MVP.
 - Automatic refresh of expired access tokens. Server-issued tokens are
   expected to be long-lived; expiry means the user reruns `cage login`.
 - Migration of existing flat custom images into the new layered store.
@@ -52,10 +54,12 @@ server implements.
 References are always fully qualified, including the registry host:
 
 ```
-<host>/<namespace>/<repo>:<tag>
+<host>/<owner>/<name>:<tag>
 ```
 
-Examples:
+`<owner>` is the cage-hub username of the repository owner (single
+segment, no nested namespaces in MVP). `<name>` is the repository name
+under that owner. Examples:
 
 - `cage-hub.io/stiivo/devbox:v1`
 - `cage-hub.local/team/runner:latest`
@@ -84,6 +88,14 @@ cage login   --list                  # list logged-in hosts (host, username, obt
 The CLI does not distinguish PAT vs Keycloak access token at storage
 time - both are opaque bearer strings.
 
+`cage logout` is a **local** operation only - it removes the token
+from `auth.yaml` and does not contact the server. Server-side
+revocation (so a stolen PAT can no longer authenticate) lives at the
+cage-hub web UI under `/settings/tokens` (or
+`DELETE /api/v1/me/pats/:id`, which requires a Keycloak JWT and is
+therefore not callable from a CLI that only has a PAT). The CLI does
+not surface a `cage pat revoke` command in MVP.
+
 ### Image transfer
 
 ```
@@ -95,7 +107,7 @@ cage tag  <src> <dst>                # local-only; no network
 
 Detection rule for `cage pull <X>`:
 
-- `X` contains `/` -> registry reference, parse as `host/namespace/repo:tag`
+- `X` contains `/` -> registry reference, parse as `host/owner/name:tag`
 - `X` is a bare word -> existing distro base alias path (`alpine`,
   `ubuntu-24.04`, ...). Same behavior as today.
 - `--base` always selects the distro path explicitly.
@@ -103,7 +115,7 @@ Detection rule for `cage pull <X>`:
 `cage tag <src> <dst>` resolves `<src>` to a local manifest digest and
 writes a new ref file pointing at the same digest. `<src>` can be a
 local name (`refs/_local/<name>/<tag>`) or a registry ref already
-present locally (`refs/<host>/<namespace>/<repo>/<tag>`). `<dst>` is the
+present locally (`refs/<host>/<owner>/<name>/<tag>`). `<dst>` is the
 new ref. Both forms allowed for `<dst>`. No data is moved or rewritten.
 If `<dst>` already exists, the existing ref is overwritten without
 prompting (matches `docker tag` behavior).
@@ -177,7 +189,7 @@ and never touches auth files.
 
   refs/                              # NEW: tag -> manifest digest
     _local/<name>/<tag>              #   for `cage build -t <name>` (no host)
-    <host>/<namespace>/<repo>/<tag>  #   for `cage-hub.io/stiivo/devbox:v1`
+    <host>/<owner>/<name>/<tag>      #   for `cage-hub.io/stiivo/devbox:v1`
                                      #   each ref file contains a single line:
                                      #   sha256:<manifest-digest>\n
 ```
@@ -215,9 +227,15 @@ chain. Backing is set up at use time during `cage start`.
     }
   ],
   "config": {
-    "user": "cage",
-    "workdir": "/home/cage",
-    "env": ["NODE_ENV=development"]
+    "os":          "linux",
+    "arch":        "amd64",
+    "user":        "cage",
+    "workdir":     "/home/cage",
+    "env":         ["NODE_ENV=development"],
+    "description": "...",
+    "readme":      "...",
+    "cagefile":    "FROM ubuntu-24.04\nRUN ...",
+    "resources":   { "memory_mb": 4096, "vcpu": 2, "disk_gb": 20 }
   }
 }
 ```
@@ -230,8 +248,17 @@ chain. Backing is set up at use time during `cage start`.
 - `layers`: an ordered list (lowest first). In MVP, every built image
   has exactly one custom layer. The list is plural because a future
   `cage build` may snapshot per RUN/COPY step.
-- `config`: runtime hints from the Cagefile that `cage start` applies to
-  the new cage (user, workdir, env injection). Fields may be empty.
+- `config`: metadata and runtime hints. `os`/`arch` describe the cage's
+  guest OS. `user`/`workdir`/`env` are applied at `cage start` time
+  (via the existing cloud-init / virtiofs env paths). `description`
+  and `readme` are the initial values shown on the web UI Image Detail
+  page (the repo row owns the live copy - subsequent web edits via
+  `PATCH /api/v1/repos/:owner/:name` overwrite the live values without
+  rewriting the manifest). `cagefile` is the raw Cagefile text capped
+  at 64 KB; omitted for images produced by `cage image save` from a
+  running cage (Recipe tab then shows the empty state). `resources`
+  carries the recommended `cage init` defaults for downstream pulls.
+  All sub-fields are optional except `os` and `arch`.
 
 ## Garbage collection
 
@@ -275,22 +302,27 @@ from the build path. There is no fallback to the old layout.
 
 `cage pull <ref>`:
 
-1. Parse `<ref>` as `(host, namespace, repo, tag)`; default `tag` to
+1. Parse `<ref>` as `(host, owner, name, tag)`; default `tag` to
    `latest`.
 2. Resolve TLS mode: HTTPS unless `host` is in `registries.insecure`,
    in which case HTTP and no cert validation.
 3. Anonymous request. If the server returns 401 (forward-compatible
-   with private images), print: `this image requires auth - run cage
-   login <host>`.
-4. GET `https://<host>/api/v1/<namespace>/<repo>/manifests/<tag>`.
-   Verify the response body's sha256 against the `Docker-Content-Digest`
-   response header (or equivalent), then store at
-   `manifests/sha256/<aa>/<digest>/manifest.json`.
+   with private images, which are not MVP), print: `this image
+   requires auth - run cage login <host>`.
+4. GET `https://<host>/api/v1/repos/<owner>/<name>/manifests/<tag>`.
+   The response body is the canonical manifest JSON. Verify
+   `sha256(body) == Docker-Content-Digest` response header. Store at
+   `manifests/sha256/<aa>/<manifest-digest>/manifest.json`.
 5. For each layer in the manifest:
-   - If `layers/sha256/<aa>/<digest>/layer.qcow2` exists, skip.
-   - Else GET `/api/v1/<namespace>/<repo>/blobs/sha256:<digest>`,
-     stream to a tmp file while computing sha256, verify, atomic rename
-     into the final layer path.
+   - If `layers/sha256/<aa>/<digest>/layer.qcow2` exists locally, skip.
+   - Else GET
+     `https://<host>/api/v1/repos/<owner>/<name>/blobs/sha256:<digest>`.
+     The server streams the blob directly from object storage. Stream to
+     a tmp file while computing sha256, verify against the requested
+     digest, atomic rename into the final layer path.
+   - On network interruption, the next attempt resumes via
+     `Range: bytes=<offset>-` against the same endpoint - cage-hub
+     forwards `Range:` to the storage backend.
 6. Base image check:
    - If `images/<manifest.base.name>.qcow2` is missing, invoke the
      existing distro pull flow (the same code path `cage pull --base`
@@ -299,38 +331,65 @@ from the build path. There is no fallback to the old layout.
      fail with: `local base image <name> differs from the one used to
      build this image (have <local-digest>, need <manifest-digest>); run
      cage image rm <name> and cage pull --base <name>`.
-7. Write `refs/<host>/<namespace>/<repo>/<tag>` containing
+7. Write `refs/<host>/<owner>/<name>/<tag>` containing
    `sha256:<manifest-digest>`.
 
-Network failures mid-download: delete the tmp file, surface the error,
-exit non-zero. No automatic retry; a second `cage pull` resumes from
-cache (already-fetched layers are kept).
+Blobs come straight from `/blobs/sha256:<digest>` rather than via
+presigned URLs - simpler and anonymous-friendly. Pull resume is a plain
+HTTP Range request against the same endpoint.
 
 ## Push flow
 
-`cage push <ref>`:
+`cage push <ref> [--latest]` uses the Docker V2 style protocol that
+cage-hub implements: per-layer HEAD, per-layer single-PUT blob upload,
+then a manifest PUT that pins the tag to the freshly-uploaded layers.
 
-1. Resolve `refs/<host>/<namespace>/<repo>/<tag>` to a manifest digest.
+1. Resolve `refs/<host>/<owner>/<name>/<tag>` to a manifest digest.
    Missing -> `no local image tagged <ref>`.
 2. Read `auth.yaml`, look up `token` for `host`. Missing -> `not logged
    in to <host> - run cage login <host>`.
 3. For each layer in the manifest:
-   - HEAD `/api/v1/<namespace>/<repo>/blobs/sha256:<digest>` with
-     `Authorization: Bearer <token>`.
-   - 200 -> server already has it, skip.
-   - 404 -> upload:
-     - POST `/api/v1/<namespace>/<repo>/blobs/uploads` -> response carries
-       an upload URL.
-     - PUT the upload URL with the layer file as the body and
-       `?digest=sha256:<digest>`. Expect 201.
-4. PUT `/api/v1/<namespace>/<repo>/manifests/<tag>` with the manifest
-   blob.
+   a. `HEAD https://<host>/api/v1/repos/<owner>/<name>/blobs/sha256:<digest>`
+      with `Authorization: Bearer <token>`.
+      - 200 -> server already has the layer (dedup hit), skip to next.
+      - 404 -> upload (steps b-c).
+   b. `POST https://<host>/api/v1/repos/<owner>/<name>/blobs/uploads`
+      with `Authorization: Bearer <token>` and body
+      `{"digest":"sha256:<digest>", "size":<bytes>}`.
+      Response 202: `{"upload_id":"...", "upload_url":"...",
+      "expires_at":"..."}`. The repo is auto-created if missing and the
+      caller is the namespace owner.
+   c. `PUT <upload_url>?digest=sha256:<digest>` with
+      `Authorization: Bearer <token>`,
+      `Content-Type: application/octet-stream`, and the layer file
+      streamed as the body.
+      - 201 + `Docker-Content-Digest: sha256:<digest>` -> done.
+      - 400 `CONFLICT_DIGEST_MISMATCH` -> server's computed sha256
+        differs from the requested digest; surface as a hard error.
+4. `PUT https://<host>/api/v1/repos/<owner>/<name>/manifests/<tag>`
+   with:
+   - `Authorization: Bearer <token>`
+   - `Content-Type: application/vnd.cage.manifest.v1+json`
+   - `X-As-Latest: true` when the user passed `--latest` (server then
+     additionally upserts the `latest` tag pointer to the same manifest)
+   - Body: the canonical manifest JSON (byte-for-byte identical to the
+     local `manifests/sha256/<aa>/<manifest-digest>/manifest.json`).
+   - 201 with `Docker-Content-Digest` -> new tag.
+   - 200 with `latest_updated: false` -> idempotent no-op (same `(repo,
+     tag, manifest_digest)` already exists; not an error).
+   - 409 `BLOB_MISSING` -> the server lost or never received a layer;
+     re-run push to re-upload.
 
-No resumable / chunked uploads in MVP. Upload failure means re-PUT the
-whole blob next time.
+No resumable / chunked uploads in MVP - server-side multipart upload
+exists as a parallel endpoint (`POST /blobs/uploads?multipart=true`)
+but the CLI MVP does not use it. A push that fails mid-blob re-uploads
+the whole layer on retry. Adding multipart selection (based on layer
+size and `auth/info.multipart_part_size`) is the first follow-up after
+MVP.
 
-403 from the server is treated as `not authorized to push to <ref> -
-check namespace ownership or run cage login <host>`.
+403 from any push endpoint is surfaced as `not authorized to push to
+<ref> - check namespace ownership or collaborator role, or run cage
+login <host>`.
 
 ## Auth endpoint discovery
 
@@ -341,9 +400,18 @@ Keycloak realm endpoints. It fetches them from cage-hub:
 GET https://<host>/api/v1/auth/info
 ->
 {
-  "device_authorization_endpoint": "https://.../auth/realms/cage-hub/protocol/openid-connect/auth/device",
-  "token_endpoint":                "https://.../auth/realms/cage-hub/protocol/openid-connect/token",
-  "client_id":                     "cage-cli"
+  "issuer":                          "https://<host>/auth/realms/cage-hub",
+  "device_authorization_endpoint":   "https://.../auth/realms/cage-hub/protocol/openid-connect/auth/device",
+  "token_endpoint":                  "https://.../auth/realms/cage-hub/protocol/openid-connect/token",
+  "client_id":                       "cage-cli",
+  "scopes":                          ["openid", "profile"],
+  "pat_format":                      "cgh_<base64url>",
+  "pat_console_url":                 "https://<host>/settings/tokens",
+  "supported_layer_media_types":     ["application/vnd.cage.layer.v1.qcow2"],
+  "supported_manifest_media_types":  ["application/vnd.cage.manifest.v1+json"],
+  "max_manifest_size":               65536,
+  "max_layer_size":                  21474836480,
+  "multipart_part_size":             67108864
 }
 ```
 
@@ -351,8 +419,14 @@ cage then talks directly to the Keycloak device authorization endpoint
 (no proxying through cage-hub). After successful auth, cage uses the
 access token as a Bearer credential on all `/api/v1/*` calls.
 
-cage-hub recognizes both Keycloak-issued JWTs (verifies via JWKS) and
-its own PAT strings (DB lookup). The CLI does not need to distinguish.
+cage-hub recognizes both Keycloak-issued JWTs (verified via JWKS) and
+its own PAT strings (DB lookup by SHA256 hash). The CLI does not need
+to distinguish.
+
+`pat_console_url` is used only in error hints ("generate a PAT at
+<url>") when the CLI rejects an unauthenticated push. `max_layer_size`,
+`max_manifest_size`, and `multipart_part_size` are read at build time
+to validate that a layer is acceptable before attempting an upload.
 
 ## Start flow integration
 
@@ -404,7 +478,9 @@ its own PAT strings (DB lookup). The CLI does not need to distinguish.
 ## Out-of-scope items deferred to follow-ups
 
 - `cage image prune` for GC of unreferenced layers and manifests.
-- Resumable layer uploads (PATCH-chunked protocol).
+- Resumable layer uploads driven by the CLI (using cage-hub's
+  multipart endpoints under `POST /blobs/uploads?multipart=true` +
+  per-part presigned URLs + `POST .../complete`).
 - Automatic token refresh on 401.
 - Multi-layer builds (`cage build` snapshotting per RUN/COPY).
 - Pull/push by digest.
