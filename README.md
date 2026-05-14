@@ -48,6 +48,9 @@ includes `shares:`, `env:`, or `network: bridge`, running plain `cage
 start` errors out with a hint to use `sudo cage start`.
 
 See [docs/modes.md](docs/modes.md) for the full design rationale.
+For cage's first-boot bootstrap (user creation, SSH key injection,
+locales, virtiofs mounts, env injection) see
+[docs/cloud-init.md](docs/cloud-init.md).
 
 ## Installation
 
