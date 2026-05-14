@@ -6,6 +6,7 @@ import (
 
 	"github.com/s-oravec/claude-cage/internal/cage"
 	"github.com/s-oravec/claude-cage/internal/libvirt"
+	"github.com/s-oravec/claude-cage/internal/mode"
 	"github.com/s-oravec/claude-cage/internal/network"
 	"github.com/s-oravec/claude-cage/internal/virtiofs"
 	"github.com/spf13/cobra"
@@ -52,6 +53,10 @@ func stopCage(cmd *cobra.Command, name string, force bool) error {
 	// Check cage exists
 	if !cage.Exists(name) {
 		return fmt.Errorf("cage '%s' not found", name)
+	}
+
+	if err := cage.RequireMode(name, mode.Current().String()); err != nil {
+		return err
 	}
 
 	// Load state

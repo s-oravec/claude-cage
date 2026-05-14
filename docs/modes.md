@@ -24,7 +24,8 @@ available.
 - Host-level network isolation via network namespace + passt
 
 **libvirt backend:** `qemu:///session`. QEMU runs as your regular user; no
-privileged operations are involved. State lives under `~/.claude-cage/`.
+privileged operations are involved. Everything lives under
+`~/.claude-cage/` (state, SSH keys, base images, disk overlays).
 
 ## Root mode
 
@@ -41,10 +42,26 @@ injection, or bridge networking
   blocking traffic to configured private subnets
 
 **libvirt backend:** `qemu:///system`. QEMU runs under the libvirt-qemu
-user with apparmor confinement. State lives under
-`/var/lib/libvirt/images/cage/`, which is on the default virt-aa-helper
-allow-list, so disk overlays and cloud-init ISOs are readable without
-apparmor surgery.
+user with apparmor confinement.
+
+State is split across two locations:
+
+- **Metadata** (state.json, SSH keys, known_hosts) lives in the
+  invoking user's `~/.claude-cage/` — cage reads `$SUDO_USER` so files
+  end up in your real home, not `/root/`. After creation cage chowns
+  them back to your user so you can read SSH private keys (mode 600)
+  and manage the cage from your normal shell.
+- **VM artifacts** (disk overlays, cloud-init ISOs, base images,
+  virtiofs mount sources) live under `/var/lib/libvirt/images/cage/`,
+  which is on the default virt-aa-helper apparmor allow-list. libvirt-
+  qemu reads them without apparmor surgery; the user's home dir does
+  not need to be apparmor-readable.
+
+The split means `cage ssh <name>` works from your normal shell against a
+cage created with `sudo cage start` — your user owns the metadata and
+the SSH key. Lifecycle operations (`stop`, `remove`) still need to match
+the mode the cage was created in (cage checks `state.Mode` and refuses
+cross-mode ops with a clear hint).
 
 ## Choosing a mode
 
@@ -116,16 +133,25 @@ into the trade-offs explicitly via `sudo`. The capability matrix in the
 README maps directly to libvirt's own architectural split between session
 and system connections.
 
-## Existing user-mode cages and switching
+## Existing cages and switching modes
 
-A cage created in user mode is defined in `qemu:///session` with state at
-`~/.claude-cage/cages/<name>/`. A cage created in root mode is in
-`qemu:///system` with state at `/var/lib/libvirt/images/cage/cages/<name>/`.
-They are separate populations: `cage list` as a user shows user-mode
-cages, `sudo cage list` shows root-mode cages. To move a workload across
-modes, run `cage remove <name>` in the originating mode and recreate it
-in the new mode (state is small — disk overlays are recreated from the
-base image).
+A cage tracks its origin mode in `state.json` (`mode: "user"` or `"root"`).
+Lifecycle operations check the saved mode against the current process:
+running `cage stop` against a root-mode cage prints `cage 'X' was created
+in root mode; run 'sudo cage stop' instead` and exits.
+
+`cage ssh` is the exception — it works cross-mode. The SSH key and the
+host port are in the user-home metadata, which is readable regardless of
+how the cage was created.
+
+To move a workload across modes, run `cage remove <name>` in the
+originating mode and recreate it in the new mode. State is small — disk
+overlays are recreated from the base image.
+
+`cage remove --force` is robust against orphan state: it works even when
+`state.json` is missing (cleans up libvirt domain + leftover dirs) and
+tries both `qemu:///session` and `qemu:///system` to catch domains that
+ended up in the "wrong" libvirt connection.
 
 ## Troubleshooting root mode
 

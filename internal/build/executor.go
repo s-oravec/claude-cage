@@ -141,8 +141,8 @@ func (e *Executor) createTempCage() error {
 
 	e.log(" ---> Using base image: %s", imageName)
 
-	// Create cage directory
-	cageDir := cage.Dir(e.tempCage)
+	// Create cage directories (metadata + VM artifacts; same in user mode)
+	cageVMDir := cage.VMDir(e.tempCage)
 	if err := cage.EnsureDir(e.tempCage); err != nil {
 		return fmt.Errorf("failed to create cage directory: %w", err)
 	}
@@ -155,9 +155,9 @@ func (e *Executor) createTempCage() error {
 	}
 	e.sshPort = sshPort
 
-	// Create qcow2 overlay (10G default for build)
+	// Create qcow2 overlay (10G default for build) in VM artifacts dir
 	baseImage := images.ImagePath(imageName)
-	overlayPath := filepath.Join(cageDir, "disk.qcow2")
+	overlayPath := filepath.Join(cageVMDir, "disk.qcow2")
 
 	createCmd := exec.Command("qemu-img", "create", "-f", "qcow2",
 		"-b", baseImage, "-F", "qcow2", overlayPath, "10G")
@@ -178,14 +178,14 @@ func (e *Executor) createTempCage() error {
 		return fmt.Errorf("failed to read public key: %w", err)
 	}
 
-	// Create runtime directory
-	if err := runtime.EnsureRuntimeDir(cageDir); err != nil {
+	// Create runtime directory in VM artifacts dir
+	if err := runtime.EnsureRuntimeDir(cageVMDir); err != nil {
 		cage.DeleteState(e.tempCage)
 		return fmt.Errorf("failed to create runtime directory: %w", err)
 	}
 
-	// Create cloud-init ISO
-	cloudInitPath, err := cloudinit.GenerateISOWithConfig(cageDir, &cloudinit.CloudInitConfig{
+	// Create cloud-init ISO in VM artifacts dir
+	cloudInitPath, err := cloudinit.GenerateISOWithConfig(cageVMDir, &cloudinit.CloudInitConfig{
 		CageName:      e.tempCage,
 		PubKey:        pubKey,
 		MountVirtiofs: false,
@@ -209,7 +209,7 @@ func (e *Executor) createTempCage() error {
 	}
 
 	// Generate domain XML
-	runtimeDir := runtime.RuntimeDir(cageDir)
+	runtimeDir := runtime.RuntimeDir(cageVMDir)
 	domainCfg := &libvirt.DomainConfig{
 		Name:         e.tempCage,
 		MemoryMB:     memoryMB,

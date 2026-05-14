@@ -80,6 +80,18 @@ func runStartCmd(cmd *cobra.Command, args []string, ports []string) error {
 		return fmt.Errorf("this cage config requires root mode (shares/env/bridge): run 'sudo cage start' instead, or remove those fields from %s", config.ProjectConfigFile)
 	}
 
+	// If a previously-saved cage is in a different mode than the current
+	// process, fail with a clear hint. (Cross-mode ssh is allowed in a
+	// separate place; lifecycle ops require matching mode.)
+	if cage.Exists(name) {
+		if state, err := cage.LoadState(name); err == nil && state.Mode != "" && state.Mode != mode.Current().String() {
+			if state.Mode == "root" {
+				return fmt.Errorf("cage '%s' was created in root mode; run 'sudo cage start' instead", name)
+			}
+			return fmt.Errorf("cage '%s' was created in user mode; run 'cage start' without sudo", name)
+		}
+	}
+
 	// Check if cage exists
 	if !cage.Exists(name) {
 		// Cage doesn't exist - need project config to create
@@ -116,8 +128,8 @@ func runStartCmd(cmd *cobra.Command, args []string, ports []string) error {
 
 	// Write runtime env file if project config has env vars
 	if resolved != nil && len(resolved.Env) > 0 {
-		cageDir := cage.Dir(name)
-		envPath := runtime.EnvFilePath(cageDir)
+		cageVMDir := cage.VMDir(name)
+		envPath := runtime.EnvFilePath(cageVMDir)
 		if err := runtime.WriteEnvFile(envPath, resolved.Env); err != nil {
 			return fmt.Errorf("failed to write runtime env: %w", err)
 		}
@@ -139,8 +151,8 @@ func createCageFromConfig(cmd *cobra.Command, name string, resolved *config.Reso
 
 	fmt.Fprintf(cmd.OutOrStdout(), "Creating cage '%s'...\n", name)
 
-	// Create cage directory
-	cageDir := cage.Dir(name)
+	// Create cage directories (metadata + VM artifacts; same path in user mode)
+	cageVMDir := cage.VMDir(name)
 	if err := cage.EnsureDir(name); err != nil {
 		return fmt.Errorf("failed to create cage directory: %w", err)
 	}
@@ -166,9 +178,9 @@ func createCageFromConfig(cmd *cobra.Command, name string, resolved *config.Reso
 	// Auto mode uses SLIRP user-mode networking
 	fmt.Fprintln(cmd.OutOrStdout(), "  Using SLIRP user-mode networking...")
 
-	// Create qcow2 overlay with specified disk size
+	// Create qcow2 overlay in VM artifacts dir (libvirt-readable)
 	baseImage := images.ImagePath(imageName)
-	overlayPath := filepath.Join(cageDir, "disk.qcow2")
+	overlayPath := filepath.Join(cageVMDir, "disk.qcow2")
 	diskSize := fmt.Sprintf("%dG", resolved.DiskGB)
 
 	fmt.Fprintf(cmd.OutOrStdout(), "  Creating disk overlay (%s)...\n", diskSize)
@@ -179,7 +191,7 @@ func createCageFromConfig(cmd *cobra.Command, name string, resolved *config.Reso
 		return fmt.Errorf("failed to create overlay: %s", string(out))
 	}
 
-	// Generate SSH keys
+	// Generate SSH keys (in user-home metadata dir)
 	fmt.Fprintln(cmd.OutOrStdout(), "  Generating SSH keys...")
 	if err := ssh.GenerateKeyPair(name); err != nil {
 		cage.DeleteState(name)
@@ -192,14 +204,14 @@ func createCageFromConfig(cmd *cobra.Command, name string, resolved *config.Reso
 		return fmt.Errorf("failed to read public key: %w", err)
 	}
 
-	// Create runtime directory and write initial env file
-	if err := runtime.EnsureRuntimeDir(cageDir); err != nil {
+	// Create runtime directory and write initial env file (in VM artifacts dir, virtiofs reads it)
+	if err := runtime.EnsureRuntimeDir(cageVMDir); err != nil {
 		cage.DeleteState(name)
 		return fmt.Errorf("failed to create runtime directory: %w", err)
 	}
 
 	if len(resolved.Env) > 0 {
-		envPath := runtime.EnvFilePath(cageDir)
+		envPath := runtime.EnvFilePath(cageVMDir)
 		if err := runtime.WriteEnvFile(envPath, resolved.Env); err != nil {
 			cage.DeleteState(name)
 			return fmt.Errorf("failed to write runtime env: %w", err)
@@ -223,7 +235,7 @@ func createCageFromConfig(cmd *cobra.Command, name string, resolved *config.Reso
 	// mode work (virtiofs is only supported in system mode).
 	useRuntimeEnv := len(resolved.Env) > 0
 
-	cloudInitPath, err := cloudinit.GenerateISOWithConfig(cageDir, &cloudinit.CloudInitConfig{
+	cloudInitPath, err := cloudinit.GenerateISOWithConfig(cageVMDir, &cloudinit.CloudInitConfig{
 		CageName:         name,
 		PubKey:           pubKey,
 		MountVirtiofs:    false, // Will be set at start time if virtiofsd is available
@@ -240,7 +252,7 @@ func createCageFromConfig(cmd *cobra.Command, name string, resolved *config.Reso
 	// Generate domain XML; RuntimeDir is only set when env injection is needed.
 	var runtimeDir string
 	if useRuntimeEnv {
-		runtimeDir = runtime.RuntimeDir(cageDir)
+		runtimeDir = runtime.RuntimeDir(cageVMDir)
 	}
 	domainCfg := &libvirt.DomainConfig{
 		Name:           name,
@@ -274,12 +286,23 @@ func createCageFromConfig(cmd *cobra.Command, name string, resolved *config.Reso
 		Status:      cage.StatusStopped,
 		Image:       imageName,
 		Profile:     "custom", // Mark as custom since we use resolved config
+		Mode:        mode.Current().String(),
 		NetworkMode: networkMode,
 		SSHPort:     sshPort,
 	}
 
 	if err := cage.SaveState(state); err != nil {
 		return fmt.Errorf("failed to save state: %w", err)
+	}
+
+	// Chown user-home metadata (state.json, SSH keys) back to SUDO_USER so
+	// the invoking user can read its own SSH private key (600) and manage
+	// state from their regular shell. No-op when not running under sudo.
+	if err := config.ChownToSudoUser(cage.Dir(name)); err != nil {
+		fmt.Fprintf(cmd.OutOrStdout(), "  Warning: failed to chown cage dir: %v\n", err)
+	}
+	if err := config.ChownToSudoUser(filepath.Join(ssh.KeysDir(), name)); err != nil {
+		fmt.Fprintf(cmd.OutOrStdout(), "  Warning: failed to chown SSH keys: %v\n", err)
 	}
 
 	fmt.Fprintf(cmd.OutOrStdout(), "Cage '%s' created\n", name)
@@ -365,14 +388,14 @@ func startCage(cmd *cobra.Command, name string, ports []string, cfg *config.Conf
 			fmt.Fprintf(cmd.OutOrStdout(), "  Passt socket: %s\n", isolatedNet.SocketPath)
 
 			// Redefine domain with passt socket
-			cageDir := cage.Dir(name)
-			runtimeDir := runtime.RuntimeDir(cageDir)
+			cageVMDir := cage.VMDir(name)
+			runtimeDir := runtime.RuntimeDir(cageVMDir)
 			domainCfg := &libvirt.DomainConfig{
 				Name:           name,
 				MemoryMB:       4096, // TODO: get from state/config
 				VCPU:           4,    // TODO: get from state/config
-				DiskPath:       filepath.Join(cageDir, "disk.qcow2"),
-				CloudInitISO:   filepath.Join(cageDir, "cloud-init.iso"),
+				DiskPath:       filepath.Join(cageVMDir, "disk.qcow2"),
+				CloudInitISO:   filepath.Join(cageVMDir, "cloud-init.iso"),
 				NetworkName:    "",
 				VirtiofsSocket: virtiofsSocket,
 				RuntimeDir:     runtimeDir,

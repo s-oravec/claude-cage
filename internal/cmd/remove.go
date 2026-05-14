@@ -6,6 +6,7 @@ import (
 	"github.com/s-oravec/claude-cage/internal/cage"
 	"github.com/s-oravec/claude-cage/internal/config"
 	"github.com/s-oravec/claude-cage/internal/libvirt"
+	"github.com/s-oravec/claude-cage/internal/mode"
 	"github.com/s-oravec/claude-cage/internal/network"
 	"github.com/s-oravec/claude-cage/internal/ssh"
 	"github.com/s-oravec/claude-cage/internal/virtiofs"
@@ -55,97 +56,117 @@ The cage's data is permanently deleted.`,
 }
 
 func removeCage(cmd *cobra.Command, name string, force bool) error {
-	// Check cage exists
-	if !cage.Exists(name) {
-		return fmt.Errorf("cage '%s' not found", name)
+	state, stateErr := cage.LoadState(name)
+	haveState := stateErr == nil
+
+	if !haveState {
+		if !force {
+			return fmt.Errorf("cage '%s' not found (use --force to clean up orphaned files/domains)", name)
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "Removing cage '%s' (no state — orphan cleanup)...\n", name)
+	} else {
+		if err := cage.RequireMode(name, mode.Current().String()); err != nil {
+			if !force {
+				return err
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "  Warning: %v\n", err)
+		}
+		if state.Status == cage.StatusRunning && !force {
+			return fmt.Errorf("cage '%s' is running, use --force or stop it first", name)
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "Removing cage '%s'...\n", name)
 	}
 
-	// Load state to check status
-	state, err := cage.LoadState(name)
-	if err != nil {
-		return err
+	// Stop and undefine the libvirt domain. With --force we try BOTH session
+	// and system URIs since the cage might be defined in the other mode (e.g.
+	// orphan from a prior run, or wrong-mode invocation).
+	uris := []string{mode.Current().URI()}
+	if force {
+		other := mode.User.URI()
+		if mode.Current() == mode.User {
+			other = mode.Root.URI()
+		}
+		uris = append(uris, other)
 	}
-
-	// Check if running
-	if state.Status == cage.StatusRunning && !force {
-		return fmt.Errorf("cage '%s' is running, use --force or stop it first", name)
-	}
-
-	fmt.Fprintf(cmd.OutOrStdout(), "Removing cage '%s'...\n", name)
-
-	client := libvirt.NewClient()
-
-	// Stop VM if running
-	if state.Status == cage.StatusRunning {
-		fmt.Fprintln(cmd.OutOrStdout(), "  Stopping VM...")
-		if force {
-			if err := client.DestroyDomain(name); err != nil {
+	for _, uri := range uris {
+		c := libvirt.NewClientWithURI(uri)
+		if haveState && state.Status == cage.StatusRunning {
+			fmt.Fprintf(cmd.OutOrStdout(), "  Stopping VM in %s...\n", uri)
+			if force {
+				if err := c.DestroyDomain(name); err != nil && !force {
+					fmt.Fprintf(cmd.OutOrStdout(), "  Warning: %v\n", err)
+				}
+			} else {
+				if err := c.StopDomain(name); err != nil {
+					fmt.Fprintf(cmd.OutOrStdout(), "  Warning: %v\n", err)
+				}
+			}
+		}
+		if err := c.UndefineDomain(name); err != nil {
+			// Silent under --force: domain probably doesn't exist in this URI.
+			if !force {
 				fmt.Fprintf(cmd.OutOrStdout(), "  Warning: %v\n", err)
 			}
 		} else {
-			if err := client.StopDomain(name); err != nil {
-				fmt.Fprintf(cmd.OutOrStdout(), "  Warning: %v\n", err)
-			}
+			fmt.Fprintf(cmd.OutOrStdout(), "  Undefined domain in %s\n", uri)
 		}
 	}
 
-	// Undefine the domain
-	fmt.Fprintln(cmd.OutOrStdout(), "  Removing VM definition...")
-	if err := client.UndefineDomain(name); err != nil {
-		fmt.Fprintf(cmd.OutOrStdout(), "  Warning: %v\n", err)
-	}
+	// State-dependent cleanup (PIDs, ports, network mode).
+	if haveState {
+		if state.VirtiofsPID > 0 {
+			fmt.Fprintln(cmd.OutOrStdout(), "  Stopping virtiofsd...")
+			virtiofs.StopByPID(name, state.VirtiofsPID)
+		} else {
+			virtiofs.CleanupSocket(name)
+		}
 
-	// Stop virtiofsd if running
-	if state.VirtiofsPID > 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "  Stopping virtiofsd...")
-		virtiofs.StopByPID(name, state.VirtiofsPID)
+		if len(state.Ports) > 0 {
+			fmt.Fprintln(cmd.OutOrStdout(), "  Stopping port forwarders...")
+			seenPIDs := make(map[int]bool)
+			for _, p := range state.Ports {
+				if p.ForwarderPID > 0 && !seenPIDs[p.ForwarderPID] {
+					seenPIDs[p.ForwarderPID] = true
+					network.StopForwarderByPID(p.ForwarderPID)
+				}
+			}
+		}
+
+		if state.SSHPort > 0 {
+			ssh.RemoveKnownHost(fmt.Sprintf("[127.0.0.1]:%d", state.SSHPort))
+		}
+		if state.IP != "" {
+			ssh.RemoveKnownHost(state.IP)
+		}
+
+		if state.NetworkMode == cage.NetworkBridge {
+			fmt.Fprintln(cmd.OutOrStdout(), "  Cleaning up firewall...")
+			cfg, _ := config.Load()
+			dnsServer := "1.1.1.1"
+			if cfg != nil && len(cfg.Network.DNS) > 0 {
+				dnsServer = cfg.Network.DNS[0]
+			}
+			network.CleanupFirewall(name, dnsServer)
+
+			fmt.Fprintln(cmd.OutOrStdout(), "  Destroying network...")
+			network.DestroyNetwork(name)
+		}
 	} else {
-		// Cleanup socket dir anyway
+		// Best-effort socket dir cleanup without state.
 		virtiofs.CleanupSocket(name)
 	}
 
-	// Stop port forwarders
-	if len(state.Ports) > 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "  Stopping port forwarders...")
-		seenPIDs := make(map[int]bool)
-		for _, p := range state.Ports {
-			if p.ForwarderPID > 0 && !seenPIDs[p.ForwarderPID] {
-				seenPIDs[p.ForwarderPID] = true
-				network.StopForwarderByPID(p.ForwarderPID)
-			}
-		}
-	}
-
-	// Delete SSH keys and known_hosts entry
+	// Always remove SSH keys + cage files (these are local rm -rf, idempotent).
 	fmt.Fprintln(cmd.OutOrStdout(), "  Removing SSH keys...")
 	ssh.DeleteKeys(name)
 
-	// Remove known_hosts entry to avoid "host key changed" errors on recreate
-	if state.SSHPort > 0 {
-		ssh.RemoveKnownHost(fmt.Sprintf("[127.0.0.1]:%d", state.SSHPort))
-	}
-	if state.IP != "" {
-		ssh.RemoveKnownHost(state.IP)
-	}
-
-	// Cleanup firewall and network (only for bridge mode)
-	if state.NetworkMode == cage.NetworkBridge {
-		fmt.Fprintln(cmd.OutOrStdout(), "  Cleaning up firewall...")
-		cfg, _ := config.Load()
-		dnsServer := "1.1.1.1"
-		if cfg != nil && len(cfg.Network.DNS) > 0 {
-			dnsServer = cfg.Network.DNS[0]
-		}
-		network.CleanupFirewall(name, dnsServer)
-
-		fmt.Fprintln(cmd.OutOrStdout(), "  Destroying network...")
-		network.DestroyNetwork(name)
-	}
-
-	// Delete cage state and files
 	fmt.Fprintln(cmd.OutOrStdout(), "  Removing cage files...")
 	if err := cage.DeleteState(name); err != nil {
-		return fmt.Errorf("failed to cleanup: %w", err)
+		if force {
+			fmt.Fprintf(cmd.OutOrStdout(), "  Warning: %v\n", err)
+		} else {
+			return fmt.Errorf("failed to cleanup: %w", err)
+		}
 	}
 
 	fmt.Fprintf(cmd.OutOrStdout(), "Cage '%s' removed\n", name)

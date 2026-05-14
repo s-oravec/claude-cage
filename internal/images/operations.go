@@ -78,8 +78,8 @@ func Save(cageName, imageName, description string) (*SaveResult, error) {
 		return nil, ErrImageExists
 	}
 
-	// Get source disk path
-	sourceDisk := filepath.Join(cage.Dir(cageName), "disk.qcow2")
+	// Get source disk path (lives in VM artifacts dir, possibly /var/lib in root mode)
+	sourceDisk := filepath.Join(cage.VMDir(cageName), "disk.qcow2")
 	if _, err := os.Stat(sourceDisk); err != nil {
 		return nil, fmt.Errorf("cage disk not found: %w", err)
 	}

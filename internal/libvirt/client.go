@@ -24,6 +24,13 @@ func NewClient() *Client {
 	}
 }
 
+// NewClientWithURI returns a client pinned to a specific libvirt URI.
+// Useful for cross-mode cleanup (e.g. orphan domain removal that might be
+// defined under either session or system).
+func NewClientWithURI(uri string) *Client {
+	return &Client{uri: uri}
+}
+
 // virsh runs a virsh command and returns output
 func (c *Client) virsh(args ...string) (string, error) {
 	fullArgs := append([]string{"-c", c.uri}, args...)

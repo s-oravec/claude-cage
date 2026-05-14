@@ -15,12 +15,17 @@ import (
 // imagesDir can be overridden in tests
 var imagesDir string
 
-// Dir returns the images directory path
+// Dir returns the base-images cache directory.
+//
+// Lives next to the VM artifacts: in user mode that's ~/.claude-cage/images/,
+// in root mode /var/lib/libvirt/images/cage/images/. Disk overlays back to
+// files here, so qemu (running as libvirt-qemu under sudo) needs the
+// directory to be on the default virt-aa-helper apparmor allow-list.
 func Dir() string {
 	if imagesDir != "" {
 		return imagesDir
 	}
-	return filepath.Join(config.Dir(), "images")
+	return filepath.Join(config.VMArtifactsDir(), "images")
 }
 
 // SetDir sets the images directory (for testing)

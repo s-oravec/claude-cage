@@ -2,6 +2,7 @@ package cage
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -26,6 +27,7 @@ type State struct {
 	Status       string    `json:"status"`
 	Image        string    `json:"image"`
 	Profile      string    `json:"profile"`
+	Mode         string    `json:"mode,omitempty"` // "user" or "root"; empty for pre-mode-split cages (treated as user)
 	NetworkMode  string    `json:"network_mode,omitempty"`
 	SSHPort      int       `json:"ssh_port,omitempty"`
 	IP           string    `json:"ip,omitempty"`
@@ -49,15 +51,32 @@ type Port struct {
 	ForwarderPID int    `json:"forwarder_pid,omitempty"`
 }
 
-// cagesDir can be overridden in tests
-var cagesDir string
+// cagesDir / vmCagesDir can be overridden in tests
+var (
+	cagesDir   string
+	vmCagesDir string
+)
 
-// CagesDir returns the cages directory
+// CagesDir returns the metadata cages directory (state.json lives here).
 func CagesDir() string {
 	if cagesDir != "" {
 		return cagesDir
 	}
 	return filepath.Join(config.Dir(), "cages")
+}
+
+// VMCagesDir returns the VM-artifacts cages directory (disk overlays,
+// cloud-init ISOs, virtiofs sources). In user mode this equals CagesDir
+// (so tests that override cagesDir keep working); in root mode it lives
+// under /var/lib/libvirt/images/cage/cages/.
+func VMCagesDir() string {
+	if vmCagesDir != "" {
+		return vmCagesDir
+	}
+	if os.Geteuid() != 0 {
+		return CagesDir()
+	}
+	return filepath.Join(config.VMArtifactsDir(), "cages")
 }
 
 // SetCagesDir sets the cages directory (for testing)
@@ -67,9 +86,23 @@ func SetCagesDir(dir string) string {
 	return old
 }
 
-// Dir returns the directory for a specific cage
+// SetVMCagesDir sets the VM cages directory (for testing)
+func SetVMCagesDir(dir string) string {
+	old := vmCagesDir
+	vmCagesDir = dir
+	return old
+}
+
+// Dir returns the metadata directory for a specific cage (state.json, etc).
 func Dir(name string) string {
 	return filepath.Join(CagesDir(), name)
+}
+
+// VMDir returns the VM-artifacts directory for a specific cage
+// (disk.qcow2, cloud-init.iso, runtime/). In user mode this equals Dir;
+// in root mode it diverges.
+func VMDir(name string) string {
+	return filepath.Join(VMCagesDir(), name)
 }
 
 // StatePath returns the path to a cage's state file
@@ -77,9 +110,12 @@ func StatePath(name string) string {
 	return filepath.Join(Dir(name), "state.json")
 }
 
-// EnsureDir creates the cage directory if it doesn't exist
+// EnsureDir creates both the metadata and VM-artifacts directories for a cage.
 func EnsureDir(name string) error {
-	return os.MkdirAll(Dir(name), 0755)
+	if err := os.MkdirAll(Dir(name), 0755); err != nil {
+		return err
+	}
+	return os.MkdirAll(VMDir(name), 0755)
 }
 
 // Exists checks if a cage exists
@@ -117,9 +153,42 @@ func LoadState(name string) (*State, error) {
 	return &state, nil
 }
 
-// DeleteState removes a cage's state and directory
+// RequireMode returns an error if the cage's saved mode differs from the
+// current process mode. Pre-mode-split cages (state.Mode == "") are treated
+// as user-mode (the historical default), so they only fail when invoked
+// under sudo. Callers use this to refuse cross-mode lifecycle operations
+// with a helpful hint to use (or drop) sudo.
+func RequireMode(name, currentMode string) error {
+	state, err := LoadState(name)
+	if err != nil {
+		return err
+	}
+	saved := state.Mode
+	if saved == "" {
+		saved = "user"
+	}
+	if saved == currentMode {
+		return nil
+	}
+	if saved == "root" {
+		return fmt.Errorf("cage '%s' was created in root mode; run 'sudo cage <op>' instead", name)
+	}
+	return fmt.Errorf("cage '%s' was created in user mode; run 'cage <op>' without sudo", name)
+}
+
+// DeleteState removes a cage's metadata directory and VM-artifacts directory.
+// Both are removed even when they share a path (user mode); RemoveAll on a
+// non-existent path is a no-op.
 func DeleteState(name string) error {
-	return os.RemoveAll(Dir(name))
+	if err := os.RemoveAll(Dir(name)); err != nil {
+		return err
+	}
+	if VMDir(name) != Dir(name) {
+		if err := os.RemoveAll(VMDir(name)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // RestartConfig holds configuration needed to restart a cage

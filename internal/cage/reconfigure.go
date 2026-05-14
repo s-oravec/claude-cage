@@ -24,13 +24,13 @@ func Reconfigure(name string, cfg *config.ResolvedConfig) error {
 		return fmt.Errorf("cage must be stopped to reconfigure")
 	}
 
-	// Get cage directory
-	cageDir := Dir(name)
+	// VM artifacts dir (where disk/ISO/virtiofs sources live)
+	cageVMDir := VMDir(name)
 
 	// Build paths for domain config
-	overlayPath := filepath.Join(cageDir, "disk.qcow2")
-	cloudInitPath := filepath.Join(cageDir, "cloud-init.iso")
-	runtimeDir := runtime.RuntimeDir(cageDir)
+	overlayPath := filepath.Join(cageVMDir, "disk.qcow2")
+	cloudInitPath := filepath.Join(cageVMDir, "cloud-init.iso")
+	runtimeDir := runtime.RuntimeDir(cageVMDir)
 
 	// Generate new domain XML with updated config
 	domainCfg := &libvirt.DomainConfig{

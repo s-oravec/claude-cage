@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -13,6 +14,9 @@ import (
 
 // configDir can be overridden in tests
 var configDir string
+
+// vmArtifactsDir can be overridden in tests
+var vmArtifactsDir string
 
 // SetDir overrides the config directory (for testing)
 func SetDir(dir string) {
@@ -64,24 +68,77 @@ type SecurityConfig struct {
 	VirtiofsSandbox bool `yaml:"virtiofsd_sandbox"`
 }
 
-// Dir returns the cage state/config directory for the current mode.
-//
-//   - User mode (regular user): $HOME/.claude-cage
-//   - Root mode (sudo cage): /var/lib/libvirt/images/cage
-//
-// The root-mode path lives under /var/lib/libvirt/images/** which is
-// permitted by the default libvirt virt-aa-helper apparmor profile, so
-// disk overlays and cloud-init ISOs created there are readable by
-// libvirt-qemu without any apparmor surgery.
+// Dir returns the metadata directory: state.json, SSH keys, known_hosts.
+// Always lives under the invoking user's home, including when running
+// under sudo (SUDO_USER env var). This keeps user-facing artifacts
+// readable and manageable from the user's normal shell.
 func Dir() string {
 	if configDir != "" {
 		return configDir
 	}
-	if os.Geteuid() == 0 {
-		return "/var/lib/libvirt/images/cage"
+	if u := os.Getenv("SUDO_USER"); u != "" {
+		if usr, err := user.Lookup(u); err == nil {
+			return filepath.Join(usr.HomeDir, ".claude-cage")
+		}
 	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".claude-cage")
+}
+
+// VMArtifactsDir returns the directory for libvirt-readable VM artifacts:
+// disk overlays, cloud-init ISOs, virtiofs-mount sources.
+//
+//   - User mode: same as Dir() (~/.claude-cage). libvirt session runs
+//     QEMU as the user, no apparmor or perm issues.
+//   - Root mode: /var/lib/libvirt/images/cage. Lives under the default
+//     libvirt virt-aa-helper apparmor allow-list, so disk files and
+//     cloud-init ISOs are readable by libvirt-qemu without per-host
+//     apparmor surgery.
+func VMArtifactsDir() string {
+	if vmArtifactsDir != "" {
+		return vmArtifactsDir
+	}
+	if os.Geteuid() == 0 {
+		return "/var/lib/libvirt/images/cage"
+	}
+	return Dir()
+}
+
+// SetVMArtifactsDir overrides VMArtifactsDir (for tests).
+func SetVMArtifactsDir(dir string) {
+	vmArtifactsDir = dir
+}
+
+// SudoUserIDs returns the uid/gid of $SUDO_USER if set, or (-1, -1) otherwise.
+// Use to chown files created under sudo back to the invoking user.
+func SudoUserIDs() (uid, gid int) {
+	name := os.Getenv("SUDO_USER")
+	if name == "" {
+		return -1, -1
+	}
+	usr, err := user.Lookup(name)
+	if err != nil {
+		return -1, -1
+	}
+	uid, _ = strconv.Atoi(usr.Uid)
+	gid, _ = strconv.Atoi(usr.Gid)
+	return uid, gid
+}
+
+// ChownToSudoUser recursively chowns a path tree to $SUDO_USER. No-op when
+// not running under sudo. Used after creating cage metadata (state.json,
+// SSH keys) under root so the invoking user retains ownership.
+func ChownToSudoUser(root string) error {
+	uid, gid := SudoUserIDs()
+	if uid < 0 {
+		return nil
+	}
+	return filepath.Walk(root, func(path string, _ os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		return os.Chown(path, uid, gid)
+	})
 }
 
 // Path returns the config file path

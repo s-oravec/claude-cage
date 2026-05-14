@@ -30,7 +30,8 @@ available:
 | Shared folders (virtiofs) | ❌ | ✅ |
 | Injected env via virtiofs | ❌ | ✅ |
 | libvirt backend | session | system |
-| State path | `~/.claude-cage/` | `/var/lib/libvirt/images/cage/` |
+| Metadata path (state.json, SSH keys) | `~/.claude-cage/` | `~/.claude-cage/` (invoking user) |
+| VM artifacts path (disk, ISO, images) | `~/.claude-cage/` | `/var/lib/libvirt/images/cage/` |
 
 **User mode** is the default and what most users want: a sandboxed VM
 with SSH and SLIRP networking, no host configuration required. Run `cage
