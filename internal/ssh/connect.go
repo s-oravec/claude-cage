@@ -64,7 +64,11 @@ func SSHExecWithPort(cageName, host string, port int, command string, interactiv
 	}
 
 	if !interactive {
-		args = append(args, "-o", "BatchMode=yes")
+		// Disable PTY allocation and redirect stdin from /dev/null so SSH
+		// can never modify the parent terminal's tty modes. Without this,
+		// a timing-out SSH probe leaves the controlling tty in raw mode
+		// (no ONLCR), making subsequent newlines render without a CR.
+		args = append(args, "-T", "-n", "-o", "BatchMode=yes")
 	}
 
 	args = append(args, fmt.Sprintf("cage@%s", host))
@@ -132,6 +136,8 @@ func ExecCaptureWithPort(cageName, host string, port int, command string) (strin
 	}
 
 	args := []string{
+		"-T", // no PTY — never touch the parent tty modes
+		"-n", // stdin from /dev/null
 		"-i", keyPath,
 		"-o", fmt.Sprintf("StrictHostKeyChecking=%s", strictHostKey),
 		"-o", fmt.Sprintf("UserKnownHostsFile=%s", knownHostsPath),
