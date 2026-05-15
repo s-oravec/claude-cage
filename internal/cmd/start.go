@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/s-oravec/claude-cage/internal/cage"
@@ -217,6 +218,21 @@ func createCageFromConfig(cmd *cobra.Command, name string, resolved *config.Reso
 		if err := json.Unmarshal(body, &m); err != nil {
 			cage.DeleteState(name)
 			return fmt.Errorf("failed to parse manifest %s: %w", manifestDigest, err)
+		}
+		// Merge env from manifest.config into the resolved env so build-time
+		// envs survive pull. .cage.yml env: still takes precedence (resolved
+		// already contains it).
+		for _, kv := range m.Config.Env {
+			if i := strings.IndexByte(kv, '='); i > 0 {
+				k := kv[:i]
+				v := kv[i+1:]
+				if _, exists := resolved.Env[k]; !exists {
+					if resolved.Env == nil {
+						resolved.Env = map[string]string{}
+					}
+					resolved.Env[k] = v
+				}
+			}
 		}
 		baseImg := images.ImagePath(m.Base.Name)
 		if !images.IsDownloaded(m.Base.Name) {
