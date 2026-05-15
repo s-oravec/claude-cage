@@ -318,7 +318,7 @@ func SaveLayered(in SaveLayeredInput) (*SaveLayeredResult, error) {
 	// Copy overlay so we don't mutate the source.
 	tmp, err := os.CreateTemp("", "cage-layer-*.qcow2")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create temp file: %w", err)
 	}
 	tmpPath := tmp.Name()
 	tmp.Close()
@@ -331,19 +331,19 @@ func SaveLayered(in SaveLayeredInput) (*SaveLayeredResult, error) {
 	// Strip backing-file pointer (metadata only).
 	cmd := exec.Command("qemu-img", "rebase", "-u", "-b", "", tmpPath)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return nil, fmt.Errorf("qemu-img rebase: %s", string(out))
+		return nil, fmt.Errorf("qemu-img rebase: %w: %s", err, string(out))
 	}
 
 	layerDigest, err := imgstore.HashFile(tmpPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("hash layer: %w", err)
 	}
 	if err := imgstore.CopyFromFile(tmpPath, layerDigest); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("store layer: %w", err)
 	}
 	info, err := os.Stat(imgstore.LayerPath(layerDigest))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("stat layer: %w", err)
 	}
 
 	baseDigest, err := BaseDigest(in.BaseName)
@@ -359,23 +359,23 @@ func SaveLayered(in SaveLayeredInput) (*SaveLayeredResult, error) {
 		Config:        in.Config,
 	}
 	if err := m.Validate(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("validate manifest: %w", err)
 	}
 	manifestBytes, err := manifest.Canonical(m)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("canonical manifest: %w", err)
 	}
 	manifestDigest := manifest.DigestBytes(manifestBytes)
 	if err := imgstore.PutManifestBytes(manifestDigest, manifestBytes); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("put manifest: %w", err)
 	}
 
 	ref, err := imgstore.ParseRef(in.Tag)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parse ref %q: %w", in.Tag, err)
 	}
 	if err := imgstore.WriteRef(ref, manifestDigest); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("write ref: %w", err)
 	}
 	return &SaveLayeredResult{ManifestDigest: manifestDigest, LayerDigest: layerDigest}, nil
 }
