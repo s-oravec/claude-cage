@@ -2,12 +2,15 @@ package images
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/s-oravec/claude-cage/internal/cage"
+	"github.com/s-oravec/claude-cage/internal/imgstore"
+	"github.com/s-oravec/claude-cage/internal/manifest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -261,4 +264,42 @@ func TestBaseDigest_ReadsFromDisk(t *testing.T) {
 	// sha256("fakebase") - we don't need to know the exact value; just verify the format.
 	assert.True(t, strings.HasPrefix(d, "sha256:"))
 	assert.Len(t, d, len("sha256:")+64)
+}
+
+func TestSaveLayered_WritesAllArtifacts(t *testing.T) {
+	if _, err := exec.LookPath("qemu-img"); err != nil {
+		t.Skip("qemu-img not installed; run on dev host")
+	}
+	root := t.TempDir()
+	imagesDir = root
+	imgstore.SetRoot(root)
+	defer func() { imagesDir = ""; imgstore.SetRoot("") }()
+
+	// Make a fake base + overlay.
+	base := filepath.Join(root, "ubuntu-24.04.qcow2")
+	require.NoError(t, exec.Command("qemu-img", "create", "-f", "qcow2", base, "1M").Run())
+
+	overlayDir := t.TempDir()
+	overlay := filepath.Join(overlayDir, "disk.qcow2")
+	require.NoError(t, exec.Command("qemu-img", "create", "-f", "qcow2",
+		"-b", base, "-F", "qcow2", overlay, "10M").Run())
+
+	r, err := SaveLayered(SaveLayeredInput{
+		OverlayPath: overlay,
+		BaseName:    "ubuntu-24.04",
+		Tag:         "myimage:v1",
+		Config:      manifest.Config{OS: "linux", Arch: "amd64"},
+	})
+	require.NoError(t, err)
+	assert.NotEmpty(t, r.ManifestDigest)
+	assert.NotEmpty(t, r.LayerDigest)
+
+	// Layer + manifest + ref are present.
+	assert.True(t, imgstore.HasLayer(r.LayerDigest))
+	assert.True(t, imgstore.HasManifest(r.ManifestDigest))
+
+	ref, _ := imgstore.ParseRef("myimage:v1")
+	got, err := imgstore.ReadRef(ref)
+	require.NoError(t, err)
+	assert.Equal(t, r.ManifestDigest, got)
 }
