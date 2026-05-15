@@ -1,6 +1,7 @@
 package images
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -88,6 +89,9 @@ func TestSave(t *testing.T) {
 	cage.SetCagesDir(filepath.Join(tmpDir, "cages"))
 	defer cage.SetCagesDir(oldCagesDir)
 
+	imgstore.SetRoot(tmpDir)
+	defer imgstore.SetRoot("")
+
 	t.Run("save non-existent cage", func(t *testing.T) {
 		_, err := Save("nonexistent", "new-image", "")
 		if err == nil {
@@ -105,15 +109,17 @@ func TestSave(t *testing.T) {
 		}
 		cage.SaveState(state)
 
-		// Create existing image
-		imgPath := filepath.Join(tmpDir, "existing.qcow2")
-		os.WriteFile(imgPath, []byte("test"), 0644)
+		// Pre-create a ref so the existence check fires before any disk work.
+		ref, err := imgstore.ParseRef("existing")
+		require.NoError(t, err)
+		require.NoError(t, imgstore.WriteRef(ref, "sha256:0000000000000000000000000000000000000000000000000000000000000000"))
 
-		_, err := Save("test-cage", "existing", "")
+		_, err = Save("test-cage", "existing", "")
 		if err != ErrImageExists {
 			t.Errorf("expected ErrImageExists, got %v", err)
 		}
 
+		require.NoError(t, imgstore.DeleteRef(ref))
 		cage.DeleteState("test-cage")
 	})
 }
@@ -302,4 +308,37 @@ func TestSaveLayered_WritesAllArtifacts(t *testing.T) {
 	got, err := imgstore.ReadRef(ref)
 	require.NoError(t, err)
 	assert.Equal(t, r.ManifestDigest, got)
+}
+
+func TestSave_BuildsValidManifestWithEmptyCagefile(t *testing.T) {
+	if _, err := exec.LookPath("qemu-img"); err != nil {
+		t.Skip("qemu-img not installed")
+	}
+	root := t.TempDir()
+	imagesDir = root
+	imgstore.SetRoot(root)
+	defer func() { imagesDir = ""; imgstore.SetRoot("") }()
+
+	base := filepath.Join(root, "ubuntu-24.04.qcow2")
+	require.NoError(t, exec.Command("qemu-img", "create", "-f", "qcow2", base, "1M").Run())
+
+	overlay := filepath.Join(t.TempDir(), "disk.qcow2")
+	require.NoError(t, exec.Command("qemu-img", "create", "-f", "qcow2",
+		"-b", base, "-F", "qcow2", overlay, "10M").Run())
+
+	r, err := SaveLayered(SaveLayeredInput{
+		OverlayPath: overlay,
+		BaseName:    "ubuntu-24.04",
+		Tag:         "savedimage:latest",
+		Config:      manifest.Config{OS: "linux", Arch: "amd64"},
+	})
+	require.NoError(t, err)
+
+	// Read the stored manifest, verify validate passes and Cagefile is empty.
+	body, err := imgstore.GetManifestBytes(r.ManifestDigest)
+	require.NoError(t, err)
+	var m manifest.Manifest
+	require.NoError(t, json.Unmarshal(body, &m))
+	require.NoError(t, m.Validate())
+	assert.Empty(t, m.Config.Cagefile)
 }

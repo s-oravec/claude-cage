@@ -9,8 +9,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
-	"time"
 
 	"github.com/s-oravec/claude-cage/internal/cage"
 	"github.com/s-oravec/claude-cage/internal/imgstore"
@@ -60,7 +60,9 @@ type SaveResult struct {
 	VirtCustomizeError string // Non-fatal error if virt-customize failed
 }
 
-// Save creates a new image from a stopped cage
+// Save creates a new image from a stopped cage by delegating to SaveLayered.
+// There is no Cagefile (the cage was running, no build context), so Config.Cagefile
+// is left empty. The description flows into Config.Description.
 func Save(cageName, imageName, description string) (*SaveResult, error) {
 	// Check cage exists
 	if !cage.Exists(cageName) {
@@ -78,8 +80,12 @@ func Save(cageName, imageName, description string) (*SaveResult, error) {
 		return nil, fmt.Errorf("cage '%s' is running. Stop it first: cage stop %s", cageName, cageName)
 	}
 
-	// Check image name not taken
-	if Exists(imageName) {
+	// Check ref name not already taken (ref-aware existence via imgstore)
+	ref, err := imgstore.ParseRef(imageName)
+	if err != nil {
+		return nil, fmt.Errorf("invalid image name: %w", err)
+	}
+	if _, rerr := imgstore.ReadRef(ref); rerr == nil {
 		return nil, ErrImageExists
 	}
 
@@ -89,61 +95,23 @@ func Save(cageName, imageName, description string) (*SaveResult, error) {
 		return nil, fmt.Errorf("cage disk not found: %w", err)
 	}
 
-	// Ensure images directory exists
-	if err := EnsureDir(); err != nil {
+	if _, err := SaveLayered(SaveLayeredInput{
+		OverlayPath: sourceDisk,
+		BaseName:    state.Image,
+		Tag:         imageName,
+		Config: manifest.Config{
+			OS:          "linux",
+			Arch:        goruntime.GOARCH,
+			Description: description,
+		},
+	}); err != nil {
 		return nil, err
 	}
 
-	// Create destination path
-	destPath := ImagePath(imageName)
-
-	// Convert and compress the image
-	cmd := exec.Command("qemu-img", "convert",
-		"-O", "qcow2",
-		"-c", // compress
-		sourceDisk,
-		destPath)
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("failed to save image: %s", strings.TrimSpace(string(output)))
-	}
-
-	// Prepare image for reuse: clear SSH keys and reset cloud-init
-	// This uses virt-customize to modify the image while it's not running
-	prepResult, err := prepareImageForReuse(destPath)
-	if err != nil {
-		os.Remove(destPath)
-		return nil, fmt.Errorf("failed to prepare image: %w", err)
-	}
-
-	// Get size of new image
-	info, err := os.Stat(destPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to stat image: %w", err)
-	}
-
-	// Save metadata
-	img := &Image{
-		Name:        imageName,
-		Type:        "custom",
-		Base:        state.Image,
-		Size:        info.Size(),
-		Description: description,
-		CreatedAt:   time.Now(),
-		Path:        destPath,
-	}
-
-	if err := SaveMetadata(img); err != nil {
-		// Try to clean up the image file
-		os.Remove(destPath)
-		return nil, fmt.Errorf("failed to save metadata: %w", err)
-	}
-
-	return &SaveResult{
-		VirtCustomizeUsed:  prepResult.VirtCustomizeUsed,
-		VirtCustomizeError: prepResult.VirtCustomizeError,
-	}, nil
+	// SaveResult is preserved for backward compat with cmd/image.go callers.
+	// VirtCustomizeUsed / VirtCustomizeError are not surfaced any more because
+	// prepareImageForReuse now runs inside SaveLayered and discards its result.
+	return &SaveResult{}, nil
 }
 
 // PrepareResult indicates what preparation was done on the image
