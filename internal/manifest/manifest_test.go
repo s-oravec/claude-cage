@@ -37,6 +37,11 @@ func TestManifest_RoundTripJSON(t *testing.T) {
 	assert.Equal(t, m, got)
 }
 
+func TestDigestBytes_KnownVector(t *testing.T) {
+	got := DigestBytes([]byte("hello"))
+	assert.Equal(t, "sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824", got)
+}
+
 func TestManifest_Canonical_Deterministic(t *testing.T) {
 	m := Manifest{
 		SchemaVersion: 1,
