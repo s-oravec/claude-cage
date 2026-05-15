@@ -95,6 +95,77 @@ func PutLayerBytes(digest string, data []byte) error {
 	return writeAtomic(LayerPath(digest), data, 0o644)
 }
 
+// FetchFn is a callback that produces an io.ReadCloser starting at the given
+// byte offset. Implementations typically issue an HTTP GET with a Range header
+// when offset > 0.
+type FetchFn func(offset int64) (io.ReadCloser, error)
+
+// PutLayerStreamed streams a layer blob into the content-addressed store with
+// resume support. Behavior:
+//   - If <store>/.../layer.qcow2 already exists -> noop, returns nil.
+//   - Otherwise opens (or creates) a sibling .partial file in append mode,
+//     determines the existing size, calls fetch(size) for the remaining bytes,
+//     and streams them into the partial file.
+//   - When the network closes EOF, the partial file is sha256-hashed from
+//     scratch and compared against expectedDigest.
+//   - On digest match: atomic rename .partial -> layer.qcow2 (success).
+//   - On digest mismatch: delete the .partial and return CONFLICT.
+//
+// Caller is responsible for retrying on transport errors; this function only
+// performs ONE network attempt per call. A subsequent call resumes naturally.
+func PutLayerStreamed(expectedDigest string, fetch FetchFn) error {
+	finalPath := LayerPath(expectedDigest)
+	if _, err := os.Stat(finalPath); err == nil {
+		return nil // already have it
+	}
+	if err := ensureDir(finalPath); err != nil {
+		return err
+	}
+	partial := finalPath + ".partial"
+
+	// Determine existing partial size for resume.
+	var offset int64
+	if fi, err := os.Stat(partial); err == nil {
+		offset = fi.Size()
+	}
+
+	rc, err := fetch(offset)
+	if err != nil {
+		return err
+	}
+	defer rc.Close()
+
+	// Open partial for append (create if missing).
+	f, err := os.OpenFile(partial, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return err
+	}
+
+	if _, err := io.Copy(f, rc); err != nil {
+		f.Close()
+		return err // .partial preserved for next attempt
+	}
+	if err := f.Sync(); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+
+	// Re-hash the partial from scratch (simpler than maintaining streaming
+	// hash state across resumes).
+	got, err := HashFile(partial)
+	if err != nil {
+		return err
+	}
+	if got != expectedDigest {
+		os.Remove(partial)
+		return fmt.Errorf("layer digest mismatch: server %s, got %s", expectedDigest, got)
+	}
+	return os.Rename(partial, finalPath)
+}
+
 // GetLayerBytes reads the layer blob at the given digest.
 func GetLayerBytes(digest string) ([]byte, error) {
 	return os.ReadFile(LayerPath(digest))

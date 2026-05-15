@@ -1,6 +1,11 @@
 package imgstore
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -139,4 +144,84 @@ func layerDigestForFile(t *testing.T, path string) string {
 	d, err := HashFile(path)
 	require.NoError(t, err)
 	return d
+}
+
+func TestPutLayerStreamed_FreshDownload(t *testing.T) {
+	SetRoot(t.TempDir())
+	defer SetRoot("")
+
+	payload := []byte("hello-layer-bytes")
+	digest := "sha256:" + sha256Hex(payload)
+
+	err := PutLayerStreamed(digest, func(offset int64) (io.ReadCloser, error) {
+		require.Equal(t, int64(0), offset)
+		return io.NopCloser(bytes.NewReader(payload)), nil
+	})
+	require.NoError(t, err)
+	assert.True(t, HasLayer(digest))
+
+	got, err := GetLayerBytes(digest)
+	require.NoError(t, err)
+	assert.Equal(t, payload, got)
+}
+
+func TestPutLayerStreamed_ResumesFromPartial(t *testing.T) {
+	SetRoot(t.TempDir())
+	defer SetRoot("")
+
+	payload := []byte("hello-layer-bytes")
+	digest := "sha256:" + sha256Hex(payload)
+
+	// Simulate a previous failed download that wrote 6 bytes.
+	if err := ensureDir(LayerPath(digest)); err != nil {
+		t.Fatal(err)
+	}
+	require.NoError(t, os.WriteFile(LayerPath(digest)+".partial", payload[:6], 0o644))
+
+	var seenOffset int64
+	err := PutLayerStreamed(digest, func(offset int64) (io.ReadCloser, error) {
+		seenOffset = offset
+		return io.NopCloser(bytes.NewReader(payload[offset:])), nil
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(6), seenOffset, "fetch should have been asked for offset 6")
+	assert.True(t, HasLayer(digest))
+	got, _ := GetLayerBytes(digest)
+	assert.Equal(t, payload, got)
+}
+
+func TestPutLayerStreamed_ExistingLayerNoop(t *testing.T) {
+	SetRoot(t.TempDir())
+	defer SetRoot("")
+	digest := "sha256:0000000000000000000000000000000000000000000000000000000000000001"
+	require.NoError(t, PutLayerBytes(digest, []byte("x")))
+
+	called := false
+	err := PutLayerStreamed(digest, func(int64) (io.ReadCloser, error) {
+		called = true
+		return nil, fmt.Errorf("should not be called")
+	})
+	require.NoError(t, err)
+	assert.False(t, called)
+}
+
+func TestPutLayerStreamed_DigestMismatch_DeletesPartial(t *testing.T) {
+	SetRoot(t.TempDir())
+	defer SetRoot("")
+	badDigest := "sha256:0000000000000000000000000000000000000000000000000000000000000099"
+
+	err := PutLayerStreamed(badDigest, func(int64) (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader([]byte("not the real bytes"))), nil
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "digest mismatch")
+
+	_, statErr := os.Stat(LayerPath(badDigest) + ".partial")
+	assert.True(t, os.IsNotExist(statErr), "partial should be deleted on digest mismatch")
+}
+
+// helper - sha256 hex of bytes
+func sha256Hex(b []byte) string {
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:])
 }

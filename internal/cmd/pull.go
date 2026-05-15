@@ -167,19 +167,13 @@ func runRegistryPull(cmd *cobra.Command, ref imgstore.Ref) error {
 			continue
 		}
 		fmt.Fprintf(cmd.OutOrStdout(), "  %s: downloading\n", l.Digest)
-		rc2, err := rc.GetBlob(ref.Owner, ref.Name, l.Digest, 0)
+		err := imgstore.PutLayerStreamed(l.Digest, func(offset int64) (io.ReadCloser, error) {
+			if offset > 0 {
+				fmt.Fprintf(cmd.OutOrStdout(), "  %s: resuming at %d bytes\n", l.Digest, offset)
+			}
+			return rc.GetBlob(ref.Owner, ref.Name, l.Digest, offset)
+		})
 		if err != nil {
-			return err
-		}
-		buf, err := io.ReadAll(rc2)
-		rc2.Close()
-		if err != nil {
-			return err
-		}
-		if manifest.DigestBytes(buf) != l.Digest {
-			return fmt.Errorf("layer digest mismatch: server %s, got %s", l.Digest, manifest.DigestBytes(buf))
-		}
-		if err := imgstore.PutLayerBytes(l.Digest, buf); err != nil {
 			return err
 		}
 	}
