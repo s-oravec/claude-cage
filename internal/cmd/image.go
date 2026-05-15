@@ -5,6 +5,7 @@ import (
 
 	"github.com/s-oravec/claude-cage/internal/cage"
 	"github.com/s-oravec/claude-cage/internal/images"
+	"github.com/s-oravec/claude-cage/internal/imgstore"
 	"github.com/spf13/cobra"
 )
 
@@ -167,6 +168,18 @@ func saveImage(cmd *cobra.Command, cageName, imageName, description string) erro
 }
 
 func removeImage(cmd *cobra.Command, imageName string, force bool) error {
+	// Try ref form first (local or registry).
+	if ref, perr := imgstore.ParseRef(imageName); perr == nil {
+		if _, rerr := imgstore.ReadRef(ref); rerr == nil {
+			if err := imgstore.DeleteRef(ref); err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "Removed %s\n", imageName)
+			return nil
+		}
+	}
+
+	// Fall back to legacy distro/custom image removal.
 	if !images.Exists(imageName) {
 		return fmt.Errorf("image '%s' not found", imageName)
 	}

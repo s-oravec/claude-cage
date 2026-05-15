@@ -9,6 +9,8 @@ import (
 
 	"github.com/s-oravec/claude-cage/internal/cage"
 	"github.com/s-oravec/claude-cage/internal/images"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestImageCmd(t *testing.T) {
@@ -165,6 +167,13 @@ func TestImageCmd(t *testing.T) {
 			t.Error("save should have --description flag")
 		}
 	})
+}
+
+func TestImageRm_HasRmSubcommand(t *testing.T) {
+	cmd := NewImageCmd()
+	rm, _, err := cmd.Find([]string{"rm"})
+	require.NoError(t, err)
+	assert.NotNil(t, rm)
 }
 
 // Helper to check if images package is properly set up
