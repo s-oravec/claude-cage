@@ -84,3 +84,16 @@ func TestPutLayer_FsyncedAtomicRename(t *testing.T) {
 		assert.NotContains(t, e.Name(), ".tmp")
 	}
 }
+
+func TestHashFile(t *testing.T) {
+	f, err := os.CreateTemp(t.TempDir(), "x")
+	require.NoError(t, err)
+	_, err = f.WriteString("hello")
+	require.NoError(t, err)
+	f.Close()
+
+	got, err := HashFile(f.Name())
+	require.NoError(t, err)
+	// sha256("hello") = 2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824
+	assert.Equal(t, "sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824", got)
+}

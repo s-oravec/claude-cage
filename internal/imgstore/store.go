@@ -148,3 +148,18 @@ func DeleteRef(r Ref) error {
 	}
 	return err
 }
+
+// HashFile computes sha256:<hex> of a file's contents via streaming.
+// Used by build flows to digest layer qcow2 files before storing.
+func HashFile(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return "sha256:" + hex.EncodeToString(h.Sum(nil)), nil
+}
