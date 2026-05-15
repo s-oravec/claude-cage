@@ -113,3 +113,44 @@ func TestManifest_Validate_RejectsMissingLayer(t *testing.T) {
 	err := m.Validate()
 	require.Error(t, err)
 }
+
+func TestManifest_Validate_AllRejectionBranches(t *testing.T) {
+	valid := func() *Manifest {
+		return &Manifest{
+			SchemaVersion: 1,
+			MediaType:     MediaTypeManifestV1,
+			Base:          Base{Type: "distro", Name: "ubuntu-24.04", Digest: "sha256:abc"},
+			Layers:        []Layer{{Digest: "sha256:def", Size: 1, MediaType: MediaTypeLayerV1}},
+			Config:        Config{OS: "linux", Arch: "amd64"},
+		}
+	}
+
+	cases := []struct {
+		name     string
+		mutate   func(*Manifest)
+		errFrag  string
+	}{
+		{"bad schema version", func(m *Manifest) { m.SchemaVersion = 2 }, "schemaVersion"},
+		{"bad media type", func(m *Manifest) { m.MediaType = "wrong" }, "mediaType"},
+		{"bad base type", func(m *Manifest) { m.Base.Type = "oci" }, "base.type"},
+		{"empty base name", func(m *Manifest) { m.Base.Name = "" }, "base.name"},
+		{"bad base digest prefix", func(m *Manifest) { m.Base.Digest = "md5:abc" }, "base.digest"},
+		{"bad layer digest", func(m *Manifest) { m.Layers[0].Digest = "md5:def" }, "layers[0].digest"},
+		{"zero layer size", func(m *Manifest) { m.Layers[0].Size = 0 }, "layers[0].size"},
+		{"bad layer mediatype", func(m *Manifest) { m.Layers[0].MediaType = "x" }, "layers[0].mediaType"},
+		{"cagefile too large", func(m *Manifest) {
+			big := make([]byte, 64*1024+1)
+			for i := range big { big[i] = 'a' }
+			m.Config.Cagefile = string(big)
+		}, "config.cagefile"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := valid()
+			tc.mutate(m)
+			err := m.Validate()
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.errFrag)
+		})
+	}
+}
