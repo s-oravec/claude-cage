@@ -42,7 +42,7 @@ Use --list to print the registries you are currently logged into.`,
 			if len(args) != 1 {
 				return fmt.Errorf("usage: cage login <host>  (or --list)")
 			}
-			return runLogin(cmd.OutOrStdout(), cmd.InOrStdin(), args[0], tokenStdin)
+			return printAPIErrorHint(runLogin(cmd.OutOrStdout(), cmd.InOrStdin(), args[0], tokenStdin))
 		},
 	}
 	c.Flags().BoolVar(&tokenStdin, "token-stdin", false, "Read a PAT from stdin (non-interactive)")

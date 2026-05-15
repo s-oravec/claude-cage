@@ -25,3 +25,19 @@ func TestParseError_NonJSONBody(t *testing.T) {
 	require.ErrorAs(t, err, &apiErr)
 	assert.Equal(t, "UNEXPECTED", apiErr.Code)
 }
+
+func TestUserMessage_KnownCodes(t *testing.T) {
+	cases := map[string]string{
+		"UNAUTHORIZED":             "run `cage login",
+		"FORBIDDEN":                "permission",
+		"BLOB_MISSING":             "re-run push",
+		"CONFLICT_DIGEST_MISMATCH": "digest",
+		"UNKNOWN_BASE":             "base image",
+		"UPLOAD_EXPIRED":           "expired",
+		"UPLOAD_COMPLETED":         "already completed",
+	}
+	for code, frag := range cases {
+		got := UserMessage(&APIError{Code: code})
+		assert.Contains(t, got, frag)
+	}
+}

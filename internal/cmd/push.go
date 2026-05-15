@@ -31,7 +31,7 @@ func NewPushCmd() *cobra.Command {
 			"  3. PUT the manifest with the X-As-Latest header set when --latest.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runPush(cmd.OutOrStdout(), args[0], asLatest)
+			return printAPIErrorHint(runPush(cmd.OutOrStdout(), args[0], asLatest))
 		},
 	}
 	c.Flags().BoolVar(&asLatest, "latest", false, "Also update the `latest` tag pointer")

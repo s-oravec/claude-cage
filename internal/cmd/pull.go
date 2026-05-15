@@ -42,7 +42,7 @@ the local image store.`,
 
 			if len(args) == 1 {
 				if ref, err := imgstore.ParseRef(args[0]); err == nil && ref.IsRegistry() {
-					return runRegistryPull(cmd, ref)
+					return printAPIErrorHint(runRegistryPull(cmd, ref))
 				}
 				base = args[0]
 			}
