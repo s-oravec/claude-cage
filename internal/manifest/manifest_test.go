@@ -126,9 +126,9 @@ func TestManifest_Validate_AllRejectionBranches(t *testing.T) {
 	}
 
 	cases := []struct {
-		name     string
-		mutate   func(*Manifest)
-		errFrag  string
+		name    string
+		mutate  func(*Manifest)
+		errFrag string
 	}{
 		{"bad schema version", func(m *Manifest) { m.SchemaVersion = 2 }, "schemaVersion"},
 		{"bad media type", func(m *Manifest) { m.MediaType = "wrong" }, "mediaType"},
@@ -140,7 +140,9 @@ func TestManifest_Validate_AllRejectionBranches(t *testing.T) {
 		{"bad layer mediatype", func(m *Manifest) { m.Layers[0].MediaType = "x" }, "layers[0].mediaType"},
 		{"cagefile too large", func(m *Manifest) {
 			big := make([]byte, 64*1024+1)
-			for i := range big { big[i] = 'a' }
+			for i := range big {
+				big[i] = 'a'
+			}
 			m.Config.Cagefile = string(big)
 		}, "config.cagefile"},
 	}
