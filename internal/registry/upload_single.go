@@ -40,7 +40,7 @@ func (c *Client) UploadBlobSinglePUT(owner, name, digest string, body io.Reader)
 
 	// Phase 2: PUT body.
 	url := init.UploadURL + "?digest=" + digest
-	req, err := http.NewRequest(http.MethodPut, c.baseURL+url, body)
+	req, err := http.NewRequest(http.MethodPut, c.resolveURL(url), body)
 	if err != nil {
 		return err
 	}

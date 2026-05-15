@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -40,6 +41,17 @@ func NewClient(host string, opt Options) (*Client, error) {
 	}, nil
 }
 
+// resolveURL returns target as-is if it is already absolute (starts with http://
+// or https://), otherwise prepends c.baseURL. Used for upload/redirect URLs that
+// the server may return either as paths or as full URLs (e.g. presigned storage
+// URLs).
+func (c *Client) resolveURL(target string) string {
+	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
+		return target
+	}
+	return c.baseURL + target
+}
+
 // do issues an HTTP request with bearer token (if set) and merges extra headers.
 // Caller MUST close resp.Body.
 func (c *Client) do(method, path string, body []byte, headers map[string]string) (*http.Response, error) {
@@ -47,7 +59,7 @@ func (c *Client) do(method, path string, body []byte, headers map[string]string)
 	if body != nil {
 		br = bytes.NewReader(body)
 	}
-	req, err := http.NewRequest(method, c.baseURL+path, br)
+	req, err := http.NewRequest(method, c.resolveURL(path), br)
 	if err != nil {
 		return nil, err
 	}

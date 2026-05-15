@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -79,7 +80,7 @@ func (c *Client) UploadBlobMultipart(owner, name, digest string, body io.Reader)
 		uresp.Body.Close()
 
 		// PUT directly to presigned URL.
-		req, err := http.NewRequest(http.MethodPut, c.baseURL+pu.URL, strings.NewReader(string(chunk)))
+		req, err := http.NewRequest(http.MethodPut, c.resolveURL(pu.URL), bytes.NewReader(chunk))
 		if err != nil {
 			return err
 		}
