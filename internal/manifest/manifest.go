@@ -1,5 +1,11 @@
 package manifest
 
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+)
+
 const (
 	// MediaTypeManifestV1 is the media type for a cage-hub v1 image manifest.
 	MediaTypeManifestV1 = "application/vnd.cage.manifest.v1+json"
@@ -50,4 +56,28 @@ type Resources struct {
 	MemoryMB int `json:"memory_mb,omitempty"`
 	VCPU     int `json:"vcpu,omitempty"`
 	DiskGB   int `json:"disk_gb,omitempty"`
+}
+
+// Canonical returns the deterministic JSON encoding used for digest
+// computation and network transport. Struct field order is fixed, so
+// stdlib json.Marshal is sufficient.
+func Canonical(m *Manifest) ([]byte, error) {
+	return json.Marshal(m)
+}
+
+// Digest computes the sha256:<hex> of the canonical encoding.
+func Digest(m *Manifest) (string, error) {
+	data, err := Canonical(m)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(data)
+	return "sha256:" + hex.EncodeToString(sum[:]), nil
+}
+
+// DigestBytes computes sha256:<hex> of arbitrary bytes (used for layer
+// blobs read from disk).
+func DigestBytes(b []byte) string {
+	sum := sha256.Sum256(b)
+	return "sha256:" + hex.EncodeToString(sum[:])
 }

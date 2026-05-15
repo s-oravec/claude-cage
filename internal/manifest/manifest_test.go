@@ -36,3 +36,26 @@ func TestManifest_RoundTripJSON(t *testing.T) {
 	require.NoError(t, json.Unmarshal(data, &got))
 	assert.Equal(t, m, got)
 }
+
+func TestManifest_Canonical_Deterministic(t *testing.T) {
+	m := Manifest{
+		SchemaVersion: 1,
+		MediaType:     MediaTypeManifestV1,
+		Base:          Base{Type: "distro", Name: "ubuntu-24.04", Digest: "sha256:abc"},
+		Layers:        []Layer{{Digest: "sha256:def", Size: 1, MediaType: MediaTypeLayerV1}},
+		Config:        Config{OS: "linux", Arch: "amd64"},
+	}
+
+	a, err := Canonical(&m)
+	require.NoError(t, err)
+	b, err := Canonical(&m)
+	require.NoError(t, err)
+	assert.Equal(t, a, b, "canonical encoding must be byte-identical across calls")
+
+	d1, err := Digest(&m)
+	require.NoError(t, err)
+	d2, err := Digest(&m)
+	require.NoError(t, err)
+	assert.Equal(t, d1, d2)
+	assert.Regexp(t, `^sha256:[0-9a-f]{64}$`, d1)
+}
