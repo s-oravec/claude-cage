@@ -2,6 +2,7 @@ package imgstore
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -96,4 +97,46 @@ func TestHashFile(t *testing.T) {
 	require.NoError(t, err)
 	// sha256("hello") = 2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824
 	assert.Equal(t, "sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824", got)
+}
+
+func TestMaterializeChain_SingleLayer(t *testing.T) {
+	if _, err := exec.LookPath("qemu-img"); err != nil {
+		t.Skip("qemu-img not installed")
+	}
+	root := t.TempDir()
+	SetRoot(root)
+	defer SetRoot("")
+
+	// Create a fake qcow2 layer.
+	layerSrc := filepath.Join(t.TempDir(), "src.qcow2")
+	require.NoError(t, exec.Command("qemu-img", "create", "-f", "qcow2", layerSrc, "1M").Run())
+
+	// Compute its digest and store it under that digest.
+	digest := layerDigestForFile(t, layerSrc)
+	require.NoError(t, CopyFromFile(layerSrc, digest))
+
+	// Construct a minimal manifest referencing one layer (use actual digest).
+	manifest := []byte(`{"layers":[{"digest":"` + digest + `"}]}`)
+	mdigest := "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+	require.NoError(t, PutManifestBytes(mdigest, manifest))
+
+	// Create a fake base image.
+	base := filepath.Join(t.TempDir(), "base.qcow2")
+	require.NoError(t, exec.Command("qemu-img", "create", "-f", "qcow2", base, "1M").Run())
+
+	dst := filepath.Join(t.TempDir(), "materialized.qcow2")
+	require.NoError(t, MaterializeChain(mdigest, base, dst))
+
+	// Verify the materialized file exists and has correct backing file.
+	out, err := exec.Command("qemu-img", "info", "--output=json", dst).Output()
+	require.NoError(t, err)
+	assert.Contains(t, string(out), base, "rebased backing path should be the base image")
+}
+
+// helper
+func layerDigestForFile(t *testing.T, path string) string {
+	t.Helper()
+	d, err := HashFile(path)
+	require.NoError(t, err)
+	return d
 }

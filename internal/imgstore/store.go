@@ -3,9 +3,11 @@ package imgstore
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -162,4 +164,54 @@ func HashFile(path string) (string, error) {
 		return "", err
 	}
 	return "sha256:" + hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// MaterializeChain copies the top layer of a manifest to dstPath and rebases
+// its backing-file pointer to baseImagePath. MVP single-layer flow only;
+// multi-layer manifests return an error.
+func MaterializeChain(manifestDigest string, baseImagePath, dstPath string) error {
+	body, err := GetManifestBytes(manifestDigest)
+	if err != nil {
+		return err
+	}
+	var m manifestForMaterialize
+	if err := json.Unmarshal(body, &m); err != nil {
+		return err
+	}
+	if len(m.Layers) != 1 {
+		return fmt.Errorf("multi-layer materialization not supported in MVP (got %d layers)", len(m.Layers))
+	}
+	src := LayerPath(m.Layers[0].Digest)
+	if err := copyFileToDst(src, dstPath); err != nil {
+		return err
+	}
+	cmd := exec.Command("qemu-img", "rebase", "-u", "-b", baseImagePath, "-F", "qcow2", dstPath)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("qemu-img rebase: %w: %s", err, string(out))
+	}
+	return nil
+}
+
+type manifestForMaterialize struct {
+	Layers []struct {
+		Digest string `json:"digest"`
+	} `json:"layers"`
+}
+
+func copyFileToDst(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	if err := ensureDir(dst); err != nil {
+		return err
+	}
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = io.Copy(out, in)
+	return err
 }
