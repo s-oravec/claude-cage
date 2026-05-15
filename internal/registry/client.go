@@ -59,3 +59,20 @@ func (c *Client) do(method, path string, body []byte, headers map[string]string)
 	}
 	return c.hc.Do(req)
 }
+
+// SelectUploadMode returns "single" or "multipart" based on the C1 hybrid rule:
+// layers below 4*partSize use single-PUT (no resume); larger use multipart.
+func SelectUploadMode(size, partSize int64) string {
+	if size < 4*partSize {
+		return "single"
+	}
+	return "multipart"
+}
+
+// UploadBlob picks single or multipart based on size + partSize and uploads body.
+func (c *Client) UploadBlob(owner, name, digest string, size, partSize int64, body io.Reader) error {
+	if SelectUploadMode(size, partSize) == "multipart" {
+		return c.UploadBlobMultipart(owner, name, digest, body)
+	}
+	return c.UploadBlobSinglePUT(owner, name, digest, body)
+}
