@@ -328,6 +328,14 @@ func SaveLayered(in SaveLayeredInput) (*SaveLayeredResult, error) {
 		return nil, fmt.Errorf("copy overlay: %w", err)
 	}
 
+	// Prepare image for reuse: clear injected SSH authorized_keys and reset
+	// cloud-init state so the next cage built from this image gets fresh keys
+	// on first boot. Non-fatal if virt-customize is unavailable - cloud-init
+	// runcmd will inject keys at boot regardless.
+	if _, err := prepareImageForReuse(tmpPath); err != nil {
+		return nil, fmt.Errorf("prepare image for reuse: %w", err)
+	}
+
 	// Strip backing-file pointer (metadata only).
 	cmd := exec.Command("qemu-img", "rebase", "-u", "-b", "", tmpPath)
 	if out, err := cmd.CombinedOutput(); err != nil {
