@@ -118,6 +118,16 @@ cage stop
 cage remove
 ```
 
+As an alternative to manually copying qcow2 files between machines, you can publish a built image to a cage-hub registry and pull it on another host (see [Registry Commands](#registry-commands) and [docs/cage-hub.md](docs/cage-hub.md)):
+
+```bash
+cage login cage-hub.io
+cage build -t cage-hub.io/me/devbox:v1 .
+cage push cage-hub.io/me/devbox:v1
+# on another machine:
+cage pull cage-hub.io/me/devbox:v1
+```
+
 ### Direct Usage (Without Project Config)
 
 ```bash
@@ -163,6 +173,15 @@ cage stop myvm
 - [`cage config`](#cage-config) - Manage configuration
 - [`cage doctor`](#cage-doctor) - Check system requirements
 - [`cage verify`](#cage-verify) - Verify network isolation
+
+### Registry Commands
+- [`cage login`](#registry-commands) - Authenticate with a cage-hub registry
+- [`cage logout`](#registry-commands) - Remove stored registry credentials
+- [`cage push`](#registry-commands) - Push a local image to a registry
+- [`cage pull`](#registry-commands) - Pull an image from a registry (also accepts registry refs)
+- [`cage tag`](#registry-commands) - Create or move a local tag
+
+See [docs/cage-hub.md](docs/cage-hub.md) for the full how-to.
 
 ---
 
@@ -739,6 +758,76 @@ cage pull --base ubuntu-24.04
 
 # Use alias
 cage pull --base ubuntu
+
+# Pull from a registry (fully-qualified ref)
+cage pull cage-hub.io/stiivo/devbox:v1
+```
+
+---
+
+## Registry Commands
+
+cage can publish and fetch built images from a cage-hub registry, similar in spirit to Docker Hub. Image refs are fully qualified as `host/owner/name:tag` (e.g. `cage-hub.io/stiivo/devbox:v1`). See [docs/cage-hub.md](docs/cage-hub.md) for the full how-to.
+
+### cage login
+
+Authenticate with a registry host using device flow (interactive) or a personal access token (CI). Credentials are stored in `~/.claude-cage/auth.yaml` (mode 0600).
+
+```bash
+cage login <host>           # device flow: prints URL and user code
+cage login <host> --token-stdin   # read PAT from stdin
+cage login --list           # list logged-in hosts
+```
+
+Example:
+```bash
+cage login cage-hub.io
+echo "$CAGE_HUB_TOKEN" | cage login cage-hub.io --token-stdin
+```
+
+### cage logout
+
+Remove stored credentials for a host. This is local-only; to revoke a PAT, use the registry's web UI.
+
+```bash
+cage logout <host>
+cage logout --all
+```
+
+### cage push
+
+Push a local image to a registry. Layers already present on the server are skipped via HEAD probe; large layers use multipart upload for resumability.
+
+```bash
+cage push <host/owner/name:tag> [--latest]
+```
+
+Example:
+```bash
+cage push cage-hub.io/stiivo/devbox:v1
+cage push cage-hub.io/stiivo/devbox:v1 --latest   # also move :latest
+```
+
+### cage pull (registry ref)
+
+`cage pull` also accepts a fully-qualified registry ref. It downloads the manifest, verifies its sha256, fetches any missing layer blobs (resumable via HTTP Range), and pulls the base distro image automatically if missing locally.
+
+```bash
+cage pull cage-hub.io/stiivo/devbox:v1
+```
+
+### cage tag
+
+Create or move a local tag, pointing it at the same manifest as an existing local ref.
+
+```bash
+cage tag <src-ref> <dst-ref>
+```
+
+Example:
+```bash
+cage tag cage-hub.io/stiivo/devbox:v1 cage-hub.io/stiivo/devbox:stable
+cage push cage-hub.io/stiivo/devbox:stable
 ```
 
 ---
