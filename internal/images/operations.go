@@ -1,8 +1,11 @@
 package images
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -271,6 +274,21 @@ func Inspect(imageName string) (*ImageDetails, error) {
 		Format:      qcowInfo.Format,
 		BackingFile: qcowInfo.BackingFile,
 	}, nil
+}
+
+// BaseDigest returns sha256:<hex> of the on-disk base image qcow2.
+// Used by build/pull flows to populate or verify manifest.Base.Digest.
+func BaseDigest(name string) (string, error) {
+	f, err := os.Open(ImagePath(name))
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return "sha256:" + hex.EncodeToString(h.Sum(nil)), nil
 }
 
 // FormatSize formats bytes as human readable string

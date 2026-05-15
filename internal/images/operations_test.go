@@ -3,10 +3,13 @@ package images
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/s-oravec/claude-cage/internal/cage"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestList(t *testing.T) {
@@ -241,4 +244,21 @@ func TestFormatSize(t *testing.T) {
 			t.Errorf("FormatSize(%d) = %q, want %q", tt.bytes, got, tt.want)
 		}
 	}
+}
+
+func TestBaseDigest_ReadsFromDisk(t *testing.T) {
+	tmpDir := t.TempDir()
+	oldDir := imagesDir
+	imagesDir = tmpDir
+	defer func() { imagesDir = oldDir }()
+
+	// Write a fake base image
+	path := filepath.Join(tmpDir, "ubuntu-24.04.qcow2")
+	require.NoError(t, os.WriteFile(path, []byte("fakebase"), 0644))
+
+	d, err := BaseDigest("ubuntu-24.04")
+	require.NoError(t, err)
+	// sha256("fakebase") - we don't need to know the exact value; just verify the format.
+	assert.True(t, strings.HasPrefix(d, "sha256:"))
+	assert.Len(t, d, len("sha256:")+64)
 }
