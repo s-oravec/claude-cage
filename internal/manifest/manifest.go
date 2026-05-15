@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 )
 
 const (
@@ -80,4 +81,67 @@ func Digest(m *Manifest) (string, error) {
 func DigestBytes(b []byte) string {
 	sum := sha256.Sum256(b)
 	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+// SupportedOS is the closed whitelist of operating systems a v1 manifest may declare.
+var SupportedOS = []string{"linux"}
+
+// SupportedArch is the closed whitelist of CPU architectures a v1 manifest may declare.
+var SupportedArch = []string{"amd64", "arm64"}
+
+// Validate checks that a manifest conforms to the v1 schema: required fields
+// are present, digests are sha256-prefixed, layers are non-empty, and
+// config.os / config.arch fall within the supported whitelists. It is called
+// on the build path (before publish) and on the pull path (after fetch).
+func (m *Manifest) Validate() error {
+	if m.SchemaVersion != SchemaVersionV1 {
+		return fmt.Errorf("schemaVersion: want %d, got %d", SchemaVersionV1, m.SchemaVersion)
+	}
+	if m.MediaType != MediaTypeManifestV1 {
+		return fmt.Errorf("mediaType: want %q, got %q", MediaTypeManifestV1, m.MediaType)
+	}
+	if m.Base.Type != "distro" {
+		return fmt.Errorf("base.type: only %q supported", "distro")
+	}
+	if m.Base.Name == "" {
+		return fmt.Errorf("base.name: required")
+	}
+	if !hasPrefix(m.Base.Digest, "sha256:") {
+		return fmt.Errorf("base.digest: must be sha256:<hex>")
+	}
+	if len(m.Layers) == 0 {
+		return fmt.Errorf("layers: at least one layer required")
+	}
+	for i, l := range m.Layers {
+		if !hasPrefix(l.Digest, "sha256:") {
+			return fmt.Errorf("layers[%d].digest: must be sha256:<hex>", i)
+		}
+		if l.Size <= 0 {
+			return fmt.Errorf("layers[%d].size: must be > 0", i)
+		}
+		if l.MediaType != MediaTypeLayerV1 {
+			return fmt.Errorf("layers[%d].mediaType: want %q", i, MediaTypeLayerV1)
+		}
+	}
+	if !inList(m.Config.OS, SupportedOS) {
+		return fmt.Errorf("config.os: must be one of %v, got %q", SupportedOS, m.Config.OS)
+	}
+	if !inList(m.Config.Arch, SupportedArch) {
+		return fmt.Errorf("config.arch: must be one of %v, got %q", SupportedArch, m.Config.Arch)
+	}
+	if len(m.Config.Cagefile) > 64*1024 {
+		return fmt.Errorf("config.cagefile: exceeds 64KB")
+	}
+	return nil
+}
+
+func hasPrefix(s, p string) bool { return len(s) >= len(p) && s[:len(p)] == p }
+
+func inList(s string, list []string) bool {
+	for _, x := range list {
+		if x == s {
+			return true
+		}
+	}
+	return false
 }

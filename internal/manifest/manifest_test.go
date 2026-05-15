@@ -64,3 +64,52 @@ func TestManifest_Canonical_Deterministic(t *testing.T) {
 	assert.Equal(t, d1, d2)
 	assert.Regexp(t, `^sha256:[0-9a-f]{64}$`, d1)
 }
+
+func TestManifest_Validate_AcceptsCanonical(t *testing.T) {
+	m := &Manifest{
+		SchemaVersion: 1,
+		MediaType:     MediaTypeManifestV1,
+		Base:          Base{Type: "distro", Name: "ubuntu-24.04", Digest: "sha256:abc"},
+		Layers:        []Layer{{Digest: "sha256:def", Size: 1, MediaType: MediaTypeLayerV1}},
+		Config:        Config{OS: "linux", Arch: "amd64"},
+	}
+	assert.NoError(t, m.Validate())
+}
+
+func TestManifest_Validate_RejectsOffWhitelistOS(t *testing.T) {
+	m := &Manifest{
+		SchemaVersion: 1,
+		MediaType:     MediaTypeManifestV1,
+		Base:          Base{Type: "distro", Name: "ubuntu-24.04", Digest: "sha256:abc"},
+		Layers:        []Layer{{Digest: "sha256:def", Size: 1, MediaType: MediaTypeLayerV1}},
+		Config:        Config{OS: "Linux", Arch: "amd64"}, // capitalized
+	}
+	err := m.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "config.os")
+}
+
+func TestManifest_Validate_RejectsOffWhitelistArch(t *testing.T) {
+	m := &Manifest{
+		SchemaVersion: 1,
+		MediaType:     MediaTypeManifestV1,
+		Base:          Base{Type: "distro", Name: "ubuntu-24.04", Digest: "sha256:abc"},
+		Layers:        []Layer{{Digest: "sha256:def", Size: 1, MediaType: MediaTypeLayerV1}},
+		Config:        Config{OS: "linux", Arch: "x86_64"},
+	}
+	err := m.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "config.arch")
+}
+
+func TestManifest_Validate_RejectsMissingLayer(t *testing.T) {
+	m := &Manifest{
+		SchemaVersion: 1,
+		MediaType:     MediaTypeManifestV1,
+		Base:          Base{Type: "distro", Name: "ubuntu-24.04", Digest: "sha256:abc"},
+		Layers:        []Layer{}, // empty
+		Config:        Config{OS: "linux", Arch: "amd64"},
+	}
+	err := m.Validate()
+	require.Error(t, err)
+}
