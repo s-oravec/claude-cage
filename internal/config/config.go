@@ -25,12 +25,31 @@ func SetDir(dir string) {
 
 // Config holds all cage configuration
 type Config struct {
-	Images   ImagesConfig       `yaml:"images"`
-	Profiles map[string]Profile `yaml:"profiles"`
-	Network  NetworkConfig      `yaml:"network"`
-	Shares   []ShareConfig      `yaml:"shares"`
-	Security SecurityConfig     `yaml:"security"`
-	Env      map[string]string  `yaml:"env,omitempty"`
+	Images     ImagesConfig       `yaml:"images"`
+	Profiles   map[string]Profile `yaml:"profiles"`
+	Network    NetworkConfig      `yaml:"network"`
+	Shares     []ShareConfig      `yaml:"shares"`
+	Security   SecurityConfig     `yaml:"security"`
+	Env        map[string]string  `yaml:"env,omitempty"`
+	Registries RegistriesConfig   `yaml:"registries,omitempty"`
+}
+
+// RegistriesConfig holds configuration for image registries.
+type RegistriesConfig struct {
+	// Insecure is the allowlist of registry hosts reached over plain HTTP
+	// with no TLS verification (for local dev / self-hosted dev instances).
+	// Every other host uses HTTPS with full chain validation.
+	Insecure []string `yaml:"insecure,omitempty"`
+}
+
+// IsInsecureRegistry reports whether the given host is in the insecure allowlist.
+func (c *Config) IsInsecureRegistry(host string) bool {
+	for _, h := range c.Registries.Insecure {
+		if h == host {
+			return true
+		}
+	}
+	return false
 }
 
 // ImagesConfig holds image settings

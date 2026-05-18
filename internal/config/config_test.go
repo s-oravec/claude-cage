@@ -602,3 +602,24 @@ func TestResolveProjectConfig_InvalidPortMapping(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "port mapping")
 }
+
+func TestConfig_RegistriesInsecure_RoundTrip(t *testing.T) {
+	tmpDir := t.TempDir()
+	old := configDir
+	configDir = tmpDir
+	defer func() { configDir = old }()
+
+	cfg := DefaultConfig()
+	cfg.Registries.Insecure = []string{"localhost:5000", "cage-hub.local"}
+	require.NoError(t, Save(cfg))
+
+	got, err := Load()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"localhost:5000", "cage-hub.local"}, got.Registries.Insecure)
+}
+
+func TestConfig_IsInsecure(t *testing.T) {
+	cfg := &Config{Registries: RegistriesConfig{Insecure: []string{"localhost:5000"}}}
+	assert.True(t, cfg.IsInsecureRegistry("localhost:5000"))
+	assert.False(t, cfg.IsInsecureRegistry("cage-hub.io"))
+}

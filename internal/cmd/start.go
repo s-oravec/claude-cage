@@ -1,17 +1,21 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/s-oravec/claude-cage/internal/cage"
 	"github.com/s-oravec/claude-cage/internal/cloudinit"
 	"github.com/s-oravec/claude-cage/internal/config"
 	"github.com/s-oravec/claude-cage/internal/images"
+	"github.com/s-oravec/claude-cage/internal/imgstore"
 	"github.com/s-oravec/claude-cage/internal/libvirt"
+	"github.com/s-oravec/claude-cage/internal/manifest"
 	"github.com/s-oravec/claude-cage/internal/mode"
 	"github.com/s-oravec/claude-cage/internal/network"
 	"github.com/s-oravec/claude-cage/internal/runtime"
@@ -141,12 +145,26 @@ func runStartCmd(cmd *cobra.Command, args []string, ports []string) error {
 
 // createCageFromConfig creates a new cage from resolved project config
 func createCageFromConfig(cmd *cobra.Command, name string, resolved *config.ResolvedConfig, globalCfg *config.Config) error {
-	// Resolve image name
-	imageName := images.ResolveAlias(resolved.Image)
+	// Decide whether this is a layered registry ref or a distro alias.
+	// Registry refs (host/owner/name[:tag]) materialize a chain into a
+	// per-cage disk-base.qcow2 that the per-cage overlay then backs onto.
+	// Distro aliases use the legacy images/<name>.qcow2 directly as backing.
+	ref, refErr := imgstore.ParseRef(resolved.Image)
+	isRegistry := refErr == nil && ref.IsRegistry()
 
-	// Check image exists
-	if !images.IsDownloaded(imageName) {
-		return fmt.Errorf("image '%s' not found, run 'cage pull --base %s' first", imageName, imageName)
+	var imageName string
+	if isRegistry {
+		// Registry refs are stored verbatim as the image identity.
+		imageName = resolved.Image
+		if _, err := imgstore.ReadRef(ref); err != nil {
+			return fmt.Errorf("image %q not pulled locally - run 'cage pull %s' first", resolved.Image, resolved.Image)
+		}
+	} else {
+		imageName = images.ResolveAlias(resolved.Image)
+		// Check image exists
+		if !images.IsDownloaded(imageName) {
+			return fmt.Errorf("image '%s' not found, run 'cage pull --base %s' first", imageName, imageName)
+		}
 	}
 
 	fmt.Fprintf(cmd.OutOrStdout(), "Creating cage '%s'...\n", name)
@@ -178,14 +196,63 @@ func createCageFromConfig(cmd *cobra.Command, name string, resolved *config.Reso
 	// Auto mode uses SLIRP user-mode networking
 	fmt.Fprintln(cmd.OutOrStdout(), "  Using SLIRP user-mode networking...")
 
-	// Create qcow2 overlay in VM artifacts dir (libvirt-readable)
-	baseImage := images.ImagePath(imageName)
+	// Resolve the qcow2 backing path for the per-cage overlay. For registry
+	// refs we first materialize the layer chain into disk-base.qcow2 inside
+	// the cage VM dir, then back disk.qcow2 onto that.
 	overlayPath := filepath.Join(cageVMDir, "disk.qcow2")
 	diskSize := fmt.Sprintf("%dG", resolved.DiskGB)
 
+	var backingPath string
+	if isRegistry {
+		manifestDigest, err := imgstore.ReadRef(ref)
+		if err != nil {
+			cage.DeleteState(name)
+			return fmt.Errorf("failed to read ref for %q: %w", resolved.Image, err)
+		}
+		body, err := imgstore.GetManifestBytes(manifestDigest)
+		if err != nil {
+			cage.DeleteState(name)
+			return fmt.Errorf("failed to read manifest %s: %w", manifestDigest, err)
+		}
+		var m manifest.Manifest
+		if err := json.Unmarshal(body, &m); err != nil {
+			cage.DeleteState(name)
+			return fmt.Errorf("failed to parse manifest %s: %w", manifestDigest, err)
+		}
+		// Merge env from manifest.config into the resolved env so build-time
+		// envs survive pull. .cage.yml env: still takes precedence (resolved
+		// already contains it).
+		for _, kv := range m.Config.Env {
+			if i := strings.IndexByte(kv, '='); i > 0 {
+				k := kv[:i]
+				v := kv[i+1:]
+				if _, exists := resolved.Env[k]; !exists {
+					if resolved.Env == nil {
+						resolved.Env = map[string]string{}
+					}
+					resolved.Env[k] = v
+				}
+			}
+		}
+		baseImg := images.ImagePath(m.Base.Name)
+		if !images.IsDownloaded(m.Base.Name) {
+			cage.DeleteState(name)
+			return fmt.Errorf("base image %q not downloaded - run 'cage pull --base %s' first", m.Base.Name, m.Base.Name)
+		}
+		diskBase := filepath.Join(cageVMDir, "disk-base.qcow2")
+		fmt.Fprintln(cmd.OutOrStdout(), "  Materializing layered image...")
+		if err := imgstore.MaterializeChain(manifestDigest, baseImg, diskBase); err != nil {
+			cage.DeleteState(name)
+			return fmt.Errorf("failed to materialize image: %w", err)
+		}
+		backingPath = diskBase
+	} else {
+		backingPath = images.ImagePath(imageName)
+	}
+
 	fmt.Fprintf(cmd.OutOrStdout(), "  Creating disk overlay (%s)...\n", diskSize)
 	createCmd := exec.Command("qemu-img", "create", "-f", "qcow2",
-		"-b", baseImage, "-F", "qcow2", overlayPath, diskSize)
+		"-b", backingPath, "-F", "qcow2", overlayPath, diskSize)
 	if out, err := createCmd.CombinedOutput(); err != nil {
 		cage.DeleteState(name)
 		return fmt.Errorf("failed to create overlay: %s", string(out))

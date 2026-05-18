@@ -1,12 +1,19 @@
 package images
 
 import (
+	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/s-oravec/claude-cage/internal/cage"
+	"github.com/s-oravec/claude-cage/internal/imgstore"
+	"github.com/s-oravec/claude-cage/internal/manifest"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestList(t *testing.T) {
@@ -15,6 +22,11 @@ func TestList(t *testing.T) {
 	oldDir := imagesDir
 	imagesDir = tmpDir
 	defer func() { imagesDir = oldDir }()
+
+	// Isolate imgstore root so the real ~/.claude-cage/refs/ does not bleed in.
+	storeRoot := t.TempDir()
+	imgstore.SetRoot(storeRoot)
+	defer imgstore.SetRoot("")
 
 	t.Run("empty directory", func(t *testing.T) {
 		images, err := List()
@@ -82,6 +94,9 @@ func TestSave(t *testing.T) {
 	cage.SetCagesDir(filepath.Join(tmpDir, "cages"))
 	defer cage.SetCagesDir(oldCagesDir)
 
+	imgstore.SetRoot(tmpDir)
+	defer imgstore.SetRoot("")
+
 	t.Run("save non-existent cage", func(t *testing.T) {
 		_, err := Save("nonexistent", "new-image", "")
 		if err == nil {
@@ -99,15 +114,17 @@ func TestSave(t *testing.T) {
 		}
 		cage.SaveState(state)
 
-		// Create existing image
-		imgPath := filepath.Join(tmpDir, "existing.qcow2")
-		os.WriteFile(imgPath, []byte("test"), 0644)
+		// Pre-create a ref so the existence check fires before any disk work.
+		ref, err := imgstore.ParseRef("existing")
+		require.NoError(t, err)
+		require.NoError(t, imgstore.WriteRef(ref, "sha256:0000000000000000000000000000000000000000000000000000000000000000"))
 
-		_, err := Save("test-cage", "existing", "")
+		_, err = Save("test-cage", "existing", "")
 		if err != ErrImageExists {
 			t.Errorf("expected ErrImageExists, got %v", err)
 		}
 
+		require.NoError(t, imgstore.DeleteRef(ref))
 		cage.DeleteState("test-cage")
 	})
 }
@@ -241,4 +258,92 @@ func TestFormatSize(t *testing.T) {
 			t.Errorf("FormatSize(%d) = %q, want %q", tt.bytes, got, tt.want)
 		}
 	}
+}
+
+func TestBaseDigest_ReadsFromDisk(t *testing.T) {
+	tmpDir := t.TempDir()
+	oldDir := imagesDir
+	imagesDir = tmpDir
+	defer func() { imagesDir = oldDir }()
+
+	// Write a fake base image
+	path := filepath.Join(tmpDir, "ubuntu-24.04.qcow2")
+	require.NoError(t, os.WriteFile(path, []byte("fakebase"), 0644))
+
+	d, err := BaseDigest("ubuntu-24.04")
+	require.NoError(t, err)
+	// sha256("fakebase") - we don't need to know the exact value; just verify the format.
+	assert.True(t, strings.HasPrefix(d, "sha256:"))
+	assert.Len(t, d, len("sha256:")+64)
+}
+
+func TestSaveLayered_WritesAllArtifacts(t *testing.T) {
+	if _, err := exec.LookPath("qemu-img"); err != nil {
+		t.Skip("qemu-img not installed; run on dev host")
+	}
+	root := t.TempDir()
+	imagesDir = root
+	imgstore.SetRoot(root)
+	defer func() { imagesDir = ""; imgstore.SetRoot("") }()
+
+	// Make a fake base + overlay.
+	base := filepath.Join(root, "ubuntu-24.04.qcow2")
+	require.NoError(t, exec.Command("qemu-img", "create", "-f", "qcow2", base, "1M").Run())
+
+	overlayDir := t.TempDir()
+	overlay := filepath.Join(overlayDir, "disk.qcow2")
+	require.NoError(t, exec.Command("qemu-img", "create", "-f", "qcow2",
+		"-b", base, "-F", "qcow2", overlay, "10M").Run())
+
+	r, err := SaveLayered(SaveLayeredInput{
+		OverlayPath: overlay,
+		BaseName:    "ubuntu-24.04",
+		Tag:         "myimage:v1",
+		Config:      manifest.Config{OS: "linux", Arch: "amd64"},
+	})
+	require.NoError(t, err)
+	assert.NotEmpty(t, r.ManifestDigest)
+	assert.NotEmpty(t, r.LayerDigest)
+
+	// Layer + manifest + ref are present.
+	assert.True(t, imgstore.HasLayer(r.LayerDigest))
+	assert.True(t, imgstore.HasManifest(r.ManifestDigest))
+
+	ref, _ := imgstore.ParseRef("myimage:v1")
+	got, err := imgstore.ReadRef(ref)
+	require.NoError(t, err)
+	assert.Equal(t, r.ManifestDigest, got)
+}
+
+func TestSave_BuildsValidManifestWithEmptyCagefile(t *testing.T) {
+	if _, err := exec.LookPath("qemu-img"); err != nil {
+		t.Skip("qemu-img not installed")
+	}
+	root := t.TempDir()
+	imagesDir = root
+	imgstore.SetRoot(root)
+	defer func() { imagesDir = ""; imgstore.SetRoot("") }()
+
+	base := filepath.Join(root, "ubuntu-24.04.qcow2")
+	require.NoError(t, exec.Command("qemu-img", "create", "-f", "qcow2", base, "1M").Run())
+
+	overlay := filepath.Join(t.TempDir(), "disk.qcow2")
+	require.NoError(t, exec.Command("qemu-img", "create", "-f", "qcow2",
+		"-b", base, "-F", "qcow2", overlay, "10M").Run())
+
+	r, err := SaveLayered(SaveLayeredInput{
+		OverlayPath: overlay,
+		BaseName:    "ubuntu-24.04",
+		Tag:         "savedimage:latest",
+		Config:      manifest.Config{OS: "linux", Arch: "amd64"},
+	})
+	require.NoError(t, err)
+
+	// Read the stored manifest, verify validate passes and Cagefile is empty.
+	body, err := imgstore.GetManifestBytes(r.ManifestDigest)
+	require.NoError(t, err)
+	var m manifest.Manifest
+	require.NoError(t, json.Unmarshal(body, &m))
+	require.NoError(t, m.Validate())
+	assert.Empty(t, m.Config.Cagefile)
 }

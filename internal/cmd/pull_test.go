@@ -26,3 +26,8 @@ func TestPullCmd_HasListFlag(t *testing.T) {
 	flag := cmd.Flag("list")
 	assert.NotNil(t, flag)
 }
+
+func TestPullCmd_LongMentionsRegistry(t *testing.T) {
+	c := NewPullCmd()
+	assert.Contains(t, c.Long, "registry")
+}

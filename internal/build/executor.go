@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	goruntime "runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -16,6 +18,7 @@ import (
 	"github.com/s-oravec/claude-cage/internal/images"
 	"github.com/s-oravec/claude-cage/internal/libvirt"
 	"github.com/s-oravec/claude-cage/internal/logging"
+	"github.com/s-oravec/claude-cage/internal/manifest"
 	"github.com/s-oravec/claude-cage/internal/network"
 	"github.com/s-oravec/claude-cage/internal/runtime"
 	"github.com/s-oravec/claude-cage/internal/ssh"
@@ -583,18 +586,51 @@ func (e *Executor) stopCage() error {
 func (e *Executor) saveImage() error {
 	e.log("Saving image as '%s'...", e.config.Tag)
 
-	result, err := images.Save(e.tempCage, e.config.Tag, fmt.Sprintf("Built from %s", e.cagefile.BaseImage))
+	overlay := filepath.Join(cage.VMDir(e.tempCage), "disk.qcow2")
+
+	cfg := manifest.Config{
+		OS:       "linux",
+		Arch:     goruntime.GOARCH,
+		User:     e.user,
+		Workdir:  e.workdir,
+		Cagefile: readCagefileText(e.config.CagefilePath),
+	}
+	if len(e.env) > 0 {
+		cfg.Env = make([]string, 0, len(e.env))
+		for k, v := range e.env {
+			cfg.Env = append(cfg.Env, k+"="+v)
+		}
+		sort.Strings(cfg.Env)
+	}
+
+	r, err := images.SaveLayered(images.SaveLayeredInput{
+		OverlayPath: overlay,
+		BaseName:    images.ResolveAlias(e.cagefile.BaseImage),
+		Tag:         e.config.Tag,
+		Config:      cfg,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to save image: %w", err)
 	}
 
-	if result.VirtCustomizeError != "" {
-		e.log(" ---> Warning: %s", result.VirtCustomizeError)
-	}
-
-	e.log("Successfully built image: %s", e.config.Tag)
-
+	e.log("Built image: %s (manifest=%s, layer=%s)", e.config.Tag, r.ManifestDigest, r.LayerDigest)
 	return nil
+}
+
+// readCagefileText reads the Cagefile at path for embedding in manifest.Config.Cagefile.
+// Returns empty string on read error or if the file exceeds 64KB (manifest cap).
+func readCagefileText(path string) string {
+	if path == "" {
+		return ""
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	if len(b) > 64*1024 {
+		return ""
+	}
+	return string(b)
 }
 
 func (e *Executor) cleanup() {

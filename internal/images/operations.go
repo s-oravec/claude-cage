@@ -1,15 +1,20 @@
 package images
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
-	"time"
 
 	"github.com/s-oravec/claude-cage/internal/cage"
+	"github.com/s-oravec/claude-cage/internal/imgstore"
+	"github.com/s-oravec/claude-cage/internal/manifest"
 )
 
 // List returns all available images
@@ -46,6 +51,41 @@ func List() ([]Image, error) {
 		}
 	}
 
+	// List layered images stored under imgstore refs (built via `cage build`
+	// or `cage image save`). Each ref points at a manifest; size is the sum of
+	// the manifest's layer sizes.
+	refs, err := imgstore.ListRefs()
+	if err != nil {
+		return nil, fmt.Errorf("list refs: %w", err)
+	}
+	for _, e := range refs {
+		mbytes, err := imgstore.GetManifestBytes(e.ManifestDigest)
+		if err != nil {
+			continue
+		}
+		var m manifest.Manifest
+		if err := json.Unmarshal(mbytes, &m); err != nil {
+			continue
+		}
+		var size int64
+		for _, l := range m.Layers {
+			size += l.Size
+		}
+		display := e.Ref.Name + ":" + e.Ref.Tag
+		if e.Ref.IsRegistry() {
+			display = e.Ref.Host + "/" + e.Ref.Owner + "/" + e.Ref.Name + ":" + e.Ref.Tag
+		}
+		images = append(images, Image{
+			Name:        display,
+			Type:        "custom",
+			Base:        m.Base.Name,
+			Size:        size,
+			Description: m.Config.Description,
+			CreatedAt:   e.ModTime,
+			Path:        imgstore.ManifestPath(e.ManifestDigest),
+		})
+	}
+
 	return images, nil
 }
 
@@ -55,7 +95,9 @@ type SaveResult struct {
 	VirtCustomizeError string // Non-fatal error if virt-customize failed
 }
 
-// Save creates a new image from a stopped cage
+// Save creates a new image from a stopped cage by delegating to SaveLayered.
+// There is no Cagefile (the cage was running, no build context), so Config.Cagefile
+// is left empty. The description flows into Config.Description.
 func Save(cageName, imageName, description string) (*SaveResult, error) {
 	// Check cage exists
 	if !cage.Exists(cageName) {
@@ -73,8 +115,12 @@ func Save(cageName, imageName, description string) (*SaveResult, error) {
 		return nil, fmt.Errorf("cage '%s' is running. Stop it first: cage stop %s", cageName, cageName)
 	}
 
-	// Check image name not taken
-	if Exists(imageName) {
+	// Check ref name not already taken (ref-aware existence via imgstore)
+	ref, err := imgstore.ParseRef(imageName)
+	if err != nil {
+		return nil, fmt.Errorf("invalid image name: %w", err)
+	}
+	if _, rerr := imgstore.ReadRef(ref); rerr == nil {
 		return nil, ErrImageExists
 	}
 
@@ -84,61 +130,23 @@ func Save(cageName, imageName, description string) (*SaveResult, error) {
 		return nil, fmt.Errorf("cage disk not found: %w", err)
 	}
 
-	// Ensure images directory exists
-	if err := EnsureDir(); err != nil {
+	if _, err := SaveLayered(SaveLayeredInput{
+		OverlayPath: sourceDisk,
+		BaseName:    state.Image,
+		Tag:         imageName,
+		Config: manifest.Config{
+			OS:          "linux",
+			Arch:        goruntime.GOARCH,
+			Description: description,
+		},
+	}); err != nil {
 		return nil, err
 	}
 
-	// Create destination path
-	destPath := ImagePath(imageName)
-
-	// Convert and compress the image
-	cmd := exec.Command("qemu-img", "convert",
-		"-O", "qcow2",
-		"-c", // compress
-		sourceDisk,
-		destPath)
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("failed to save image: %s", strings.TrimSpace(string(output)))
-	}
-
-	// Prepare image for reuse: clear SSH keys and reset cloud-init
-	// This uses virt-customize to modify the image while it's not running
-	prepResult, err := prepareImageForReuse(destPath)
-	if err != nil {
-		os.Remove(destPath)
-		return nil, fmt.Errorf("failed to prepare image: %w", err)
-	}
-
-	// Get size of new image
-	info, err := os.Stat(destPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to stat image: %w", err)
-	}
-
-	// Save metadata
-	img := &Image{
-		Name:        imageName,
-		Type:        "custom",
-		Base:        state.Image,
-		Size:        info.Size(),
-		Description: description,
-		CreatedAt:   time.Now(),
-		Path:        destPath,
-	}
-
-	if err := SaveMetadata(img); err != nil {
-		// Try to clean up the image file
-		os.Remove(destPath)
-		return nil, fmt.Errorf("failed to save metadata: %w", err)
-	}
-
-	return &SaveResult{
-		VirtCustomizeUsed:  prepResult.VirtCustomizeUsed,
-		VirtCustomizeError: prepResult.VirtCustomizeError,
-	}, nil
+	// SaveResult is preserved for backward compat with cmd/image.go callers.
+	// VirtCustomizeUsed / VirtCustomizeError are not surfaced any more because
+	// prepareImageForReuse now runs inside SaveLayered and discards its result.
+	return &SaveResult{}, nil
 }
 
 // PrepareResult indicates what preparation was done on the image
@@ -271,6 +279,133 @@ func Inspect(imageName string) (*ImageDetails, error) {
 		Format:      qcowInfo.Format,
 		BackingFile: qcowInfo.BackingFile,
 	}, nil
+}
+
+// BaseDigest returns sha256:<hex> of the on-disk base image qcow2.
+// Used by build/pull flows to populate or verify manifest.Base.Digest.
+func BaseDigest(name string) (string, error) {
+	f, err := os.Open(ImagePath(name))
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return "sha256:" + hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// SaveLayeredInput is the request shape for SaveLayered.
+type SaveLayeredInput struct {
+	OverlayPath string          // path to built qcow2 overlay with backing-file pointer set
+	BaseName    string          // distro alias of the backing image (must already be in images/)
+	Tag         string          // target ref, parseable by imgstore.ParseRef
+	Config      manifest.Config // runtime config (os, arch, env, etc.) - validate must pass after Save
+}
+
+// SaveLayeredResult names the digests of the produced artifacts.
+type SaveLayeredResult struct {
+	ManifestDigest string
+	LayerDigest    string
+}
+
+// SaveLayered turns a built overlay qcow2 into a layered registry-ready image:
+//   - strips the backing-file pointer via `qemu-img rebase -u -b ""`
+//   - stores the resulting layer in the content-addressed layer store
+//   - builds + stores a manifest referencing the base and the layer
+//   - writes the named ref pointing at the manifest digest
+//
+// MVP single-layer flow; future builds may emit multi-layer manifests.
+func SaveLayered(in SaveLayeredInput) (*SaveLayeredResult, error) {
+	// Copy overlay so we don't mutate the source.
+	tmp, err := os.CreateTemp("", "cage-layer-*.qcow2")
+	if err != nil {
+		return nil, fmt.Errorf("create temp file: %w", err)
+	}
+	tmpPath := tmp.Name()
+	tmp.Close()
+	defer os.Remove(tmpPath)
+
+	if err := copyFile(in.OverlayPath, tmpPath); err != nil {
+		return nil, fmt.Errorf("copy overlay: %w", err)
+	}
+
+	// Prepare image for reuse: clear injected SSH authorized_keys and reset
+	// cloud-init state so the next cage built from this image gets fresh keys
+	// on first boot. Non-fatal if virt-customize is unavailable - cloud-init
+	// runcmd will inject keys at boot regardless.
+	if _, err := prepareImageForReuse(tmpPath); err != nil {
+		return nil, fmt.Errorf("prepare image for reuse: %w", err)
+	}
+
+	// Strip backing-file pointer (metadata only).
+	cmd := exec.Command("qemu-img", "rebase", "-u", "-b", "", tmpPath)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("qemu-img rebase: %w: %s", err, string(out))
+	}
+
+	layerDigest, err := imgstore.HashFile(tmpPath)
+	if err != nil {
+		return nil, fmt.Errorf("hash layer: %w", err)
+	}
+	if err := imgstore.CopyFromFile(tmpPath, layerDigest); err != nil {
+		return nil, fmt.Errorf("store layer: %w", err)
+	}
+	info, err := os.Stat(imgstore.LayerPath(layerDigest))
+	if err != nil {
+		return nil, fmt.Errorf("stat layer: %w", err)
+	}
+
+	baseDigest, err := BaseDigest(in.BaseName)
+	if err != nil {
+		return nil, fmt.Errorf("base digest: %w", err)
+	}
+
+	m := &manifest.Manifest{
+		SchemaVersion: manifest.SchemaVersionV1,
+		MediaType:     manifest.MediaTypeManifestV1,
+		Base:          manifest.Base{Type: "distro", Name: in.BaseName, Digest: baseDigest},
+		Layers:        []manifest.Layer{{Digest: layerDigest, Size: info.Size(), MediaType: manifest.MediaTypeLayerV1}},
+		Config:        in.Config,
+	}
+	if err := m.Validate(); err != nil {
+		return nil, fmt.Errorf("validate manifest: %w", err)
+	}
+	manifestBytes, err := manifest.Canonical(m)
+	if err != nil {
+		return nil, fmt.Errorf("canonical manifest: %w", err)
+	}
+	manifestDigest := manifest.DigestBytes(manifestBytes)
+	if err := imgstore.PutManifestBytes(manifestDigest, manifestBytes); err != nil {
+		return nil, fmt.Errorf("put manifest: %w", err)
+	}
+
+	ref, err := imgstore.ParseRef(in.Tag)
+	if err != nil {
+		return nil, fmt.Errorf("parse ref %q: %w", in.Tag, err)
+	}
+	if err := imgstore.WriteRef(ref, manifestDigest); err != nil {
+		return nil, fmt.Errorf("write ref: %w", err)
+	}
+	return &SaveLayeredResult{ManifestDigest: manifestDigest, LayerDigest: layerDigest}, nil
+}
+
+// copyFile copies src to dst, creating dst if needed. Used by SaveLayered to
+// avoid mutating the caller's overlay when stripping the backing-file pointer.
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = io.Copy(out, in)
+	return err
 }
 
 // FormatSize formats bytes as human readable string
