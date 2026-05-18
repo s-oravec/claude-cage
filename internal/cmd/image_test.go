@@ -9,6 +9,7 @@ import (
 
 	"github.com/s-oravec/claude-cage/internal/cage"
 	"github.com/s-oravec/claude-cage/internal/images"
+	"github.com/s-oravec/claude-cage/internal/imgstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,6 +29,11 @@ func TestImageCmd(t *testing.T) {
 	oldCagesDir := cage.CagesDir()
 	cage.SetCagesDir(filepath.Join(tmpDir, "cages"))
 	defer cage.SetCagesDir(oldCagesDir)
+
+	// Isolate imgstore root so the user's real ~/.claude-cage/refs/ tree
+	// does not leak custom images into this test.
+	imgstore.SetRoot(filepath.Join(tmpDir, "store"))
+	defer imgstore.SetRoot("")
 
 	t.Run("image has subcommands", func(t *testing.T) {
 		cmd := NewRootCmd()

@@ -51,6 +51,41 @@ func List() ([]Image, error) {
 		}
 	}
 
+	// List layered images stored under imgstore refs (built via `cage build`
+	// or `cage image save`). Each ref points at a manifest; size is the sum of
+	// the manifest's layer sizes.
+	refs, err := imgstore.ListRefs()
+	if err != nil {
+		return nil, fmt.Errorf("list refs: %w", err)
+	}
+	for _, e := range refs {
+		mbytes, err := imgstore.GetManifestBytes(e.ManifestDigest)
+		if err != nil {
+			continue
+		}
+		var m manifest.Manifest
+		if err := json.Unmarshal(mbytes, &m); err != nil {
+			continue
+		}
+		var size int64
+		for _, l := range m.Layers {
+			size += l.Size
+		}
+		display := e.Ref.Name + ":" + e.Ref.Tag
+		if e.Ref.IsRegistry() {
+			display = e.Ref.Host + "/" + e.Ref.Owner + "/" + e.Ref.Name + ":" + e.Ref.Tag
+		}
+		images = append(images, Image{
+			Name:        display,
+			Type:        "custom",
+			Base:        m.Base.Name,
+			Size:        size,
+			Description: m.Config.Description,
+			CreatedAt:   e.ModTime,
+			Path:        imgstore.ManifestPath(e.ManifestDigest),
+		})
+	}
+
 	return images, nil
 }
 

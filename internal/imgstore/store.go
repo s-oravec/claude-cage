@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 func ensureDir(p string) error { return os.MkdirAll(filepath.Dir(p), 0o755) }
@@ -192,6 +194,61 @@ func GetManifestBytes(digest string) ([]byte, error) {
 func HasManifest(digest string) bool {
 	_, err := os.Stat(ManifestPath(digest))
 	return err == nil
+}
+
+// RefEntry pairs a Ref with its manifest digest and the on-disk mtime of the
+// ref file. Returned by ListRefs.
+type RefEntry struct {
+	Ref            Ref
+	ManifestDigest string
+	ModTime        time.Time
+}
+
+// ListRefs walks refs/ under Root() and returns every ref found. Local refs
+// live at refs/_local/<name>/<tag>; registry-qualified refs at
+// refs/<host>/<owner>/<name>/<tag>. Returns nil if refs/ does not exist.
+func ListRefs() ([]RefEntry, error) {
+	root := filepath.Join(Root(), "refs")
+	if _, err := os.Stat(root); os.IsNotExist(err) {
+		return nil, nil
+	}
+	var out []RefEntry
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return nil
+		}
+		parts := strings.Split(rel, string(filepath.Separator))
+		var ref Ref
+		switch {
+		case len(parts) == 3 && parts[0] == "_local":
+			ref = Ref{Name: parts[1], Tag: parts[2]}
+		case len(parts) == 4:
+			ref = Ref{Host: parts[0], Owner: parts[1], Name: parts[2], Tag: parts[3]}
+		default:
+			return nil
+		}
+		digest, rerr := ReadRef(ref)
+		if rerr != nil {
+			return nil
+		}
+		info, ierr := d.Info()
+		if ierr != nil {
+			return nil
+		}
+		out = append(out, RefEntry{Ref: ref, ManifestDigest: digest, ModTime: info.ModTime()})
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // WriteRef atomically writes the ref file for r to point at digest.
