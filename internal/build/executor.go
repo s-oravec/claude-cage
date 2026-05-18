@@ -605,7 +605,7 @@ func (e *Executor) saveImage() error {
 
 	r, err := images.SaveLayered(images.SaveLayeredInput{
 		OverlayPath: overlay,
-		BaseName:    e.cagefile.BaseImage,
+		BaseName:    images.ResolveAlias(e.cagefile.BaseImage),
 		Tag:         e.config.Tag,
 		Config:      cfg,
 	})
