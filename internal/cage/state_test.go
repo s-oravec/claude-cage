@@ -296,3 +296,48 @@ func TestConstants(t *testing.T) {
 	assert.Equal(t, "running", StatusRunning)
 	assert.Equal(t, "stopped", StatusStopped)
 }
+
+func TestValidName(t *testing.T) {
+	cases := []struct {
+		name   string
+		wantOK bool
+	}{
+		{"good", true},
+		{"cage-build-12345", true},
+		{"with_underscore", true},
+		{"", false},
+		{".", false},
+		{"..", false},
+		{"../escape", false},
+		{"sub/dir", false},
+		{"back\\slash", false},
+		{"nul\x00byte", false},
+	}
+	for _, tc := range cases {
+		err := ValidName(tc.name)
+		if tc.wantOK {
+			assert.NoError(t, err, "ValidName(%q) should pass", tc.name)
+		} else {
+			assert.Error(t, err, "ValidName(%q) should be rejected", tc.name)
+		}
+	}
+}
+
+func TestDeleteState_RejectsPathTraversal(t *testing.T) {
+	tmpDir := t.TempDir()
+	oldDir := cagesDir
+	cagesDir = tmpDir
+	defer func() { cagesDir = oldDir }()
+
+	// Create a sentinel file in the parent of cagesDir. Pre-fix, DeleteState("..")
+	// resolved RemoveAll to that parent and would have wiped this file.
+	sentinel := filepath.Join(filepath.Dir(tmpDir), "sentinel.keep")
+	require.NoError(t, os.WriteFile(sentinel, []byte("preserve me"), 0644))
+	defer os.Remove(sentinel)
+
+	err := DeleteState("..")
+	assert.Error(t, err)
+	// Sentinel must still exist after the rejected DeleteState.
+	_, statErr := os.Stat(sentinel)
+	assert.NoError(t, statErr, "DeleteState('..') must not touch parent directories")
+}

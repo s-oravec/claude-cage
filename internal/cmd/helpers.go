@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/s-oravec/claude-cage/internal/cage"
 	"github.com/s-oravec/claude-cage/internal/config"
 )
 
@@ -14,6 +15,9 @@ import (
 // - Error if no args and no config file
 func resolveCageName(args []string) (string, *config.ProjectConfig, error) {
 	if len(args) > 0 {
+		if err := cage.ValidName(args[0]); err != nil {
+			return "", nil, err
+		}
 		return args[0], nil, nil
 	}
 

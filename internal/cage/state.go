@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/s-oravec/claude-cage/internal/config"
@@ -179,7 +180,14 @@ func RequireMode(name, currentMode string) error {
 // DeleteState removes a cage's metadata directory and VM-artifacts directory.
 // Both are removed even when they share a path (user mode); RemoveAll on a
 // non-existent path is a no-op.
+//
+// Refuses names that contain path separators or traversal segments. Without
+// this, e.g. `cage remove ..` would resolve to RemoveAll on the parent
+// (~/.claude-cage) and silently nuke config.yaml, auth.yaml, images/, keys/.
 func DeleteState(name string) error {
+	if err := ValidName(name); err != nil {
+		return err
+	}
 	if err := os.RemoveAll(Dir(name)); err != nil {
 		return err
 	}
@@ -187,6 +195,22 @@ func DeleteState(name string) error {
 		if err := os.RemoveAll(VMDir(name)); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// ValidName rejects cage names that would let DeleteState (or any path-joining
+// caller) escape its intended directory. Empty, "." and ".." are rejected as
+// well as anything containing OS path separators ('/', '\\') or NUL bytes.
+func ValidName(name string) error {
+	if name == "" {
+		return fmt.Errorf("cage name is empty")
+	}
+	if name == "." || name == ".." {
+		return fmt.Errorf("cage name %q is reserved", name)
+	}
+	if strings.ContainsAny(name, "/\\\x00") {
+		return fmt.Errorf("cage name %q contains an illegal character (/, \\, or NUL)", name)
 	}
 	return nil
 }
