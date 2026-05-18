@@ -15,14 +15,14 @@ type uploadInitResp struct {
 }
 
 // UploadBlobSinglePUT performs the two-phase Docker V2 single-PUT blob upload.
-// Phase 1: POST /blobs/uploads with {digest} -> {upload_id, upload_url, expires_at}.
+// Phase 1: POST /blobs/uploads with {digest, size} -> {upload_id, upload_url, expires_at}.
 // Phase 2: PUT upload_url?digest=<digest> with the body bytes as octet-stream.
 // Used for layers below the multipart-size threshold; for larger layers use
 // UploadBlobMultipart for resumable uploads.
-func (c *Client) UploadBlobSinglePUT(owner, name, digest string, body io.Reader) error {
+func (c *Client) UploadBlobSinglePUT(owner, name, digest string, size int64, body io.Reader) error {
 	// Phase 1: init.
 	initPath := fmt.Sprintf("/api/v1/repos/%s/%s/blobs/uploads", owner, name)
-	initBody, _ := json.Marshal(map[string]string{"digest": digest})
+	initBody, _ := json.Marshal(map[string]any{"digest": digest, "size": size})
 	resp, err := c.do(http.MethodPost, initPath, initBody, map[string]string{"Content-Type": "application/json"})
 	if err != nil {
 		return err
@@ -48,7 +48,7 @@ func (c *Client) UploadBlobSinglePUT(owner, name, digest string, body io.Reader)
 	if c.token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.token)
 	}
-	resp2, err := c.hc.Do(req)
+	resp2, err := c.transport(req)
 	if err != nil {
 		return err
 	}

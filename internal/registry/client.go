@@ -18,6 +18,7 @@ type Options struct {
 // Client is the HTTP client for a single cage-hub registry host.
 type Client struct {
 	baseURL string
+	host    string
 	token   string
 	hc      *http.Client
 }
@@ -33,12 +34,24 @@ func NewClient(host string, opt Options) (*Client, error) {
 	}
 	return &Client{
 		baseURL: scheme + "://" + host,
+		host:    host,
 		token:   opt.Token,
 		hc: &http.Client{
 			Transport: tr,
 			Timeout:   60 * time.Second,
 		},
 	}, nil
+}
+
+// transport executes req and converts any transport-level failure into a
+// *TransportError so callers see a human-friendly message instead of a raw
+// dial/TLS/DNS error string.
+func (c *Client) transport(req *http.Request) (*http.Response, error) {
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return nil, classifyTransport(c.host, err)
+	}
+	return resp, nil
 }
 
 // resolveURL returns target as-is if it is already absolute (starts with http://
@@ -69,7 +82,7 @@ func (c *Client) do(method, path string, body []byte, headers map[string]string)
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
-	return c.hc.Do(req)
+	return c.transport(req)
 }
 
 // SelectUploadMode returns "single" or "multipart" based on the C1 hybrid rule:
@@ -84,7 +97,7 @@ func SelectUploadMode(size, partSize int64) string {
 // UploadBlob picks single or multipart based on size + partSize and uploads body.
 func (c *Client) UploadBlob(owner, name, digest string, size, partSize int64, body io.Reader) error {
 	if SelectUploadMode(size, partSize) == "multipart" {
-		return c.UploadBlobMultipart(owner, name, digest, body)
+		return c.UploadBlobMultipart(owner, name, digest, size, body)
 	}
-	return c.UploadBlobSinglePUT(owner, name, digest, body)
+	return c.UploadBlobSinglePUT(owner, name, digest, size, body)
 }

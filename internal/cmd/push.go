@@ -78,7 +78,7 @@ func runPush(out io.Writer, refStr string, asLatest bool) error {
 
 	info, err := rc.AuthInfo()
 	if err != nil {
-		return fmt.Errorf("auth/info: %w", err)
+		return err
 	}
 
 	// Push each missing layer.

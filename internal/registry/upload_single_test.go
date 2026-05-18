@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,6 +17,10 @@ func TestUploadBlobSinglePUT_TwoPhase(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/repos/s/d/blobs/uploads", func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "sha256:abc", body["digest"])
+		assert.EqualValues(t, 5, body["size"])
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(202)
 		w.Write([]byte(`{"upload_id":"u1","upload_url":"/api/v1/repos/s/d/blobs/uploads/u1","expires_at":"2026-05-15T12:00:00Z"}`))
@@ -30,7 +35,7 @@ func TestUploadBlobSinglePUT_TwoPhase(t *testing.T) {
 	defer srv.Close()
 
 	c, _ := NewClient(srv.URL[len("http://"):], Options{Token: "t", Insecure: true})
-	err := c.UploadBlobSinglePUT("s", "d", "sha256:abc", strings.NewReader("layer"))
+	err := c.UploadBlobSinglePUT("s", "d", "sha256:abc", 5, strings.NewReader("layer"))
 	require.NoError(t, err)
 }
 
@@ -55,7 +60,7 @@ func TestUploadBlobSinglePUT_AbsoluteUploadURL(t *testing.T) {
 	defer api.Close()
 
 	c, _ := NewClient(api.URL[len("http://"):], Options{Token: "t", Insecure: true})
-	err := c.UploadBlobSinglePUT("s", "d", "sha256:abc", strings.NewReader("payload"))
+	err := c.UploadBlobSinglePUT("s", "d", "sha256:abc", 7, strings.NewReader("payload"))
 	require.NoError(t, err)
 	assert.Equal(t, []byte("payload"), stored)
 }

@@ -2,9 +2,14 @@ package registry
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"os"
+	"strings"
+	"syscall"
 )
 
 // APIError is the typed error returned by registry client methods when the
@@ -35,6 +40,78 @@ func parseError(resp *http.Response) error {
 	}
 	env.Error.HTTPStatus = resp.StatusCode
 	return &env.Error
+}
+
+// TransportError is returned when the HTTP transport fails before the server
+// can respond (DNS failure, connection refused, TLS handshake error, timeout).
+// Distinct from APIError, which represents a server-returned non-2xx status.
+type TransportError struct {
+	Host string
+	Kind string // "refused", "dns", "tls", "timeout", "other"
+	Err  error  // underlying transport error, preserved for debugging
+}
+
+func (e *TransportError) Error() string {
+	switch e.Kind {
+	case "refused":
+		return fmt.Sprintf("Cannot connect to registry %s: connection refused (is cage-hub running?)", e.Host)
+	case "dns":
+		return fmt.Sprintf("Cannot connect to registry %s: host not found", e.Host)
+	case "tls":
+		return fmt.Sprintf("Cannot connect to registry %s: TLS handshake failed: %v", e.Host, e.Err)
+	case "timeout":
+		return fmt.Sprintf("Cannot connect to registry %s: connection timed out", e.Host)
+	default:
+		return fmt.Sprintf("Cannot connect to registry %s: %v", e.Host, e.Err)
+	}
+}
+
+func (e *TransportError) Unwrap() error { return e.Err }
+
+// classifyTransport wraps a transport-level error (returned by http.Client.Do)
+// into a TransportError with a kind suitable for human-friendly display.
+// Returns nil if err is nil.
+func classifyTransport(host string, err error) error {
+	if err == nil {
+		return nil
+	}
+	kind := "other"
+	switch {
+	case errors.Is(err, syscall.ECONNREFUSED):
+		kind = "refused"
+	case isDNSError(err):
+		kind = "dns"
+	case isTimeout(err):
+		kind = "timeout"
+	case isTLSError(err):
+		kind = "tls"
+	}
+	return &TransportError{Host: host, Kind: kind, Err: err}
+}
+
+func isDNSError(err error) bool {
+	var dnsErr *net.DNSError
+	return errors.As(err, &dnsErr)
+}
+
+func isTimeout(err error) bool {
+	if errors.Is(err, os.ErrDeadlineExceeded) {
+		return true
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+	return false
+}
+
+func isTLSError(err error) bool {
+	// Standard library returns a *tls.RecordHeaderError or wraps an
+	// x509.UnknownAuthorityError; both surface "tls:" or "x509:" in their
+	// rendered message. Cheap substring check avoids importing crypto/tls
+	// just for type identity.
+	msg := err.Error()
+	return strings.Contains(msg, "tls:") || strings.Contains(msg, "x509:")
 }
 
 // UserMessage maps a server error code to an actionable hint suitable for

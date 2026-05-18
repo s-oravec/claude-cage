@@ -90,7 +90,7 @@ func runLogin(out io.Writer, in io.Reader, host string, tokenStdin bool) error {
 	}
 	info, err := rc.AuthInfo()
 	if err != nil {
-		return fmt.Errorf("auth/info: %w", err)
+		return err
 	}
 	dev, err := oidcdevice.RequestDevice(info.DeviceAuthorizationEndpoint, info.ClientID, info.Scopes)
 	if err != nil {

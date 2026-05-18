@@ -18,6 +18,10 @@ func TestUploadBlobMultipart_HappyPath(t *testing.T) {
 
 	mux.HandleFunc("/api/v1/repos/s/d/blobs/uploads", func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "true", r.URL.Query().Get("multipart"))
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "sha256:abc", body["digest"])
+		assert.EqualValues(t, 10, body["size"])
 		w.WriteHeader(202)
 		w.Write([]byte(`{
 			"upload_id":"u1",
@@ -56,7 +60,7 @@ func TestUploadBlobMultipart_HappyPath(t *testing.T) {
 	defer srv.Close()
 
 	c, _ := NewClient(srv.URL[len("http://"):], Options{Token: "t", Insecure: true})
-	err := c.UploadBlobMultipart("s", "d", "sha256:abc", strings.NewReader("abcdefghij"))
+	err := c.UploadBlobMultipart("s", "d", "sha256:abc", 10, strings.NewReader("abcdefghij"))
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []int{1, 2}, partsReceived)
 }

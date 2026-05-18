@@ -28,15 +28,15 @@ type completedPart struct {
 }
 
 // UploadBlobMultipart drives a per-part presigned-PUT multipart blob upload.
-// Phase 1: POST /blobs/uploads?multipart=true {digest} -> upload_id + part metadata.
+// Phase 1: POST /blobs/uploads?multipart=true {digest, size} -> upload_id + part metadata.
 // Phase 2: For each part 1..N: GET per-part presigned URL, PUT chunk, collect ETag.
 // Phase 3: POST .../complete {parts:[{n,etag}]}.
 // Selected for layers above the multipart threshold; provides resumability and
 // parallelism (though current implementation is serial).
-func (c *Client) UploadBlobMultipart(owner, name, digest string, body io.Reader) error {
+func (c *Client) UploadBlobMultipart(owner, name, digest string, size int64, body io.Reader) error {
 	// Init.
 	initPath := fmt.Sprintf("/api/v1/repos/%s/%s/blobs/uploads?multipart=true", owner, name)
-	initBody, _ := json.Marshal(map[string]string{"digest": digest})
+	initBody, _ := json.Marshal(map[string]any{"digest": digest, "size": size})
 	resp, err := c.do(http.MethodPost, initPath, initBody, map[string]string{"Content-Type": "application/json"})
 	if err != nil {
 		return err
@@ -85,7 +85,7 @@ func (c *Client) UploadBlobMultipart(owner, name, digest string, body io.Reader)
 			return err
 		}
 		req.Header.Set("Content-Type", "application/octet-stream")
-		presp, err := c.hc.Do(req)
+		presp, err := c.transport(req)
 		if err != nil {
 			return err
 		}
