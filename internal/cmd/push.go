@@ -29,7 +29,8 @@ func NewPushCmd() *cobra.Command {
 			"  2. For missing layers, choose single-PUT or multipart upload by size\n" +
 			"     (multipart kicks in at ~4x multipart_part_size from /auth/info).\n" +
 			"  3. PUT the manifest with the X-As-Latest header set when --latest.",
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeLocalRefs(true),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return printAPIErrorHint(runPush(cmd.OutOrStdout(), args[0], asLatest))
 		},

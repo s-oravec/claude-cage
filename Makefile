@@ -14,8 +14,8 @@
 #   make e2e-short      - Run E2E tests in short mode
 #   make e2e-user       - Run E2E tests with user-mode networking (no root)
 #   make e2e-ubuntu     - Run E2E tests with Ubuntu image
-#   make install        - Install cage to ~/.local/bin/
-#   make install-system - Install cage to /usr/local/bin/ (needs sudo; available to sudo cage)
+#   make install        - Install cage + bash/zsh/fish completions to ~/.local/...
+#   make install-system - Install cage + completions system-wide (needs sudo)
 #   make clean          - Remove build artifacts
 
 .PHONY: build test test-quick test-verbose coverage coverage-html coverage-check e2e e2e-short e2e-user e2e-ubuntu install install-system clean
@@ -114,15 +114,34 @@ e2e-ubuntu: build
 	@echo "Running E2E tests with Ubuntu..."
 	CAGE_BIN=$(PWD)/cage CAGE_TEST_IMAGE=ubuntu-24.04 go test -v -timeout 15m ./test/e2e/...
 
-# Install cage binary to user's local bin directory
+# Install cage binary to user's local bin directory + shell completions in
+# XDG-standard per-user locations. The completion files are harmless when the
+# corresponding shell isn't used.
 install: build
 	install -m 755 cage ~/.local/bin/cage
+	@install -d ~/.local/share/bash-completion/completions
+	./cage completion bash > ~/.local/share/bash-completion/completions/cage
+	@install -d ~/.local/share/zsh/site-functions
+	./cage completion zsh  > ~/.local/share/zsh/site-functions/_cage
+	@install -d ~/.config/fish/completions
+	./cage completion fish > ~/.config/fish/completions/cage.fish
+	@echo "Installed: ~/.local/bin/cage + bash/zsh/fish completions."
+	@echo "Restart your shell (or 'source' the relevant rc file) to pick up completions."
 
 # Install cage binary system-wide so it lives on sudo's default secure_path
 # (required for `sudo cage` to work in root mode). Uses sudo internally so
 # you can run plain `make install-system`; if already root, sudo is a no-op.
+# Also installs shell completions in system-wide standard paths.
 install-system: build
 	sudo install -m 755 cage /usr/local/bin/cage
+	sudo install -d /usr/share/bash-completion/completions
+	./cage completion bash | sudo tee /usr/share/bash-completion/completions/cage > /dev/null
+	sudo install -d /usr/local/share/zsh/site-functions
+	./cage completion zsh  | sudo tee /usr/local/share/zsh/site-functions/_cage > /dev/null
+	sudo install -d /usr/share/fish/vendor_completions.d
+	./cage completion fish | sudo tee /usr/share/fish/vendor_completions.d/cage.fish > /dev/null
+	@echo "Installed: /usr/local/bin/cage + bash/zsh/fish completions."
+	@echo "Open a new shell to pick up completions."
 
 # Remove build artifacts
 clean:

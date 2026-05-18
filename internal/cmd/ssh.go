@@ -29,7 +29,8 @@ In that case, all arguments are treated as the command to execute.
 Use -A to forward your local ssh-agent into the cage so git/ssh inside
 the cage can authenticate against private hosts (Gitea, GitHub, …) with
 your existing keys, without ever copying them in.`,
-		Args: cobra.ArbitraryArgs,
+		Args:              cobra.ArbitraryArgs,
+		ValidArgsFunction: completeCageNames(true),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name, command, err := resolveSSHArgs(args)
 			if err != nil {

@@ -22,6 +22,20 @@ via the cage-hub web UI (/settings/tokens) or DELETE /api/v1/me/pats/:id.
 With --all, clears every host. Otherwise the single positional <host>
 argument is required.`,
 		Args: cobra.MaximumNArgs(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if len(args) > 0 {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			a, err := auth.Load()
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveError
+			}
+			hosts := make([]string, 0, len(a.Registries))
+			for h := range a.Registries {
+				hosts = append(hosts, h)
+			}
+			return hosts, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if all {
 				return auth.RemoveAll()

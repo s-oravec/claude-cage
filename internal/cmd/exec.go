@@ -22,6 +22,7 @@ func NewExecCmd() *cobra.Command {
 Useful for scripting and automation. Output is returned directly.
 Use 'cage ssh' for interactive sessions.`,
 		Args:               cobra.MinimumNArgs(1),
+		ValidArgsFunction:  completeCageNames(true),
 		DisableFlagParsing: false,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Find the -- separator

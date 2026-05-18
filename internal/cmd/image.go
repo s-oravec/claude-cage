@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"text/tabwriter"
 
 	"github.com/s-oravec/claude-cage/internal/cage"
 	"github.com/s-oravec/claude-cage/internal/images"
@@ -52,7 +53,8 @@ The image can then be used to create new cages with the same
 software and configuration.
 
 When run from a directory with .cage.yml, the cage name is optional.`,
-		Args: cobra.MaximumNArgs(1),
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: completeCageNames(false),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cageName, _, err := resolveCageName(args)
 			if err != nil {
@@ -79,7 +81,8 @@ func newImageRemoveCmd() *cobra.Command {
 		Long: `Remove an image from the system.
 
 Base images require --force to remove. Images in use by cages cannot be removed.`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeImageNames,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return removeImage(cmd, args[0], force)
 		},
@@ -92,9 +95,10 @@ Base images require --force to remove. Images in use by cages cannot be removed.
 
 func newImageInspectCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "inspect <image-name>",
-		Short: "Show detailed information about an image",
-		Args:  cobra.ExactArgs(1),
+		Use:               "inspect <image-name>",
+		Short:             "Show detailed information about an image",
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeImageNames,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return inspectImage(cmd, args[0])
 		},
@@ -112,7 +116,8 @@ func listAvailableImages(cmd *cobra.Command) error {
 		return nil
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "%-20s %-8s %-20s %-10s %s\n", "NAME", "TYPE", "BASE", "SIZE", "CREATED")
+	tw := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 3, ' ', 0)
+	fmt.Fprintln(tw, "NAME\tTYPE\tBASE\tSIZE\tCREATED")
 	for _, img := range imgList {
 		created := "-"
 		if !img.CreatedAt.IsZero() {
@@ -120,17 +125,16 @@ func listAvailableImages(cmd *cobra.Command) error {
 		}
 		base := "-"
 		if img.Base != "" {
-			base = truncateString(img.Base, 20)
+			base = img.Base
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "%-20s %-8s %-20s %-10s %s\n",
-			truncateString(img.Name, 20),
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
+			img.Name,
 			img.Type,
 			base,
 			images.FormatSize(img.Size),
 			created)
 	}
-
-	return nil
+	return tw.Flush()
 }
 
 func saveImage(cmd *cobra.Command, cageName, imageName, description string) error {

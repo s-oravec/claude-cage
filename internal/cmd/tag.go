@@ -20,6 +20,12 @@ Both arguments use the standard ref format (local "name[:tag]" or
 created. If <dst> already exists, it is overwritten (matches
 docker tag).`,
 		Args: cobra.ExactArgs(2),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if len(args) == 0 {
+				return completeLocalRefs(false)(cmd, args, toComplete)
+			}
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			src, err := imgstore.ParseRef(args[0])
 			if err != nil {

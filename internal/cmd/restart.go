@@ -19,7 +19,8 @@ func NewRestartCmd() *cobra.Command {
 
 The cage is restarted with the same configuration.
 Use --force for immediate shutdown instead of graceful shutdown.`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeCageNames(false),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return restartCage(cmd, args[0], force)
 		},

@@ -24,7 +24,8 @@ To exit the console, press Ctrl+] (control + right bracket).
 Login credentials (set by cloud-init):
   Username: cage
   Password: cage`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeCageNames(true),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runConsole(args[0])
 		},

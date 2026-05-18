@@ -34,7 +34,8 @@ This stops the VM (if running) and removes:
 When run from a directory with .cage.yml, the cage name is optional.
 
 The cage's data is permanently deleted.`,
-		Args: cobra.MaximumNArgs(1),
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: completeCageNames(false),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if all {
 				return removeAllCages(cmd, force)

@@ -23,7 +23,8 @@ Tests include:
 - Link-local addresses (should be blocked)
 
 This is a security verification - use after starting a cage.`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeCageNames(true),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return verifyCage(cmd, args[0])
 		},

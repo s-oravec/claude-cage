@@ -78,7 +78,8 @@ func NewStatusCmd() *cobra.Command {
 
 Shows resource usage, network configuration, Docker status,
 shared directories, and top processes.`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeCageNames(false),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 			if watch {

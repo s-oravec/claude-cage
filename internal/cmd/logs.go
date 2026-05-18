@@ -22,7 +22,8 @@ func NewLogsCmd() *cobra.Command {
 		Long: `Display system logs from a running cage.
 
 By default shows the last 100 lines. Use -f to follow (stream) logs.`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeCageNames(false),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return showLogs(cmd, args[0], follow, lines)
 		},

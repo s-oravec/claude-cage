@@ -43,7 +43,8 @@ config file is present, the cage will be created automatically.
 Use 'cage init' to create a project configuration.
 Use 'cage start' in a project directory to start the configured cage.
 Use 'cage start <name>' to start a specific existing cage.`,
-		Args: cobra.MaximumNArgs(1),
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: completeCageNames(false),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runStartCmd(cmd, args, ports)
 		},

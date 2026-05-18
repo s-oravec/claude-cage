@@ -28,7 +28,8 @@ The cage's resources (disk, network, keys) are preserved and can be restarted.
 When run from a directory with .cage.yml, the cage name is optional.
 
 To remove a cage and all its resources, use 'cage remove'.`,
-		Args: cobra.MaximumNArgs(1),
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: completeCageNames(true),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if all {
 				return stopAllCages(cmd, force)

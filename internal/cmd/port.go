@@ -55,6 +55,12 @@ Examples:
   cage port add mycage 0.0.0.0:8080:80
   cage port add mycage 5353:53/udp`,
 		Args: cobra.ExactArgs(2),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if len(args) == 0 {
+				return completeCageNames(false)(cmd, args, toComplete)
+			}
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addPort(cmd, args[0], args[1])
 		},

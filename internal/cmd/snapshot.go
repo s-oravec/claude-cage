@@ -38,7 +38,8 @@ func newSnapshotCreateCmd() *cobra.Command {
 
 The snapshot captures the current state of the VM's disk.
 You can restore to this snapshot later using 'cage snapshot restore'.`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeCageNames(false),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return createSnapshot(cmd, args[0], name, description)
 		},
@@ -53,10 +54,11 @@ You can restore to this snapshot later using 'cage snapshot restore'.`,
 
 func newSnapshotListCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:     "list <cage-name>",
-		Aliases: []string{"ls"},
-		Short:   "List snapshots of a cage",
-		Args:    cobra.ExactArgs(1),
+		Use:               "list <cage-name>",
+		Aliases:           []string{"ls"},
+		Short:             "List snapshots of a cage",
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeCageNames(false),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listSnapshots(cmd, args[0])
 		},
@@ -72,7 +74,8 @@ func newSnapshotRestoreCmd() *cobra.Command {
 		Long: `Restore a cage VM to a previous snapshot.
 
 Warning: This will discard any changes made since the snapshot was created.`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeCageNames(false),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return restoreSnapshot(cmd, args[0], name)
 		},
@@ -88,10 +91,11 @@ func newSnapshotRemoveCmd() *cobra.Command {
 	var name string
 
 	cmd := &cobra.Command{
-		Use:     "remove <cage-name>",
-		Aliases: []string{"rm", "delete"},
-		Short:   "Remove a snapshot",
-		Args:    cobra.ExactArgs(1),
+		Use:               "remove <cage-name>",
+		Aliases:           []string{"rm", "delete"},
+		Short:             "Remove a snapshot",
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeCageNames(false),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return removeSnapshot(cmd, args[0], name)
 		},

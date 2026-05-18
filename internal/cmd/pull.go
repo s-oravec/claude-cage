@@ -34,7 +34,8 @@ A positional argument of the form host/owner/name[:tag] is treated as a
 registry reference and pulled from the cage-hub registry; the manifest
 and any missing layers are stored locally and the tag is written into
 the local image store.`,
-		Args: cobra.MaximumNArgs(1),
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: completeBaseImageNames,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if list {
 				return listImages(cmd)
