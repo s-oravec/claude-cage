@@ -522,9 +522,19 @@ func CreateDefault() error {
 	return Save(DefaultConfig())
 }
 
-// CreateDefaultForce creates the default config, overwriting if exists
+// CreateDefaultForce creates the default config, overwriting if exists.
+// Preserves sticky user-set fields (currently: registries.insecure) so that
+// running `cage config init -f` after manually allowlisting an insecure host
+// does not silently nuke that list.
 func CreateDefaultForce() error {
-	return Save(DefaultConfig())
+	cfg := DefaultConfig()
+	if data, err := os.ReadFile(Path()); err == nil {
+		var existing Config
+		if yaml.Unmarshal(data, &existing) == nil && len(existing.Registries.Insecure) > 0 {
+			cfg.Registries = existing.Registries
+		}
+	}
+	return Save(cfg)
 }
 
 // GetProfile returns a profile by name

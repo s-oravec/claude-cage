@@ -165,6 +165,27 @@ func TestCreateDefault_Force(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestCreateDefaultForce_PreservesRegistriesInsecure(t *testing.T) {
+	tmpDir := t.TempDir()
+	oldDir := configDir
+	configDir = tmpDir
+	defer func() { configDir = oldDir }()
+
+	// Seed config with a custom insecure registry list.
+	cfg := DefaultConfig()
+	cfg.Registries.Insecure = []string{"localhost", "registry.dev"}
+	require.NoError(t, Save(cfg))
+
+	// Force re-init should overwrite everything EXCEPT registries.insecure,
+	// which is "sticky" because users edit it by hand and a wipe is hard to
+	// recover from.
+	require.NoError(t, CreateDefaultForce())
+
+	got, err := Load()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"localhost", "registry.dev"}, got.Registries.Insecure)
+}
+
 func TestExists(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldDir := configDir
