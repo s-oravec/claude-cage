@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 
 	"github.com/s-oravec/claude-cage/internal/config"
 	"github.com/s-oravec/claude-cage/internal/images"
@@ -139,11 +140,74 @@ func pullImage(cmd *cobra.Command, name, arch string) error {
 	return images.Setup(name, arch, progressFn, status)
 }
 
+// selectArchManifest dispatches on the manifest endpoint's Content-Type and returns
+// the concrete single-arch manifest (body, digest, parsed) to materialize locally.
+//   - manifest content type: requires m.Config.Arch == arch, else an error telling the
+//     user to retry with --platform <that arch>.
+//   - index content type: picks the entry whose platform.architecture == arch and
+//     fetches that manifest via fetch(entry.Digest); errors (listing available arches)
+//     if no entry matches.
+//
+// fetch(reference) returns (body, dockerDigest, err) for a manifest reference.
+func selectArchManifest(arch, contentType string, body []byte, digest string,
+	fetch func(reference string) ([]byte, string, error),
+) (selBody []byte, selDigest string, m *manifest.Manifest, err error) {
+	switch contentType {
+	case manifest.MediaTypeManifestV1:
+		var mm manifest.Manifest
+		if err := json.Unmarshal(body, &mm); err != nil {
+			return nil, "", nil, err
+		}
+		if mm.Config.Arch != arch {
+			return nil, "", nil, fmt.Errorf(
+				"image architecture is %s, but %s was requested; retry with --platform %s to pull it",
+				mm.Config.Arch, arch, mm.Config.Arch)
+		}
+		return body, digest, &mm, nil
+	case manifest.MediaTypeIndexV1:
+		var idx manifest.IndexBody
+		if err := json.Unmarshal(body, &idx); err != nil {
+			return nil, "", nil, err
+		}
+		var pick *manifest.IndexEntry
+		for i := range idx.Manifests {
+			if idx.Manifests[i].Platform.Architecture == arch {
+				pick = &idx.Manifests[i]
+				break
+			}
+		}
+		if pick == nil {
+			return nil, "", nil, fmt.Errorf("image does not provide %s; available: %s",
+				arch, strings.Join(archesOf(idx), ", "))
+		}
+		mBody, mDigest, err := fetch(pick.Digest)
+		if err != nil {
+			return nil, "", nil, err
+		}
+		var mm manifest.Manifest
+		if err := json.Unmarshal(mBody, &mm); err != nil {
+			return nil, "", nil, err
+		}
+		return mBody, mDigest, &mm, nil
+	default:
+		return nil, "", nil, fmt.Errorf("unexpected Content-Type %q from manifest endpoint", contentType)
+	}
+}
+
+// archesOf collects the architecture of each index entry, preserving order.
+func archesOf(idx manifest.IndexBody) []string {
+	arches := make([]string, 0, len(idx.Manifests))
+	for _, e := range idx.Manifests {
+		arches = append(arches, e.Platform.Architecture)
+	}
+	return arches
+}
+
 // runRegistryPull pulls an image from a cage-hub registry. The arch parameter is
-// the resolved target architecture; it is threaded in here for the dispatch task
-// that will consume it (it is intentionally unused for now).
+// the resolved target architecture; the manifest endpoint's Content-Type is used
+// to dispatch between a single-arch manifest and a multi-arch index, selecting the
+// concrete arch-specific manifest to materialize locally.
 func runRegistryPull(cmd *cobra.Command, ref imgstore.Ref, arch string) error {
-	_ = arch
 	cfg, err := config.Load()
 	if err != nil {
 		return err
@@ -153,22 +217,28 @@ func runRegistryPull(cmd *cobra.Command, ref imgstore.Ref, arch string) error {
 		return err
 	}
 
-	// Manifest.
-	body, _, digest, err := rc.GetManifest(ref.Owner, ref.Name, ref.Tag)
+	// Manifest. The endpoint may return either a single-arch manifest or a
+	// multi-arch index; selectArchManifest dispatches on Content-Type and yields
+	// the concrete arch-specific manifest (selBody/selDigest/m).
+	body, ct, digest, err := rc.GetManifest(ref.Owner, ref.Name, ref.Tag)
 	if err != nil {
 		return err
 	}
-	if manifest.DigestBytes(body) != digest {
-		return fmt.Errorf("manifest digest mismatch: server %s vs computed %s", digest, manifest.DigestBytes(body))
+	fetch := func(reference string) ([]byte, string, error) {
+		b, _, d, e := rc.GetManifest(ref.Owner, ref.Name, reference)
+		return b, d, e
 	}
-	if err := imgstore.PutManifestBytes(digest, body); err != nil {
+	selBody, selDigest, m, err := selectArchManifest(arch, ct, body, digest, fetch)
+	if err != nil {
+		return err
+	}
+	if manifest.DigestBytes(selBody) != selDigest {
+		return fmt.Errorf("manifest digest mismatch: server %s vs computed %s", selDigest, manifest.DigestBytes(selBody))
+	}
+	if err := imgstore.PutManifestBytes(selDigest, selBody); err != nil {
 		return err
 	}
 
-	var m manifest.Manifest
-	if err := json.Unmarshal(body, &m); err != nil {
-		return err
-	}
 	if err := m.Validate(); err != nil {
 		return err
 	}
@@ -208,8 +278,9 @@ func runRegistryPull(cmd *cobra.Command, ref imgstore.Ref, arch string) error {
 			m.Base.Name, have, m.Base.Digest, m.Base.Name, m.Base.Name)
 	}
 
-	// Ref.
-	if err := imgstore.WriteRef(ref, digest); err != nil {
+	// Ref. The local ref points at the arch-specific manifest digest (selDigest),
+	// never the index digest.
+	if err := imgstore.WriteRef(ref, selDigest); err != nil {
 		return err
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "Pulled %s\n", ref.Host+"/"+ref.Owner+"/"+ref.Name+":"+ref.Tag)
