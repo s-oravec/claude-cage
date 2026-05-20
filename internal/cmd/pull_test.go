@@ -129,6 +129,22 @@ func TestSelectArchManifest_Index_NoMatchingArch_Errors(t *testing.T) {
 	assert.Contains(t, err.Error(), "amd64")
 }
 
+func TestSelectArchManifest_Index_EntryArchMismatch_Errors(t *testing.T) {
+	body := indexBody(t, "arm64")
+	// The index entry claims arm64, but the fetched manifest is actually amd64.
+	mismatchedManifest := manifestBody(t, "amd64")
+	fetch := func(reference string) ([]byte, string, error) {
+		return mismatchedManifest, "sha256:amd64-docker-digest", nil
+	}
+
+	_, _, _, err := selectArchManifest(
+		"arm64", manifest.MediaTypeIndexV1, body, "sha256:idx", fetch)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "arm64")
+	assert.Contains(t, err.Error(), "amd64")
+}
+
 func TestSelectArchManifest_UnexpectedContentType_Errors(t *testing.T) {
 	fetch := func(reference string) ([]byte, string, error) {
 		return nil, "", errors.New("fetch should not be called")

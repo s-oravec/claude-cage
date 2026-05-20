@@ -188,6 +188,9 @@ func selectArchManifest(arch, contentType string, body []byte, digest string,
 		if err := json.Unmarshal(mBody, &mm); err != nil {
 			return nil, "", nil, err
 		}
+		if mm.Config.Arch != arch {
+			return nil, "", nil, fmt.Errorf("index entry for %s resolved to a %s manifest", arch, mm.Config.Arch)
+		}
 		return mBody, mDigest, &mm, nil
 	default:
 		return nil, "", nil, fmt.Errorf("unexpected Content-Type %q from manifest endpoint", contentType)
