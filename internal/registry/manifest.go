@@ -9,9 +9,11 @@ import (
 
 // PutManifestResult is the JSON response body for a successful manifest PUT.
 type PutManifestResult struct {
-	Tag            string `json:"tag"`
-	ManifestDigest string `json:"manifest_digest"`
-	LatestUpdated  bool   `json:"latest_updated"`
+	Tag             string `json:"tag"`
+	ManifestDigest  string `json:"manifest_digest"`
+	TagTargetKind   string `json:"tag_target_kind"`
+	TagTargetDigest string `json:"tag_target_digest"`
+	LatestUpdated   bool   `json:"latest_updated"`
 }
 
 // GetManifest fetches the canonical manifest JSON for repos/<owner>/<name>:<tag>.

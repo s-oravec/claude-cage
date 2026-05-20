@@ -50,6 +50,27 @@ func TestPutManifest_201(t *testing.T) {
 	assert.True(t, res.LatestUpdated)
 }
 
+func TestPutManifest_DecodesTagTarget(t *testing.T) {
+	const targetDigest = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte(`{
+			"tag": "1.0",
+			"manifest_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+			"tag_target_kind": "index",
+			"tag_target_digest": "` + targetDigest + `",
+			"latest_updated": false
+		}`))
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(srv.URL[len("http://"):], Options{Token: "t", Insecure: true})
+	res, err := c.PutManifest("s", "d", "1.0", []byte(`{}`), false)
+	require.NoError(t, err)
+	assert.Equal(t, "index", res.TagTargetKind)
+	assert.Equal(t, targetDigest, res.TagTargetDigest)
+}
+
 func sha256Sum(b []byte) []byte { s := sha256.Sum256(b); return s[:] }
 
 // Unused but useful helper for future tests:

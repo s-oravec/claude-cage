@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -108,6 +109,25 @@ func runPush(out io.Writer, refStr string, asLatest bool) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "Pushed %s -> %s (latest_updated=%v)\n", refStr, res.ManifestDigest, res.LatestUpdated)
+	tagLabel := fmt.Sprintf("%s/%s:%s", ref.Owner, ref.Name, ref.Tag)
+	fmt.Fprintf(out, "Pushed: %s (%s)\n", shortDigest(res.ManifestDigest), m.Config.Arch)
+	if res.TagTargetKind == "index" {
+		fmt.Fprintf(out, "Tag %s -> index %s (auto-composed by server)\n", tagLabel, shortDigest(res.TagTargetDigest))
+	} else {
+		fmt.Fprintf(out, "Tag %s -> manifest %s\n", tagLabel, shortDigest(res.TagTargetDigest))
+	}
+	if res.LatestUpdated {
+		fmt.Fprintf(out, "Updated latest -> %s\n", shortDigest(res.TagTargetDigest))
+	}
 	return nil
+}
+
+// shortDigest truncates a "sha256:<64hex>" digest to "sha256:" + first 12 hex
+// chars. Any other input is returned unchanged.
+func shortDigest(d string) string {
+	const prefix = "sha256:"
+	if len(d) == len(prefix)+64 && strings.HasPrefix(d, prefix) {
+		return d[:len(prefix)+12]
+	}
+	return d
 }
