@@ -102,6 +102,32 @@ func TestManifest_Validate_RejectsOffWhitelistArch(t *testing.T) {
 	assert.Contains(t, err.Error(), "config.arch")
 }
 
+func TestManifest_RejectsUnknownArch(t *testing.T) {
+	m := &Manifest{
+		SchemaVersion: 1,
+		MediaType:     MediaTypeManifestV1,
+		Base:          Base{Type: "distro", Name: "ubuntu-24.04", Digest: "sha256:abc"},
+		Layers:        []Layer{{Digest: "sha256:def", Size: 1, MediaType: MediaTypeLayerV1}},
+		Config:        Config{OS: "linux", Arch: "riscv64"},
+	}
+	err := m.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "config.arch")
+}
+
+func TestManifest_RejectsMissingArch(t *testing.T) {
+	m := &Manifest{
+		SchemaVersion: 1,
+		MediaType:     MediaTypeManifestV1,
+		Base:          Base{Type: "distro", Name: "ubuntu-24.04", Digest: "sha256:abc"},
+		Layers:        []Layer{{Digest: "sha256:def", Size: 1, MediaType: MediaTypeLayerV1}},
+		Config:        Config{OS: "linux", Arch: ""}, // empty
+	}
+	err := m.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "config.arch")
+}
+
 func TestManifest_Validate_RejectsMissingLayer(t *testing.T) {
 	m := &Manifest{
 		SchemaVersion: 1,
