@@ -16,23 +16,24 @@ type PutManifestResult struct {
 	LatestUpdated   bool   `json:"latest_updated"`
 }
 
-// GetManifest fetches the canonical manifest JSON for repos/<owner>/<name>:<tag>.
-// Returns the body bytes and the server-reported Docker-Content-Digest.
-func (c *Client) GetManifest(owner, name, tag string) ([]byte, string, error) {
-	path := fmt.Sprintf("/api/v1/repos/%s/%s/manifests/%s", owner, name, tag)
+// GetManifest fetches repos/<owner>/<name>:<reference>. Returns the raw body, the
+// response Content-Type (manifest.MediaTypeManifestV1 or .MediaTypeIndexV1), and the
+// server-reported Docker-Content-Digest.
+func (c *Client) GetManifest(owner, name, ref string) (body []byte, contentType, dockerDigest string, err error) {
+	path := fmt.Sprintf("/api/v1/repos/%s/%s/manifests/%s", owner, name, ref)
 	resp, err := c.do(http.MethodGet, path, nil, nil)
 	if err != nil {
-		return nil, "", err
+		return nil, "", "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, "", parseError(resp)
+		return nil, "", "", parseError(resp)
 	}
-	body, err := io.ReadAll(resp.Body)
+	body, err = io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, "", err
+		return nil, "", "", err
 	}
-	return body, resp.Header.Get("Docker-Content-Digest"), nil
+	return body, resp.Header.Get("Content-Type"), resp.Header.Get("Docker-Content-Digest"), nil
 }
 
 // PutManifest uploads a canonical manifest JSON for repos/<owner>/<name>:<tag>.

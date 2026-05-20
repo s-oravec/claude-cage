@@ -154,7 +154,7 @@ func runRegistryPull(cmd *cobra.Command, ref imgstore.Ref, arch string) error {
 	}
 
 	// Manifest.
-	body, digest, err := rc.GetManifest(ref.Owner, ref.Name, ref.Tag)
+	body, _, digest, err := rc.GetManifest(ref.Owner, ref.Name, ref.Tag)
 	if err != nil {
 		return err
 	}

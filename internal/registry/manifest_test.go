@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/s-oravec/claude-cage/internal/manifest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,9 +27,30 @@ func TestGetManifest_ReturnsBodyAndDigest(t *testing.T) {
 	defer srv.Close()
 
 	c, _ := NewClient(srv.URL[len("http://"):], Options{Insecure: true})
-	got, gotDigest, err := c.GetManifest("s", "d", "v1")
+	got, gotContentType, gotDigest, err := c.GetManifest("s", "d", "v1")
 	require.NoError(t, err)
 	assert.Equal(t, body, got)
+	assert.Equal(t, manifest.MediaTypeManifestV1, gotContentType)
+	assert.Equal(t, digest, gotDigest)
+}
+
+func TestGetManifest_ReturnsIndexContentType(t *testing.T) {
+	body := []byte(`{"schemaVersion":2,"mediaType":"application/vnd.cage.index.v1+json","manifests":[]}`)
+	digest := "sha256:idx" + hex.EncodeToString(sha256Sum(body))
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/api/v1/repos/s/d/manifests/v1", r.URL.Path)
+		w.Header().Set("Content-Type", manifest.MediaTypeIndexV1)
+		w.Header().Set("Docker-Content-Digest", digest)
+		w.Write(body)
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(srv.URL[len("http://"):], Options{Insecure: true})
+	got, gotContentType, gotDigest, err := c.GetManifest("s", "d", "v1")
+	require.NoError(t, err)
+	assert.NotEmpty(t, got)
+	assert.Equal(t, manifest.MediaTypeIndexV1, gotContentType)
 	assert.Equal(t, digest, gotDigest)
 }
 
