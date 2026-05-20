@@ -109,8 +109,16 @@ func runPush(out io.Writer, refStr string, asLatest bool) error {
 	if err != nil {
 		return err
 	}
-	tagLabel := fmt.Sprintf("%s/%s:%s", ref.Owner, ref.Name, ref.Tag)
-	fmt.Fprintf(out, "Pushed: %s (%s)\n", shortDigest(res.ManifestDigest), m.Config.Arch)
+	printPushResult(out, fmt.Sprintf("%s/%s:%s", ref.Owner, ref.Name, ref.Tag), m.Config.Arch, res)
+	return nil
+}
+
+// printPushResult renders the post-push tag state. tagLabel is "<owner>/<name>:<tag>",
+// arch is the pushed manifest's Config.Arch.
+func printPushResult(out io.Writer, tagLabel, arch string, res *registry.PutManifestResult) {
+	fmt.Fprintf(out, "Pushed: %s (%s)\n", shortDigest(res.ManifestDigest), arch)
+	// tag_target_kind is "manifest" or "index"; treat any non-"index" value as a
+	// direct manifest target (the default server contract).
 	if res.TagTargetKind == "index" {
 		fmt.Fprintf(out, "Tag %s -> index %s (auto-composed by server)\n", tagLabel, shortDigest(res.TagTargetDigest))
 	} else {
@@ -119,7 +127,6 @@ func runPush(out io.Writer, refStr string, asLatest bool) error {
 	if res.LatestUpdated {
 		fmt.Fprintf(out, "Updated latest -> %s\n", shortDigest(res.TagTargetDigest))
 	}
-	return nil
 }
 
 // shortDigest truncates a "sha256:<64hex>" digest to "sha256:" + first 12 hex
