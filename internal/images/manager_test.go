@@ -192,3 +192,13 @@ func TestListDownloaded_IgnoresNonQcow2(t *testing.T) {
 	assert.Len(t, list, 1)
 	assert.Contains(t, list, "ubuntu")
 }
+
+// TestDownload_UnknownArch_Errors verifies the empty-URL early return. For an
+// arch not present in the base's URL map, GetSource returns URL="" and Download
+// must error before any network access (no http.Get is reached).
+func TestDownload_UnknownArch_Errors(t *testing.T) {
+	SetDir(t.TempDir())
+	err := Download("ubuntu-24.04", "ppc64le", func(written, total int64) {})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ppc64le")
+}

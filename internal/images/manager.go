@@ -158,6 +158,10 @@ func Download(name, arch string, progress func(written, total int64)) error {
 		Size:        size,
 		CreatedAt:   time.Now(),
 	}); err != nil {
+		// Keep Download all-or-nothing: without metadata IsDownloaded() would
+		// report true while BaseArch falls back to the host arch. Remove the
+		// image so the next run re-downloads cleanly.
+		os.Remove(finalPath)
 		return fmt.Errorf("failed to record image metadata: %w", err)
 	}
 

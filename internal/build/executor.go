@@ -156,8 +156,9 @@ func (e *Executor) createTempCage() error {
 	if !images.IsDownloaded(imageName) {
 		return fmt.Errorf("base image '%s' not found, run 'cage pull --base %s' first", imageName, imageName)
 	}
-	if images.BaseArch(imageName) != e.config.Arch {
-		return fmt.Errorf("base image %q is %s but build targets %s; run `cage pull --platform %s --base %s`", imageName, images.BaseArch(imageName), e.config.Arch, e.config.Arch, imageName)
+	baseArch := images.BaseArch(imageName)
+	if baseArch != e.config.Arch {
+		return fmt.Errorf("base image %q is %s but build targets %s; run `cage pull --platform %s --base %s`", imageName, baseArch, e.config.Arch, e.config.Arch, imageName)
 	}
 
 	e.log(" ---> Using base image: %s", imageName)
