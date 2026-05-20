@@ -1,10 +1,18 @@
 package images
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestBaseAliasEntry_ParsesArchMaps(t *testing.T) {
+	var e BaseAliasEntry
+	json.Unmarshal([]byte(`{"name":"x","urls":{"amd64":"https://a","arm64":"https://b"},"sha256":{"amd64":null,"arm64":null},"description":"x"}`), &e)
+	assert.Equal(t, "https://a", e.URLs["amd64"])
+	assert.Equal(t, "https://b", e.URLs["arm64"])
+}
 
 func TestBaseImages_ContainsExpected(t *testing.T) {
 	sources := BaseImages()
@@ -18,9 +26,13 @@ func TestImageSource_HasRequiredFields(t *testing.T) {
 	sources := BaseImages()
 	ubuntu := sources["ubuntu-24.04"]
 
-	assert.NotEmpty(t, ubuntu.URL)
+	// BaseImages populates Name + Description; URL is per-arch (via GetSource).
 	assert.NotEmpty(t, ubuntu.Name)
-	assert.Contains(t, ubuntu.URL, "https://")
+	assert.NotEmpty(t, ubuntu.Description)
+
+	src, err := GetSource("ubuntu-24.04", "amd64")
+	assert.NoError(t, err)
+	assert.Contains(t, src.URL, "https://")
 }
 
 func TestListAvailable(t *testing.T) {
@@ -32,14 +44,14 @@ func TestListAvailable(t *testing.T) {
 }
 
 func TestGetSource_Exists(t *testing.T) {
-	src, err := GetSource("ubuntu-24.04")
+	src, err := GetSource("ubuntu-24.04", "amd64")
 
 	assert.NoError(t, err)
 	assert.Equal(t, "ubuntu-24.04", src.Name)
 }
 
 func TestGetSource_NotExists(t *testing.T) {
-	_, err := GetSource("nonexistent")
+	_, err := GetSource("nonexistent", "amd64")
 
 	assert.Error(t, err)
 }
@@ -52,11 +64,6 @@ func TestResolveAlias_KnownAliases(t *testing.T) {
 		{"alpine", "alpine-3.21"},
 		{"ubuntu", "ubuntu-24.04"},
 		{"debian", "debian-12"},
-		{"rocky", "rocky-9"},
-		{"alma", "alma-9"},
-		{"fedora", "fedora-41"},
-		{"opensuse", "opensuse-15.6"},
-		{"centos", "centos-stream-9"},
 	}
 
 	for _, tt := range tests {
@@ -78,7 +85,7 @@ func TestResolveAlias_UnknownReturnsInput(t *testing.T) {
 
 func TestGetSource_WithAlias(t *testing.T) {
 	// Getting source with alias should work
-	src, err := GetSource("alpine")
+	src, err := GetSource("alpine", "amd64")
 	assert.NoError(t, err)
 	assert.Equal(t, "alpine-3.21", src.Name)
 }
@@ -98,25 +105,6 @@ func TestBaseImages_AllDistros(t *testing.T) {
 	// Debian
 	assert.Contains(t, sources, "debian-12")
 	assert.Contains(t, sources, "debian-11")
-
-	// Rocky
-	assert.Contains(t, sources, "rocky-9")
-	assert.Contains(t, sources, "rocky-8")
-
-	// Alma
-	assert.Contains(t, sources, "alma-9")
-	assert.Contains(t, sources, "alma-8")
-
-	// Fedora
-	assert.Contains(t, sources, "fedora-41")
-	assert.Contains(t, sources, "fedora-40")
-
-	// openSUSE
-	assert.Contains(t, sources, "opensuse-15.6")
-	assert.Contains(t, sources, "opensuse-15.5")
-
-	// CentOS
-	assert.Contains(t, sources, "centos-stream-9")
 }
 
 func TestBaseImages_AllHaveValidURLs(t *testing.T) {
@@ -124,9 +112,14 @@ func TestBaseImages_AllHaveValidURLs(t *testing.T) {
 
 	for name, src := range sources {
 		t.Run(name, func(t *testing.T) {
-			assert.NotEmpty(t, src.URL, "image %s should have URL", name)
-			assert.Contains(t, src.URL, "https://", "image %s URL should be HTTPS", name)
 			assert.NotEmpty(t, src.Description, "image %s should have description", name)
+			// URL is per-arch; verify each supported arch resolves to an HTTPS URL.
+			for _, arch := range SupportedArchitectures {
+				got, err := GetSource(name, arch)
+				assert.NoError(t, err)
+				assert.NotEmpty(t, got.URL, "image %s should have URL for %s", name, arch)
+				assert.Contains(t, got.URL, "https://", "image %s/%s URL should be HTTPS", name, arch)
+			}
 		})
 	}
 }

@@ -10,7 +10,7 @@ import (
 // vendored copy in cage-hub at apps/api/src/config/base-aliases.json
 // (sister-PR required). If this test fails, the error message prints the
 // actual hash - paste it here.
-const expectedBaseAliasesSHA256 = "4a90ab534b7cc6e77e89373122a3ec3c2dab29b6ff812db0b4561d8c84325dc5"
+const expectedBaseAliasesSHA256 = "160a7d45da5a4de0ec04826f8353fc9d24b30b937452d4aa3d3d9b6f55dad0ed"
 
 func TestBaseAliasesJSON_PinnedHash(t *testing.T) {
 	sum := sha256.Sum256(baseAliasesData)

@@ -17,10 +17,10 @@ type ImageSource struct {
 // via a byte-identical vendored copy; see docs at
 // ../cage-hub/docs/superpowers/specs/2026-05-18-base-aliases-unification-design.md.
 type BaseAliasEntry struct {
-	Name        string  `json:"name"`
-	URL         string  `json:"url"`
-	SHA256      *string `json:"sha256"`
-	Description string  `json:"description"`
+	Name        string             `json:"name"`
+	URLs        map[string]string  `json:"urls"`
+	SHA256      map[string]*string `json:"sha256,omitempty"`
+	Description string             `json:"description"`
 }
 
 //go:embed base-aliases.json
@@ -41,21 +41,17 @@ func init() {
 // never sees short names because the CLI resolves them before pushing.
 var imageAliases = map[string]string{
 	// Default aliases point to latest stable/LTS
-	"alpine":   "alpine-3.21",
-	"ubuntu":   "ubuntu-24.04",
-	"debian":   "debian-12",
-	"rocky":    "rocky-9",
-	"alma":     "alma-9",
-	"fedora":   "fedora-41",
-	"opensuse": "opensuse-15.6",
-	"centos":   "centos-stream-9",
+	"alpine": "alpine-3.21",
+	"ubuntu": "ubuntu-24.04",
+	"debian": "debian-12",
 }
 
 // BaseImages returns available base images, indexed by canonical name.
 func BaseImages() map[string]ImageSource {
 	out := make(map[string]ImageSource, len(baseAliases))
 	for _, e := range baseAliases {
-		out[e.Name] = ImageSource{Name: e.Name, URL: e.URL, Description: e.Description}
+		// URL is per-arch now; resolve via GetSource(name, arch).
+		out[e.Name] = ImageSource{Name: e.Name, Description: e.Description}
 	}
 	return out
 }
@@ -77,13 +73,19 @@ func ListAvailable() []string {
 	return names
 }
 
-// GetSource returns an image source by name (supports aliases)
-func GetSource(name string) (*ImageSource, error) {
+// GetSource returns an image source by name (supports aliases) for the given
+// architecture. The URL is resolved per-arch; if the entry has no URL for arch,
+// ImageSource.URL is left empty (the build executor checks for empty later).
+func GetSource(name, arch string) (*ImageSource, error) {
 	name = ResolveAlias(name)
-	sources := BaseImages()
-	src, ok := sources[name]
-	if !ok {
-		return nil, errors.New("unknown image: " + name)
+	for _, e := range baseAliases {
+		if e.Name == name {
+			return &ImageSource{
+				Name:        e.Name,
+				URL:         e.URLs[arch],
+				Description: e.Description,
+			}, nil
+		}
 	}
-	return &src, nil
+	return nil, errors.New("unknown image: " + name)
 }

@@ -84,7 +84,7 @@ func (pw *ProgressWriter) Write(p []byte) (int, error) {
 
 // Download downloads and prepares a base image
 func Download(name string, progress func(written, total int64)) error {
-	src, err := GetSource(name)
+	src, err := GetSource(name, HostArchitecture())
 	if err != nil {
 		return err
 	}
