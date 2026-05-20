@@ -19,6 +19,7 @@ import (
 func NewPullCmd() *cobra.Command {
 	var base string
 	var list bool
+	var platform string
 
 	cmd := &cobra.Command{
 		Use:   "pull",
@@ -41,9 +42,14 @@ the local image store.`,
 				return listImages(cmd)
 			}
 
+			arch, err := resolvePlatform(platform)
+			if err != nil {
+				return err
+			}
+
 			if len(args) == 1 {
 				if ref, err := imgstore.ParseRef(args[0]); err == nil && ref.IsRegistry() {
-					return printAPIErrorHint(runRegistryPull(cmd, ref))
+					return printAPIErrorHint(runRegistryPull(cmd, ref, arch))
 				}
 				base = args[0]
 			}
@@ -58,6 +64,7 @@ the local image store.`,
 
 	cmd.Flags().StringVarP(&base, "base", "b", "", "Base image to download (e.g., ubuntu-24.04)")
 	cmd.Flags().BoolVarP(&list, "list", "l", false, "List available base images")
+	cmd.Flags().StringVar(&platform, "platform", "", "Target architecture (amd64|arm64). Defaults to host architecture.")
 
 	return cmd
 }
@@ -131,7 +138,11 @@ func pullImage(cmd *cobra.Command, name string) error {
 	return images.Setup(name, progressFn, status)
 }
 
-func runRegistryPull(cmd *cobra.Command, ref imgstore.Ref) error {
+// runRegistryPull pulls an image from a cage-hub registry. The arch parameter is
+// the resolved target architecture; it is threaded in here for the dispatch task
+// that will consume it (it is intentionally unused for now).
+func runRegistryPull(cmd *cobra.Command, ref imgstore.Ref, arch string) error {
+	_ = arch
 	cfg, err := config.Load()
 	if err != nil {
 		return err

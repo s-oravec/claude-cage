@@ -20,6 +20,7 @@ func NewBuildCmd() *cobra.Command {
 	var keepOnError bool
 	var interactive bool
 	var forwardAgent bool
+	var platform string
 
 	cmd := &cobra.Command{
 		Use:   "build <context>",
@@ -48,7 +49,11 @@ Usage:
   cage build -t my-image --build-arg VERSION=2.0 .`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runBuild(cmd, args[0], tag, cagefilePath, buildArgs, keepOnError, interactive, forwardAgent)
+			arch, err := resolvePlatform(platform)
+			if err != nil {
+				return err
+			}
+			return runBuild(cmd, args[0], tag, arch, cagefilePath, buildArgs, keepOnError, interactive, forwardAgent)
 		},
 	}
 
@@ -58,13 +63,14 @@ Usage:
 	cmd.Flags().BoolVar(&keepOnError, "keep-on-error", false, "Keep temporary cage defined on build failure")
 	cmd.Flags().BoolVar(&interactive, "interactive", false, "On failure, leave the temp cage running and print SSH instructions for debugging")
 	cmd.Flags().BoolVarP(&forwardAgent, "forward-agent", "A", false, "Forward the local ssh-agent into RUN steps (for git clone over SSH from inside the build)")
+	cmd.Flags().StringVar(&platform, "platform", "", "Target architecture (amd64|arm64). Defaults to host architecture.")
 
 	cmd.MarkFlagRequired("tag")
 
 	return cmd
 }
 
-func runBuild(cmd *cobra.Command, context, tag, cagefilePath string, buildArgsList []string, keepOnError, interactive, forwardAgent bool) error {
+func runBuild(cmd *cobra.Command, context, tag, arch, cagefilePath string, buildArgsList []string, keepOnError, interactive, forwardAgent bool) error {
 	// Validate tag
 	if tag == "" {
 		return fmt.Errorf("--tag is required")
@@ -115,6 +121,7 @@ func runBuild(cmd *cobra.Command, context, tag, cagefilePath string, buildArgsLi
 	// Create and run executor
 	executor := build.NewExecutor(&build.BuildConfig{
 		Tag:          tag,
+		Arch:         arch,
 		ContextDir:   contextDir,
 		CagefilePath: cagefilePath,
 		BuildArgs:    buildArgs,

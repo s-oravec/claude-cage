@@ -31,3 +31,10 @@ func TestPullCmd_LongMentionsRegistry(t *testing.T) {
 	c := NewPullCmd()
 	assert.Contains(t, c.Long, "registry")
 }
+
+func TestPullCmd_HasPlatformFlag(t *testing.T) {
+	cmd := NewPullCmd()
+
+	flag := cmd.Flag("platform")
+	assert.NotNil(t, flag)
+}

@@ -27,6 +27,7 @@ import (
 // BuildConfig contains configuration for the build
 type BuildConfig struct {
 	Tag          string            // Output image name
+	Arch         string            // Target architecture (e.g. "amd64", "arm64")
 	ContextDir   string            // Build context directory
 	CagefilePath string            // Path to Cagefile
 	BuildArgs    map[string]string // Build arguments
