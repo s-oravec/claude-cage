@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/s-oravec/claude-cage/internal/config"
 )
@@ -82,11 +83,16 @@ func (pw *ProgressWriter) Write(p []byte) (int, error) {
 	return n, nil
 }
 
-// Download downloads and prepares a base image
-func Download(name string, progress func(written, total int64)) error {
-	src, err := GetSource(name, HostArchitecture())
+// Download downloads and prepares a base image for the given architecture.
+// On success it writes base metadata recording the downloaded arch (the cache
+// itself stays flat: images/<name>.qcow2).
+func Download(name, arch string, progress func(written, total int64)) error {
+	src, err := GetSource(name, arch)
 	if err != nil {
 		return err
+	}
+	if src.URL == "" {
+		return fmt.Errorf("base %q has no %s cloud-image; pick a different base or architecture", name, arch)
 	}
 
 	if err := EnsureDir(); err != nil {
@@ -138,12 +144,29 @@ func Download(name string, progress func(written, total int64)) error {
 		}
 	}
 
+	// Record base metadata so BaseArch can report the downloaded arch.
+	var size int64
+	if fi, err := os.Stat(finalPath); err == nil {
+		size = fi.Size()
+	}
+	if err := SaveMetadata(&Image{
+		Name:        ResolveAlias(name),
+		Type:        "base",
+		Arch:        arch,
+		Description: src.Description,
+		Path:        finalPath,
+		Size:        size,
+		CreatedAt:   time.Now(),
+	}); err != nil {
+		return fmt.Errorf("failed to record image metadata: %w", err)
+	}
+
 	return nil
 }
 
 // Setup downloads and prepares a base image with customization
-func Setup(name string, progress func(written, total int64), status func(msg string)) error {
-	if err := Download(name, progress); err != nil {
+func Setup(name, arch string, progress func(written, total int64), status func(msg string)) error {
+	if err := Download(name, arch, progress); err != nil {
 		return err
 	}
 

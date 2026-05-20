@@ -58,7 +58,7 @@ the local image store.`,
 				base = "alpine" // default
 			}
 
-			return pullImage(cmd, base)
+			return pullImage(cmd, base, arch)
 		},
 	}
 
@@ -101,15 +101,16 @@ func listImages(cmd *cobra.Command) error {
 	return nil
 }
 
-func pullImage(cmd *cobra.Command, name string) error {
-	// Check if already downloaded
-	if images.IsDownloaded(name) {
+func pullImage(cmd *cobra.Command, name, arch string) error {
+	// Already have this base for the requested arch -> nothing to do. A cached
+	// copy for a different arch is overwritten by the download below.
+	if images.IsDownloaded(name) && images.BaseArch(name) == arch {
 		fmt.Fprintf(cmd.OutOrStdout(), "✓ Image already downloaded: %s\n", name)
 		return nil
 	}
 
-	// Validate image name and get size info
-	src, err := images.GetSource(name, images.HostArchitecture())
+	// Validate image name and get size info for the requested arch
+	src, err := images.GetSource(name, arch)
 	if err != nil {
 		return err
 	}
@@ -135,7 +136,7 @@ func pullImage(cmd *cobra.Command, name string) error {
 		fmt.Fprintln(cmd.OutOrStdout(), msg)
 	}
 
-	return images.Setup(name, progressFn, status)
+	return images.Setup(name, arch, progressFn, status)
 }
 
 // runRegistryPull pulls an image from a cage-hub registry. The arch parameter is
@@ -190,10 +191,11 @@ func runRegistryPull(cmd *cobra.Command, ref imgstore.Ref, arch string) error {
 		}
 	}
 
-	// Base image check.
-	if !images.IsDownloaded(m.Base.Name) {
-		fmt.Fprintf(cmd.OutOrStdout(), "  base %s: not found locally, pulling...\n", m.Base.Name)
-		if err := pullImage(cmd, m.Base.Name); err != nil {
+	// Base image check. The base must match the manifest's architecture; (re)pull
+	// it when missing or when the cached copy is for a different arch.
+	if !images.IsDownloaded(m.Base.Name) || images.BaseArch(m.Base.Name) != m.Config.Arch {
+		fmt.Fprintf(cmd.OutOrStdout(), "  base %s (%s): pulling...\n", m.Base.Name, m.Config.Arch)
+		if err := pullImage(cmd, m.Base.Name, m.Config.Arch); err != nil {
 			return err
 		}
 	}

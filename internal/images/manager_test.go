@@ -162,7 +162,7 @@ func TestDownload_UnknownImage(t *testing.T) {
 	imagesDir = tmpDir
 	defer func() { imagesDir = oldDir }()
 
-	err := Download("nonexistent-image-xyz", nil)
+	err := Download("nonexistent-image-xyz", HostArchitecture(), nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown image")
 }

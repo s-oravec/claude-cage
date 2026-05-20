@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	goruntime "runtime"
 	"strings"
 
 	"github.com/s-oravec/claude-cage/internal/cage"
@@ -136,7 +135,7 @@ func Save(cageName, imageName, description string) (*SaveResult, error) {
 		Tag:         imageName,
 		Config: manifest.Config{
 			OS:          "linux",
-			Arch:        goruntime.GOARCH,
+			Arch:        HostArchitecture(),
 			Description: description,
 		},
 	}); err != nil {

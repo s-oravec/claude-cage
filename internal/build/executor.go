@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	goruntime "runtime"
 	"sort"
 	"strings"
 	"time"
@@ -156,6 +155,9 @@ func (e *Executor) createTempCage() error {
 	// Check image exists
 	if !images.IsDownloaded(imageName) {
 		return fmt.Errorf("base image '%s' not found, run 'cage pull --base %s' first", imageName, imageName)
+	}
+	if images.BaseArch(imageName) != e.config.Arch {
+		return fmt.Errorf("base image %q is %s but build targets %s; run `cage pull --platform %s --base %s`", imageName, images.BaseArch(imageName), e.config.Arch, e.config.Arch, imageName)
 	}
 
 	e.log(" ---> Using base image: %s", imageName)
@@ -591,7 +593,7 @@ func (e *Executor) saveImage() error {
 
 	cfg := manifest.Config{
 		OS:       "linux",
-		Arch:     goruntime.GOARCH,
+		Arch:     e.config.Arch,
 		User:     e.user,
 		Workdir:  e.workdir,
 		Cagefile: readCagefileText(e.config.CagefilePath),

@@ -19,6 +19,7 @@ type Image struct {
 	Name        string    `json:"name"`
 	Type        string    `json:"type"`           // base, custom
 	Base        string    `json:"base,omitempty"` // parent image (for custom)
+	Arch        string    `json:"arch,omitempty"` // recorded architecture of the cached image
 	Size        int64     `json:"size_bytes"`
 	Description string    `json:"description,omitempty"`
 	CreatedAt   time.Time `json:"created_at,omitempty"`
@@ -102,4 +103,18 @@ func IsBaseImage(name string) bool {
 		return true // No metadata means base image
 	}
 	return meta.Type == "base"
+}
+
+// BaseArch returns the recorded architecture of a downloaded base image.
+//
+// It loads metadata for the resolved name and returns meta.Arch when present.
+// When there is no metadata (or the recorded Arch is empty), it falls back to
+// the host architecture: legacy flat caches predate multi-arch and were always
+// host-arch downloads, so this keeps existing setups working.
+func BaseArch(name string) string {
+	meta, err := LoadMetadata(ResolveAlias(name))
+	if err != nil || meta == nil || meta.Arch == "" {
+		return HostArchitecture()
+	}
+	return meta.Arch
 }

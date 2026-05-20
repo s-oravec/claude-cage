@@ -240,6 +240,10 @@ func createCageFromConfig(cmd *cobra.Command, name string, resolved *config.Reso
 			cage.DeleteState(name)
 			return fmt.Errorf("base image %q not downloaded - run 'cage pull --base %s' first", m.Base.Name, m.Base.Name)
 		}
+		if images.BaseArch(m.Base.Name) != m.Config.Arch {
+			cage.DeleteState(name)
+			return fmt.Errorf("base image %q is %s but this image needs %s; run `cage pull --platform %s --base %s`", m.Base.Name, images.BaseArch(m.Base.Name), m.Config.Arch, m.Config.Arch, m.Base.Name)
+		}
 		diskBase := filepath.Join(cageVMDir, "disk-base.qcow2")
 		fmt.Fprintln(cmd.OutOrStdout(), "  Materializing layered image...")
 		if err := imgstore.MaterializeChain(manifestDigest, baseImg, diskBase); err != nil {

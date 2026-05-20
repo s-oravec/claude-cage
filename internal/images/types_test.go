@@ -84,6 +84,67 @@ func TestImageMetadata(t *testing.T) {
 	})
 }
 
+func TestImageArchRoundTrip(t *testing.T) {
+	SetDir(t.TempDir())
+
+	img := &Image{
+		Name: "arch-roundtrip",
+		Type: "base",
+		Arch: "arm64",
+		Path: filepath.Join(Dir(), "arch-roundtrip.qcow2"),
+	}
+	if err := SaveMetadata(img); err != nil {
+		t.Fatalf("failed to save metadata: %v", err)
+	}
+
+	loaded, err := LoadMetadata("arch-roundtrip")
+	if err != nil {
+		t.Fatalf("failed to load metadata: %v", err)
+	}
+	if loaded.Arch != "arm64" {
+		t.Errorf("expected arch %q, got %q", "arm64", loaded.Arch)
+	}
+}
+
+func TestBaseArch(t *testing.T) {
+	SetDir(t.TempDir())
+
+	t.Run("returns recorded arch", func(t *testing.T) {
+		img := &Image{
+			Name: "recorded-arch",
+			Type: "base",
+			Arch: "arm64",
+			Path: filepath.Join(Dir(), "recorded-arch.qcow2"),
+		}
+		if err := SaveMetadata(img); err != nil {
+			t.Fatal(err)
+		}
+		if got := BaseArch("recorded-arch"); got != "arm64" {
+			t.Errorf("expected %q, got %q", "arm64", got)
+		}
+	})
+
+	t.Run("falls back to host arch when no metadata", func(t *testing.T) {
+		if got := BaseArch("no-metadata"); got != HostArchitecture() {
+			t.Errorf("expected host arch %q, got %q", HostArchitecture(), got)
+		}
+	})
+
+	t.Run("falls back to host arch when arch empty", func(t *testing.T) {
+		img := &Image{
+			Name: "empty-arch",
+			Type: "base",
+			Path: filepath.Join(Dir(), "empty-arch.qcow2"),
+		}
+		if err := SaveMetadata(img); err != nil {
+			t.Fatal(err)
+		}
+		if got := BaseArch("empty-arch"); got != HostArchitecture() {
+			t.Errorf("expected host arch %q, got %q", HostArchitecture(), got)
+		}
+	})
+}
+
 func TestIsBaseImage(t *testing.T) {
 	// Create temp dir for tests
 	tmpDir := t.TempDir()
