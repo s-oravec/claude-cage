@@ -56,15 +56,8 @@ func (c *Client) UploadBlobSinglePUT(owner, name, digest string, size int64, bod
 	u.RawQuery = q.Encode()
 	uploadURL := u.String()
 
-	req, err := http.NewRequest(http.MethodPut, c.resolveURL(uploadURL), body)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/octet-stream")
-	if tok, _ := c.provider.Token(); tok != "" {
-		req.Header.Set("Authorization", "Bearer "+tok)
-	}
-	resp2, err := c.transport(req)
+	seeker, _ := body.(io.Seeker)
+	resp2, err := c.putWithRefresh(c.resolveURL(uploadURL), body, seeker)
 	if err != nil {
 		return err
 	}
@@ -73,4 +66,38 @@ func (c *Client) UploadBlobSinglePUT(owner, name, digest string, size int64, bod
 		return parseError(resp2)
 	}
 	return nil
+}
+
+// putWithRefresh PUTs body as octet-stream with the bearer token. On a 401 it
+// force-refreshes the token and, if the body is seekable, rewinds and retries
+// once. A non-seekable body cannot be replayed, so the 401 is returned as-is
+// (proactive refresh in Token() makes this path unlikely).
+func (c *Client) putWithRefresh(url string, body io.Reader, seeker io.Seeker) (*http.Response, error) {
+	resp, err := c.putOnce(url, body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode == http.StatusUnauthorized && seeker != nil {
+		resp.Body.Close()
+		if _, rerr := c.provider.Refresh(); rerr != nil {
+			return nil, rerr
+		}
+		if _, serr := seeker.Seek(0, io.SeekStart); serr != nil {
+			return nil, serr
+		}
+		return c.putOnce(url, body)
+	}
+	return resp, nil
+}
+
+func (c *Client) putOnce(url string, body io.Reader) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodPut, url, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+	if tok, _ := c.provider.Token(); tok != "" {
+		req.Header.Set("Authorization", "Bearer "+tok)
+	}
+	return c.transport(req)
 }
