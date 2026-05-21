@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
 
 // uploadInitResp is the JSON body of POST /blobs/uploads.
@@ -38,8 +39,14 @@ func (c *Client) UploadBlobSinglePUT(owner, name, digest string, size int64, bod
 	}
 	resp.Body.Close()
 
-	// Phase 2: PUT body.
-	url := init.UploadURL + "?digest=" + digest
+	// Phase 2: PUT body. The cage-hub server already bakes "?digest=<digest>"
+	// into upload_url, so only append it when the returned URL lacks a query
+	// string. Appending unconditionally yields "...?digest=X?digest=X", which
+	// the server rejects (querystring/digest Invalid).
+	url := init.UploadURL
+	if !strings.Contains(url, "?") {
+		url += "?digest=" + digest
+	}
 	req, err := http.NewRequest(http.MethodPut, c.resolveURL(url), body)
 	if err != nil {
 		return err
