@@ -99,11 +99,11 @@ func runLogin(out io.Writer, in io.Reader, host string, tokenStdin bool) error {
 	fmt.Fprintf(out, "Open %s and enter code: %s\n", dev.VerificationURI, dev.UserCode)
 	fmt.Fprintln(out, "Waiting for authorization...")
 
-	token, err := oidcdevice.PollToken(info.TokenEndpoint, info.ClientID, dev.DeviceCode, dev.Interval, dev.ExpiresIn)
+	tok, err := oidcdevice.PollToken(info.TokenEndpoint, info.ClientID, dev.DeviceCode, dev.Interval, dev.ExpiresIn)
 	if err != nil {
 		return err
 	}
-	if err := auth.AddHost(host, token, ""); err != nil {
+	if err := auth.AddHost(host, tok.AccessToken, ""); err != nil {
 		return err
 	}
 	fmt.Fprintf(out, "Logged in to %s.\n", host)
