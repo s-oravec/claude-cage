@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
+	neturl "net/url"
 )
 
 // uploadInitResp is the JSON body of POST /blobs/uploads.
@@ -39,15 +39,24 @@ func (c *Client) UploadBlobSinglePUT(owner, name, digest string, size int64, bod
 	}
 	resp.Body.Close()
 
-	// Phase 2: PUT body. The cage-hub server already bakes "?digest=<digest>"
-	// into upload_url, so only append it when the returned URL lacks a query
-	// string. Appending unconditionally yields "...?digest=X?digest=X", which
-	// the server rejects (querystring/digest Invalid).
-	url := init.UploadURL
-	if !strings.Contains(url, "?") {
-		url += "?digest=" + digest
+	// Phase 2: PUT body. Parse upload_url and SET the digest query param
+	// explicitly. The cage-hub server already bakes "?digest=<digest>" into
+	// upload_url, but setting it ensures exactly one digest param regardless of
+	// what the server returned: it overwrites a pre-baked value rather than
+	// appending a second one ("...?digest=X?digest=X", which the server rejects
+	// as querystring/digest Invalid) and adds it when the server omits it.
+	// upload_url may be relative or absolute; neturl.Parse handles both, and
+	// resolveURL still prepends the base for relative URLs.
+	u, err := neturl.Parse(init.UploadURL)
+	if err != nil {
+		return fmt.Errorf("invalid upload_url from server: %w", err)
 	}
-	req, err := http.NewRequest(http.MethodPut, c.resolveURL(url), body)
+	q := u.Query()
+	q.Set("digest", digest) // exactly one digest param, regardless of what the server returned
+	u.RawQuery = q.Encode()
+	uploadURL := u.String()
+
+	req, err := http.NewRequest(http.MethodPut, c.resolveURL(uploadURL), body)
 	if err != nil {
 		return err
 	}
