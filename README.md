@@ -11,7 +11,7 @@ A lightweight QEMU/KVM-based VM sandbox CLI for running Claude Code in isolation
 - **Port Forwarding**: Forward ports between host and VM
 - **Snapshots**: Create and restore VM snapshots
 - **Multiple Profiles**: Light, default, and heavy resource profiles
-- **Multiple Distros**: Alpine, Ubuntu, Debian, Rocky, Alma, Fedora, openSUSE, CentOS
+- **Multiple Distros**: Alpine, Ubuntu, Debian (each available for amd64 and arm64)
 
 ## Operating Modes
 
@@ -603,6 +603,7 @@ cage image <subcommand>
 - When run from a project directory with `.cage.yml`, cage-name is optional
 - Saved images are prepared for reuse (SSH keys cleared, cloud-init reset)
 - For full image preparation, install `virt-customize` (from `libguestfs-tools`)
+- `list` includes an `ARCH` column showing each image's architecture (`amd64` or `arm64`)
 
 **Examples:**
 ```bash
@@ -648,6 +649,11 @@ cage build -t <name> <context>
 | `--keep-on-error` | Keep temporary cage **defined** on build failure (stopped) |
 | `--interactive` | On failure, leave the temp cage **running** with SSH instructions for live debugging |
 | `-A, --forward-agent` | Forward host ssh-agent into RUN steps (for `git clone` over SSH from inside the build) |
+| `--platform` | Target architecture (`amd64` or `arm64`); defaults to the host architecture |
+
+Cross-arch builds (building for an architecture other than the host's) run under
+QEMU emulation and are noticeably slower than native-arch builds. See
+[docs/cage-hub.md](docs/cage-hub.md) for details on architecture support.
 
 **Cagefile Instructions:**
 
@@ -723,6 +729,7 @@ cage pull [options]
 |--------|-------------|
 | `-b, --base` | Base image to download |
 | `-l, --list` | List available images |
+| `--platform` | Target architecture (`amd64` or `arm64`); defaults to the host architecture |
 
 **Available Images:**
 
@@ -735,15 +742,10 @@ cage pull [options]
 | `ubuntu-20.04` | Ubuntu 20.04 LTS |
 | `debian` / `debian-12` | Debian 12 (Bookworm) |
 | `debian-11` | Debian 11 (Bullseye) |
-| `rocky` / `rocky-9` | Rocky Linux 9 |
-| `rocky-8` | Rocky Linux 8 |
-| `alma` / `alma-9` | AlmaLinux 9 |
-| `alma-8` | AlmaLinux 8 |
-| `fedora` / `fedora-41` | Fedora 41 |
-| `fedora-40` | Fedora 40 |
-| `opensuse` / `opensuse-15.6` | openSUSE Leap 15.6 |
-| `opensuse-15.5` | openSUSE Leap 15.5 |
-| `centos` / `centos-stream-9` | CentOS Stream 9 |
+
+Each image is available for both `amd64` and `arm64`. By default pull selects the
+host architecture (auto-detected); override it with `--platform amd64` or
+`--platform arm64`.
 
 **Examples:**
 ```bash
@@ -808,13 +810,43 @@ cage push cage-hub.io/stiivo/devbox:v1
 cage push cage-hub.io/stiivo/devbox:v1 --latest   # also move :latest
 ```
 
+`cage push` has no `--platform` flag: the architecture comes from the built
+image. The CLI always pushes a single-arch manifest and never composes indexes
+itself. When you push a second architecture to the same tag, the cage-hub server
+auto-composes a multi-arch index. Push prints the resulting tag target (a
+`manifest` for a single arch, or an `index` once the server composes one):
+
+```
+Pushed: sha256:abc123def456 (amd64)
+Tag stiivo/devbox:v1 -> manifest sha256:abc123def456
+```
+
+and, after pushing a second arch to the same tag:
+
+```
+Pushed: sha256:789abc012def (arm64)
+Tag stiivo/devbox:v1 -> index sha256:fed987cba654 (auto-composed by server)
+```
+
+See [docs/cage-hub.md](docs/cage-hub.md) for the full architecture-support how-to.
+
 ### cage pull (registry ref)
 
 `cage pull` also accepts a fully-qualified registry ref. It downloads the manifest, verifies its sha256, fetches any missing layer blobs (resumable via HTTP Range), and pulls the base distro image automatically if missing locally.
 
 ```bash
 cage pull cage-hub.io/stiivo/devbox:v1
+cage pull cage-hub.io/stiivo/devbox:v1 --platform arm64
 ```
+
+The `--platform` flag (`amd64` or `arm64`, defaulting to the host architecture)
+controls architecture dispatch:
+
+- If the tag resolves to a multi-arch index, pull selects the entry matching the
+  target architecture. If no entry matches, pull errors and lists the
+  architectures the index does provide.
+- If the tag resolves to a single manifest of a different architecture, pull
+  errors with a hint to retry with `--platform <that arch>`.
 
 ### cage tag
 
@@ -828,6 +860,24 @@ Example:
 ```bash
 cage tag cage-hub.io/stiivo/devbox:v1 cage-hub.io/stiivo/devbox:stable
 cage push cage-hub.io/stiivo/devbox:stable
+```
+
+#### cage tag inspect
+
+Inspect a tag and report whether it points at a single-arch `manifest` or a
+multi-arch `index`, along with its digest and the architecture(s) it covers.
+Works for both registry refs and local refs.
+
+```bash
+cage tag inspect <ref>
+```
+
+Example:
+```bash
+cage tag inspect cage-hub.io/stiivo/devbox:v1
+Kind:          index
+Digest:        sha256:fed987cba654
+Architectures: amd64, arm64
 ```
 
 ---
