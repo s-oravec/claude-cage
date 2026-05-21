@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"sort"
 )
 
 // ImageSource defines a base image source
@@ -54,6 +55,17 @@ func BaseImages() map[string]ImageSource {
 		out[e.Name] = ImageSource{Name: e.Name, Description: e.Description}
 	}
 	return out
+}
+
+// AliasNames returns the sorted short alias names (e.g. alpine, debian, ubuntu).
+// Used by the CLI to display the available aliases without hardcoding them.
+func AliasNames() []string {
+	names := make([]string, 0, len(imageAliases))
+	for name := range imageAliases {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 // ResolveAlias resolves an image alias to canonical name

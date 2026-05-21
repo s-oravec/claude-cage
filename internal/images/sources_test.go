@@ -43,6 +43,13 @@ func TestListAvailable(t *testing.T) {
 	assert.Contains(t, names, "debian-12")
 }
 
+func TestAliasNames(t *testing.T) {
+	names := AliasNames()
+
+	// Returns the short alias keys, sorted for stable output.
+	assert.Equal(t, []string{"alpine", "debian", "ubuntu"}, names)
+}
+
 func TestGetSource_Exists(t *testing.T) {
 	src, err := GetSource("ubuntu-24.04", "amd64")
 

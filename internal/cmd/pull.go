@@ -97,7 +97,7 @@ func listImages(cmd *cobra.Command) error {
 	}
 
 	fmt.Fprintln(cmd.OutOrStdout())
-	fmt.Fprintln(cmd.OutOrStdout(), "Aliases: alpine, ubuntu, debian")
+	fmt.Fprintln(cmd.OutOrStdout(), "Aliases: "+strings.Join(images.AliasNames(), ", "))
 	fmt.Fprintln(cmd.OutOrStdout(), "Use 'cage pull --base <name>' to download an image")
 	return nil
 }

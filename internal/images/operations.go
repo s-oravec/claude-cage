@@ -135,8 +135,12 @@ func Save(cageName, imageName, description string) (*SaveResult, error) {
 		BaseName:    state.Image,
 		Tag:         imageName,
 		Config: manifest.Config{
-			OS:          "linux",
-			Arch:        HostArchitecture(),
+			OS: "linux",
+			// Derive arch from the base the cage layers onto, not the host: a
+			// cage created from a non-host-arch base must be labeled with that
+			// base's arch. BaseArch resolves the alias + reads metadata, falling
+			// back to host arch for legacy caches, so this is strictly safer.
+			Arch:        BaseArch(state.Image),
 			Description: description,
 		},
 	}); err != nil {

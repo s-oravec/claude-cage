@@ -166,6 +166,12 @@ func createCageFromConfig(cmd *cobra.Command, name string, resolved *config.Reso
 		if !images.IsDownloaded(imageName) {
 			return fmt.Errorf("image '%s' not found, run 'cage pull --base %s' first", imageName, imageName)
 		}
+		// Distro-alias cages are always host-arch (no --platform on start). If a
+		// prior `cage pull --platform <other> --base <name>` cached a non-host-arch
+		// base, refuse to back the overlay onto it rather than boot a broken VM.
+		if ba := images.BaseArch(imageName); ba != images.HostArchitecture() {
+			return fmt.Errorf("base image %q is %s but this host is %s; run `cage pull --base %s` to fetch the host-arch image", imageName, ba, images.HostArchitecture(), imageName)
+		}
 	}
 
 	fmt.Fprintf(cmd.OutOrStdout(), "Creating cage '%s'...\n", name)

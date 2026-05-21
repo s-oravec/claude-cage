@@ -347,3 +347,64 @@ func TestSave_BuildsValidManifestWithEmptyCagefile(t *testing.T) {
 	require.NoError(t, m.Validate())
 	assert.Empty(t, m.Config.Cagefile)
 }
+
+// TestSave_DerivesArchFromBase asserts the saved manifest's Config.Arch comes
+// from BaseArch(base) - i.e. the base's recorded arch - not the host arch. We
+// record a non-host arch in the base metadata and expect Save to label the
+// manifest with it.
+func TestSave_DerivesArchFromBase(t *testing.T) {
+	if _, err := exec.LookPath("qemu-img"); err != nil {
+		t.Skip("qemu-img not installed")
+	}
+
+	root := t.TempDir()
+	oldImagesDir := imagesDir
+	imagesDir = root
+	imgstore.SetRoot(root)
+	defer func() { imagesDir = oldImagesDir; imgstore.SetRoot("") }()
+
+	oldCagesDir := cage.CagesDir()
+	cage.SetCagesDir(filepath.Join(root, "cages"))
+	defer cage.SetCagesDir(oldCagesDir)
+
+	// Pick a base arch that differs from the host so a host-arch assumption
+	// would visibly fail.
+	baseArch := "arm64"
+	if HostArchitecture() == "arm64" {
+		baseArch = "amd64"
+	}
+
+	// Base image qcow2 + metadata recording the non-host arch.
+	baseName := "ubuntu-24.04"
+	basePath := filepath.Join(root, baseName+".qcow2")
+	require.NoError(t, exec.Command("qemu-img", "create", "-f", "qcow2", basePath, "1M").Run())
+	require.NoError(t, SaveMetadata(&Image{Name: baseName, Type: "base", Arch: baseArch, Path: basePath}))
+	require.Equal(t, baseArch, BaseArch(baseName))
+
+	// Stopped cage layered onto that base.
+	cageVMDir := cage.VMDir("arch-cage")
+	require.NoError(t, cage.EnsureDir("arch-cage"))
+	overlay := filepath.Join(cageVMDir, "disk.qcow2")
+	require.NoError(t, exec.Command("qemu-img", "create", "-f", "qcow2",
+		"-b", basePath, "-F", "qcow2", overlay, "10M").Run())
+	require.NoError(t, cage.SaveState(&cage.State{
+		Name:    "arch-cage",
+		Status:  cage.StatusStopped,
+		Image:   baseName,
+		Profile: "custom",
+	}))
+
+	_, err := Save("arch-cage", "arch-saved:latest", "")
+	require.NoError(t, err)
+
+	ref, err := imgstore.ParseRef("arch-saved:latest")
+	require.NoError(t, err)
+	digest, err := imgstore.ReadRef(ref)
+	require.NoError(t, err)
+	body, err := imgstore.GetManifestBytes(digest)
+	require.NoError(t, err)
+	var m manifest.Manifest
+	require.NoError(t, json.Unmarshal(body, &m))
+
+	assert.Equal(t, baseArch, m.Config.Arch, "manifest arch should come from BaseArch(base), not host")
+}
