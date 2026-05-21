@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -186,8 +187,10 @@ func FindProjectConfig(dir string) string {
 
 // ProjectNetwork holds network settings for a project
 type ProjectNetwork struct {
-	SSH   string   `yaml:"ssh,omitempty"`   // port number or "auto"
-	Ports []string `yaml:"ports,omitempty"` // "host:guest" format
+	SSH            string   `yaml:"ssh,omitempty"`             // port number or "auto"
+	Ports          []string `yaml:"ports,omitempty"`           // "host:guest" format
+	Isolation      *bool    `yaml:"isolation,omitempty"`       // nil => default (on)
+	AllowedSubnets []string `yaml:"allowed_subnets,omitempty"` // extra subnets reachable while isolation is on (auto/SLIRP path only)
 }
 
 // ProjectConfig holds project-level configuration from .cage.yml
@@ -259,8 +262,10 @@ type ResolvedConfig struct {
 	Shares    []ShareConfig
 	Env       map[string]string
 	// From global config
-	Network  NetworkConfig
-	Security SecurityConfig
+	Network          NetworkConfig
+	Security         SecurityConfig
+	NetworkIsolation bool
+	AllowedSubnets   []string
 }
 
 // ParseMemory parses a memory string like "4G" or "512M" to megabytes
@@ -353,6 +358,18 @@ func ResolveProjectConfig(global *Config, project *ProjectConfig, projectDir str
 			return nil, fmt.Errorf("invalid port mapping %q: %w", p, err)
 		}
 		resolved.Ports = append(resolved.Ports, pm)
+	}
+
+	// Network isolation defaults on (nil => true). Allowed subnets are
+	// validated and canonicalized here because they are interpolated into
+	// shell route commands in cloud-init; garbage CIDRs must be rejected.
+	resolved.NetworkIsolation = project.Network.Isolation == nil || *project.Network.Isolation
+	for _, s := range project.Network.AllowedSubnets {
+		_, ipnet, err := net.ParseCIDR(strings.TrimSpace(s))
+		if err != nil {
+			return nil, fmt.Errorf("invalid network.allowed_subnets entry %q: %w", s, err)
+		}
+		resolved.AllowedSubnets = append(resolved.AllowedSubnets, ipnet.String()) // canonical form
 	}
 
 	// Resolve share paths to absolute

@@ -624,6 +624,95 @@ func TestResolveProjectConfig_InvalidPortMapping(t *testing.T) {
 	assert.Contains(t, err.Error(), "port mapping")
 }
 
+func TestLoadProjectConfig_NetworkIsolationFields(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	configPath := filepath.Join(tmpDir, ProjectConfigFile)
+	configContent := `image: ubuntu-24.04
+network:
+  allowed_subnets: [192.168.1.0/24]
+  isolation: false
+`
+	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	require.NoError(t, err)
+
+	project, err := LoadProjectConfig(tmpDir)
+	require.NoError(t, err)
+	require.NotNil(t, project)
+
+	assert.Equal(t, []string{"192.168.1.0/24"}, project.Network.AllowedSubnets)
+	require.NotNil(t, project.Network.Isolation)
+	assert.False(t, *project.Network.Isolation)
+}
+
+func TestResolveProjectConfig_NetworkIsolation(t *testing.T) {
+	globalCfg := DefaultConfig()
+
+	isolation := false
+	projectCfg := &ProjectConfig{
+		Cage:  "my-project",
+		Image: "ubuntu-24.04",
+		Network: ProjectNetwork{
+			Isolation:      &isolation,
+			AllowedSubnets: []string{"192.168.1.0/24"},
+		},
+	}
+
+	resolved, err := ResolveProjectConfig(globalCfg, projectCfg, "/home/user/project")
+	require.NoError(t, err)
+
+	assert.False(t, resolved.NetworkIsolation)
+	assert.Equal(t, []string{"192.168.1.0/24"}, resolved.AllowedSubnets)
+}
+
+func TestResolveProjectConfig_NetworkIsolationDefaultsOn(t *testing.T) {
+	globalCfg := DefaultConfig()
+
+	projectCfg := &ProjectConfig{
+		Cage:  "my-project",
+		Image: "ubuntu-24.04",
+	}
+
+	resolved, err := ResolveProjectConfig(globalCfg, projectCfg, "/home/user/project")
+	require.NoError(t, err)
+
+	assert.True(t, resolved.NetworkIsolation)
+	assert.Empty(t, resolved.AllowedSubnets)
+}
+
+func TestResolveProjectConfig_AllowedSubnetCanonicalized(t *testing.T) {
+	globalCfg := DefaultConfig()
+
+	projectCfg := &ProjectConfig{
+		Cage:  "my-project",
+		Image: "ubuntu-24.04",
+		Network: ProjectNetwork{
+			AllowedSubnets: []string{"192.168.1.5/24"},
+		},
+	}
+
+	resolved, err := ResolveProjectConfig(globalCfg, projectCfg, "/home/user/project")
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"192.168.1.0/24"}, resolved.AllowedSubnets)
+}
+
+func TestResolveProjectConfig_InvalidAllowedSubnetRejected(t *testing.T) {
+	globalCfg := DefaultConfig()
+
+	projectCfg := &ProjectConfig{
+		Cage:  "my-project",
+		Image: "ubuntu-24.04",
+		Network: ProjectNetwork{
+			AllowedSubnets: []string{"not-a-cidr"},
+		},
+	}
+
+	_, err := ResolveProjectConfig(globalCfg, projectCfg, "/home/user/project")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not-a-cidr")
+}
+
 func TestConfig_RegistriesInsecure_RoundTrip(t *testing.T) {
 	tmpDir := t.TempDir()
 	old := configDir
