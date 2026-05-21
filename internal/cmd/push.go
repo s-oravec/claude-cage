@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -130,7 +129,7 @@ func pushLayers(
 	}
 
 	pg := progress.NewGroup(out)
-	g, _ := errgroup.WithContext(context.Background())
+	var g errgroup.Group
 	g.SetLimit(concurrency)
 
 	for _, l := range layers {

@@ -174,6 +174,7 @@ func TestPushLayers_RespectsConcurrencyLimit(t *testing.T) {
 	err := pushLayers(&buf, rc, owner, name, layers, 1024, 2, open)
 	require.NoError(t, err)
 	assert.LessOrEqual(t, int(atomic.LoadInt32(&maxInflight)), 2, "observed in-flight uploads must not exceed concurrency limit")
+	assert.GreaterOrEqual(t, int(atomic.LoadInt32(&maxInflight)), 2, "expected at least 2 concurrent uploads (parallelism not happening?)")
 }
 
 func TestPushCmd_Args(t *testing.T) {
