@@ -126,6 +126,25 @@ func pullImage(cmd *cobra.Command, name, arch string) error {
 	// (total stays unknown), no mpb container is created at all.
 	var pg *progress.Group
 	var bar *progress.LayerBar
+	tornDown := false
+	// teardown completes the bar (so pg.Wait does not block on an incomplete
+	// bar) and then waits for the render goroutine to exit. It is idempotent and
+	// runs on every exit path via defer, so a mid-download failure (where status
+	// is never called) still tears the live region down.
+	teardown := func() {
+		if tornDown {
+			return
+		}
+		tornDown = true
+		if bar != nil {
+			bar.Done("")
+		}
+		if pg != nil {
+			pg.Wait()
+		}
+	}
+	defer teardown()
+
 	progressFn := func(written, total int64) {
 		if bar == nil && total > 0 {
 			pg = progress.NewGroup(cmd.OutOrStdout())
@@ -136,12 +155,7 @@ func pullImage(cmd *cobra.Command, name, arch string) error {
 		}
 	}
 	status := func(msg string) {
-		if bar != nil {
-			bar.Done("")
-		}
-		if pg != nil {
-			pg.Wait()
-		}
+		teardown() // Done + Wait before printing, so the final frame flushes first
 		fmt.Fprintln(cmd.OutOrStdout(), msg)
 	}
 	return images.Setup(name, arch, progressFn, status)
