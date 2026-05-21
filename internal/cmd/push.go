@@ -107,7 +107,7 @@ func runPush(out io.Writer, refStr string, asLatest bool) error {
 			return err
 		}
 		fmt.Fprintf(out, "  %s: uploading %d bytes\n", l.Digest, l.Size)
-		err = rc.UploadBlob(ref.Owner, ref.Name, l.Digest, l.Size, info.MultipartPartSize, f)
+		err = rc.UploadBlob(ref.Owner, ref.Name, l.Digest, l.Size, info.MultipartPartSize, f, nil)
 		f.Close()
 		if err != nil {
 			return err

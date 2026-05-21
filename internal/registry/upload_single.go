@@ -20,7 +20,7 @@ type uploadInitResp struct {
 // Phase 2: PUT upload_url?digest=<digest> with the body bytes as octet-stream.
 // Used for layers below the multipart-size threshold; for larger layers use
 // UploadBlobMultipart for resumable uploads.
-func (c *Client) UploadBlobSinglePUT(owner, name, digest string, size int64, body io.Reader) error {
+func (c *Client) UploadBlobSinglePUT(owner, name, digest string, size int64, body io.Reader, onProgress ProgressFunc) error {
 	// Phase 1: init.
 	initPath := fmt.Sprintf("/api/v1/repos/%s/%s/blobs/uploads", owner, name)
 	initBody, _ := json.Marshal(map[string]any{"digest": digest, "size": size})
@@ -56,8 +56,16 @@ func (c *Client) UploadBlobSinglePUT(owner, name, digest string, size int64, bod
 	u.RawQuery = q.Encode()
 	uploadURL := u.String()
 
-	seeker, _ := body.(io.Seeker)
-	resp2, err := c.putWithRefresh(c.resolveURL(uploadURL), body, seeker)
+	var rdr io.Reader = body
+	if onProgress != nil {
+		var sk io.Seeker
+		if s, ok := body.(io.Seeker); ok {
+			sk = s
+		}
+		rdr = &progressReader{r: body, seeker: sk, cb: onProgress}
+	}
+	seeker, _ := rdr.(io.Seeker)
+	resp2, err := c.putWithRefresh(c.resolveURL(uploadURL), rdr, seeker)
 	if err != nil {
 		return err
 	}
@@ -88,6 +96,37 @@ func (c *Client) putWithRefresh(url string, body io.Reader, seeker io.Seeker) (*
 		return c.putOnce(url, body)
 	}
 	return resp, nil
+}
+
+// progressReader counts bytes read and reports the running total. It forwards
+// Seek to the underlying seeker and resets the counter to the new offset, so a
+// rewind-and-retry replays progress from that point.
+type progressReader struct {
+	r      io.Reader
+	seeker io.Seeker
+	cb     ProgressFunc
+	n      int64
+}
+
+func (p *progressReader) Read(b []byte) (int, error) {
+	m, err := p.r.Read(b)
+	if m > 0 {
+		p.n += int64(m)
+		p.cb(p.n)
+	}
+	return m, err
+}
+
+func (p *progressReader) Seek(offset int64, whence int) (int64, error) {
+	if p.seeker == nil {
+		return 0, fmt.Errorf("progressReader: underlying body is not seekable")
+	}
+	pos, err := p.seeker.Seek(offset, whence)
+	if err == nil {
+		p.n = pos
+		p.cb(p.n)
+	}
+	return pos, err
 }
 
 func (c *Client) putOnce(url string, body io.Reader) (*http.Response, error) {

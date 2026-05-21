@@ -38,7 +38,7 @@ func TestUploadBlobSinglePUT_RefreshAndRetryOn401(t *testing.T) {
 
 	fp := &fakeProvider{cur: "old", next: "new"}
 	c, _ := NewClient(srv.URL[len("http://"):], Options{TokenProvider: fp, Insecure: true})
-	err := c.UploadBlobSinglePUT("o", "n", "sha256:deadbeef", 8, bytes.NewReader([]byte("blobdata")))
+	err := c.UploadBlobSinglePUT("o", "n", "sha256:deadbeef", 8, bytes.NewReader([]byte("blobdata")), nil)
 	require.NoError(t, err)
 	assert.Equal(t, 2, puts)
 	assert.Equal(t, 1, fp.rCalls)
@@ -67,7 +67,7 @@ func TestUploadBlobSinglePUT_TwoPhase(t *testing.T) {
 	defer srv.Close()
 
 	c, _ := NewClient(srv.URL[len("http://"):], Options{Token: "t", Insecure: true})
-	err := c.UploadBlobSinglePUT("s", "d", "sha256:abc", 5, strings.NewReader("layer"))
+	err := c.UploadBlobSinglePUT("s", "d", "sha256:abc", 5, strings.NewReader("layer"), nil)
 	require.NoError(t, err)
 }
 
@@ -93,7 +93,7 @@ func TestUploadBlobSinglePUT_UploadURLWithDigestQuery(t *testing.T) {
 	defer srv.Close()
 
 	c, _ := NewClient(srv.URL[len("http://"):], Options{Token: "t", Insecure: true})
-	err := c.UploadBlobSinglePUT("s", "d", "sha256:abc", 5, strings.NewReader("layer"))
+	err := c.UploadBlobSinglePUT("s", "d", "sha256:abc", 5, strings.NewReader("layer"), nil)
 	require.NoError(t, err)
 }
 
@@ -120,7 +120,7 @@ func TestUploadBlobSinglePUT_UploadURLWithUnrelatedQuery(t *testing.T) {
 	defer srv.Close()
 
 	c, _ := NewClient(srv.URL[len("http://"):], Options{Token: "t", Insecure: true})
-	err := c.UploadBlobSinglePUT("s", "d", "sha256:abc", 5, strings.NewReader("layer"))
+	err := c.UploadBlobSinglePUT("s", "d", "sha256:abc", 5, strings.NewReader("layer"), nil)
 	require.NoError(t, err)
 }
 
@@ -145,7 +145,7 @@ func TestUploadBlobSinglePUT_AbsoluteUploadURL(t *testing.T) {
 	defer api.Close()
 
 	c, _ := NewClient(api.URL[len("http://"):], Options{Token: "t", Insecure: true})
-	err := c.UploadBlobSinglePUT("s", "d", "sha256:abc", 7, strings.NewReader("payload"))
+	err := c.UploadBlobSinglePUT("s", "d", "sha256:abc", 7, strings.NewReader("payload"), nil)
 	require.NoError(t, err)
 	assert.Equal(t, []byte("payload"), stored)
 }

@@ -138,10 +138,14 @@ func SelectUploadMode(size, partSize int64) string {
 	return "multipart"
 }
 
+// ProgressFunc reports cumulative bytes transferred for a single blob upload.
+// It may be nil.
+type ProgressFunc func(uploaded int64)
+
 // UploadBlob picks single or multipart based on size + partSize and uploads body.
-func (c *Client) UploadBlob(owner, name, digest string, size, partSize int64, body io.Reader) error {
+func (c *Client) UploadBlob(owner, name, digest string, size, partSize int64, body io.Reader, onProgress ProgressFunc) error {
 	if SelectUploadMode(size, partSize) == "multipart" {
-		return c.UploadBlobMultipart(owner, name, digest, size, body)
+		return c.UploadBlobMultipart(owner, name, digest, size, body, onProgress)
 	}
-	return c.UploadBlobSinglePUT(owner, name, digest, size, body)
+	return c.UploadBlobSinglePUT(owner, name, digest, size, body, onProgress)
 }

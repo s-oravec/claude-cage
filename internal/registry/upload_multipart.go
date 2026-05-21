@@ -33,7 +33,7 @@ type completedPart struct {
 // Phase 3: POST .../complete {parts:[{n,etag}]}.
 // Selected for layers above the multipart threshold; provides resumability and
 // parallelism (though current implementation is serial).
-func (c *Client) UploadBlobMultipart(owner, name, digest string, size int64, body io.Reader) error {
+func (c *Client) UploadBlobMultipart(owner, name, digest string, size int64, body io.Reader, onProgress ProgressFunc) error {
 	// Init.
 	initPath := fmt.Sprintf("/api/v1/repos/%s/%s/blobs/uploads?multipart=true", owner, name)
 	initBody, _ := json.Marshal(map[string]any{"digest": digest, "size": size})
@@ -54,6 +54,7 @@ func (c *Client) UploadBlobMultipart(owner, name, digest string, size int64, bod
 
 	completed := make([]completedPart, 0, init.PartCount)
 	buf := make([]byte, init.PartSize)
+	var uploaded int64
 	for n := 1; n <= init.PartCount; n++ {
 		// Read one part of bytes from body.
 		readSize, err := io.ReadFull(body, buf)
@@ -95,6 +96,10 @@ func (c *Client) UploadBlobMultipart(owner, name, digest string, size int64, bod
 			return fmt.Errorf("part %d upload failed: HTTP %d", n, presp.StatusCode)
 		}
 		completed = append(completed, completedPart{N: n, Etag: etag})
+		uploaded += int64(len(chunk))
+		if onProgress != nil {
+			onProgress(uploaded)
+		}
 	}
 
 	// Complete.

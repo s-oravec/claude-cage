@@ -60,7 +60,7 @@ func TestUploadBlobMultipart_HappyPath(t *testing.T) {
 	defer srv.Close()
 
 	c, _ := NewClient(srv.URL[len("http://"):], Options{Token: "t", Insecure: true})
-	err := c.UploadBlobMultipart("s", "d", "sha256:abc", 10, strings.NewReader("abcdefghij"))
+	err := c.UploadBlobMultipart("s", "d", "sha256:abc", 10, strings.NewReader("abcdefghij"), nil)
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []int{1, 2}, partsReceived)
 }

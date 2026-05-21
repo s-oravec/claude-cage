@@ -114,7 +114,7 @@ func TestMultiArch_IndexComposition(t *testing.T) {
 	// between runs and never collide with prior state.
 	layer := []byte("cage-e2e-multiarch-layer-" + name)
 	layerDigest := manifest.DigestBytes(layer)
-	err = rc.UploadBlob(owner, name, layerDigest, int64(len(layer)), 8<<20, bytes.NewReader(layer))
+	err = rc.UploadBlob(owner, name, layerDigest, int64(len(layer)), 8<<20, bytes.NewReader(layer), nil)
 	require.NoError(t, err, "UploadBlob (must succeed before manifest push; upload-init auto-creates the repo)")
 
 	// push builds the per-arch manifest, pushes it, and returns the PUT result
@@ -188,7 +188,7 @@ func TestMultiArch_SingleManifestContentType(t *testing.T) {
 
 	layer := []byte("cage-e2e-single-layer-" + name)
 	layerDigest := manifest.DigestBytes(layer)
-	err = rc.UploadBlob(owner, name, layerDigest, int64(len(layer)), 8<<20, bytes.NewReader(layer))
+	err = rc.UploadBlob(owner, name, layerDigest, int64(len(layer)), 8<<20, bytes.NewReader(layer), nil)
 	require.NoError(t, err, "UploadBlob")
 
 	m := buildManifest("amd64", layerDigest, int64(len(layer)))
