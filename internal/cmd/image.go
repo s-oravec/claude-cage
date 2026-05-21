@@ -197,7 +197,7 @@ func removeImage(cmd *cobra.Command, imageName string, force bool) error {
 		return err
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "✓ Image '%s' removed\n", imageName)
+	fmt.Fprintf(cmd.OutOrStdout(), "Removed %s\n", imageName)
 	return nil
 }
 
