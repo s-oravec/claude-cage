@@ -14,6 +14,7 @@ import (
 	"github.com/s-oravec/claude-cage/internal/progress"
 	"github.com/s-oravec/claude-cage/internal/registry"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
 
 // NewPullCmd creates the pull command
@@ -21,6 +22,7 @@ func NewPullCmd() *cobra.Command {
 	var base string
 	var list bool
 	var platform string
+	var concurrency int
 
 	cmd := &cobra.Command{
 		Use:   "pull",
@@ -50,7 +52,7 @@ the local image store.`,
 
 			if len(args) == 1 {
 				if ref, err := imgstore.ParseRef(args[0]); err == nil && ref.IsRegistry() {
-					return printAPIErrorHint(runRegistryPull(cmd, ref, arch))
+					return printAPIErrorHint(runRegistryPull(cmd, ref, arch, concurrency))
 				}
 				base = args[0]
 			}
@@ -66,6 +68,7 @@ the local image store.`,
 	cmd.Flags().StringVarP(&base, "base", "b", "", "Base image to download (e.g., ubuntu-24.04)")
 	cmd.Flags().BoolVarP(&list, "list", "l", false, "List available base images")
 	cmd.Flags().StringVar(&platform, "platform", "", "Target architecture (amd64|arm64). Defaults to host architecture.")
+	cmd.Flags().IntVarP(&concurrency, "concurrency", "j", 3, "Max layers to download in parallel")
 
 	return cmd
 }
@@ -210,7 +213,7 @@ func archesOf(idx manifest.IndexBody) []string {
 // the resolved target architecture; the manifest endpoint's Content-Type is used
 // to dispatch between a single-arch manifest and a multi-arch index, selecting the
 // concrete arch-specific manifest to materialize locally.
-func runRegistryPull(cmd *cobra.Command, ref imgstore.Ref, arch string) error {
+func runRegistryPull(cmd *cobra.Command, ref imgstore.Ref, arch string, concurrency int) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return err
@@ -246,22 +249,10 @@ func runRegistryPull(cmd *cobra.Command, ref imgstore.Ref, arch string) error {
 		return err
 	}
 
-	// Layers.
-	for _, l := range m.Layers {
-		if imgstore.HasLayer(l.Digest) {
-			fmt.Fprintf(cmd.OutOrStdout(), "  %s: cached\n", l.Digest)
-			continue
-		}
-		fmt.Fprintf(cmd.OutOrStdout(), "  %s: downloading\n", l.Digest)
-		err := imgstore.PutLayerStreamed(l.Digest, func(offset int64) (io.ReadCloser, error) {
-			if offset > 0 {
-				fmt.Fprintf(cmd.OutOrStdout(), "  %s: resuming at %d bytes\n", l.Digest, offset)
-			}
-			return rc.GetBlob(ref.Owner, ref.Name, l.Digest, offset)
-		})
-		if err != nil {
-			return err
-		}
+	// Layers. Download all uncached layers concurrently with per-layer progress.
+	if err := pullLayers(cmd.OutOrStdout(), rc, ref.Owner, ref.Name, m.Layers, concurrency,
+		imgstore.HasLayer, imgstore.PutLayerStreamed); err != nil {
+		return err
 	}
 
 	// Base image check. The base must match the manifest's architecture; (re)pull
@@ -288,4 +279,60 @@ func runRegistryPull(cmd *cobra.Command, ref imgstore.Ref, arch string) error {
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "Pulled %s\n", ref.Host+"/"+ref.Owner+"/"+ref.Name+":"+ref.Tag)
 	return nil
+}
+
+// pullLayers downloads all uncached layers concurrently (up to `concurrency`
+// at once), rendering per-layer progress to out. hasLayer/putLayer are injected
+// (production: imgstore.HasLayer / imgstore.PutLayerStreamed) so the pool is
+// testable without touching the local store. The first error from any worker is
+// returned; the progress live region is always torn down so the terminal is not
+// left dirty.
+func pullLayers(
+	out io.Writer,
+	rc *registry.Client,
+	owner, name string,
+	layers []manifest.Layer,
+	concurrency int,
+	hasLayer func(digest string) bool,
+	putLayer func(digest string, fetch imgstore.FetchFn) error,
+) error {
+	if concurrency < 1 {
+		concurrency = 1
+	}
+
+	pg := progress.NewGroup(out)
+	var g errgroup.Group
+	g.SetLimit(concurrency)
+
+	for _, l := range layers {
+		l := l // capture loop var
+		g.Go(func() error {
+			bar := pg.AddBar(l.Size, shortDigest(l.Digest), "downloading")
+			if hasLayer(l.Digest) {
+				bar.Done("cached")
+				return nil
+			}
+			err := putLayer(l.Digest, func(offset int64) (io.ReadCloser, error) {
+				if offset > 0 {
+					bar.SetCurrent(offset)
+				}
+				rc2, err := rc.GetBlob(owner, name, l.Digest, offset)
+				if err != nil {
+					return nil, err
+				}
+				return &progressReadCloser{rc: rc2, n: offset, bar: bar}, nil
+			})
+			if err != nil {
+				return err
+			}
+			bar.Done("")
+			return nil
+		})
+	}
+
+	// Wait on the group FIRST to collect the error, THEN tear down the live
+	// region so the terminal is clean even on error.
+	err := g.Wait()
+	pg.Wait()
+	return err
 }
