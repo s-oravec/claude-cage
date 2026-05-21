@@ -3,6 +3,7 @@ package cloudinit
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -387,6 +388,44 @@ func TestGenerateUserDataWithConfig_NetworkIsolation(t *testing.T) {
 
 	// Should create persistence scripts
 	assert.Contains(t, userData, "cage-isolation")
+}
+
+func TestSLIRPConstants(t *testing.T) {
+	assert.Equal(t, "10.0.2.0/24", SLIRPNetwork)
+	assert.Equal(t, "10.0.2.2", SLIRPGateway)
+}
+
+func TestNetworkIsolationRuncmd_AllowedSubnetGetsGatewayRoute(t *testing.T) {
+	out := generateNetworkIsolationRuncmd([]string{SLIRPNetwork, "192.168.1.0/24"})
+
+	// Blocked CIDRs still get unreachable routes.
+	assert.Contains(t, out, "ip route add unreachable 10.0.0.0/8")
+	assert.Contains(t, out, "ip route add unreachable 172.16.0.0/12")
+	assert.Contains(t, out, "ip route add unreachable 192.168.0.0/16")
+	assert.Contains(t, out, "ip route add unreachable 169.254.0.0/16")
+
+	// Allowed non-SLIRP subnet gets a real gateway route.
+	assert.Contains(t, out, "ip route add 192.168.1.0/24 via 10.0.2.2")
+
+	// The directly-connected SLIRP net must never get a gateway route.
+	assert.NotContains(t, out, "ip route add 10.0.2.0/24 via 10.0.2.2")
+
+	// The gateway route must appear in the live block plus both persistence blocks.
+	count := strings.Count(out, "ip route add 192.168.1.0/24 via 10.0.2.2")
+	assert.GreaterOrEqual(t, count, 3, "gateway route should be live + persisted twice")
+}
+
+func TestNetworkIsolationRuncmd_NoExtraAllowed(t *testing.T) {
+	out := generateNetworkIsolationRuncmd([]string{SLIRPNetwork})
+
+	// All four unreachable routes present.
+	assert.Contains(t, out, "ip route add unreachable 10.0.0.0/8")
+	assert.Contains(t, out, "ip route add unreachable 172.16.0.0/12")
+	assert.Contains(t, out, "ip route add unreachable 192.168.0.0/16")
+	assert.Contains(t, out, "ip route add unreachable 169.254.0.0/16")
+
+	// No gateway routes at all (SLIRP net is excluded).
+	assert.NotContains(t, out, "via 10.0.2.2")
 }
 
 func TestGenerateUserDataWithConfig_NetworkIsolation_Disabled(t *testing.T) {

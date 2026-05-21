@@ -10,6 +10,12 @@ import (
 	"time"
 )
 
+// SLIRP user-mode networking fixed addresses (QEMU defaults).
+const (
+	SLIRPNetwork = "10.0.2.0/24" // directly-connected guest subnet
+	SLIRPGateway = "10.0.2.2"    // NAT gateway; egress and allowed-subnet routes go via here
+)
+
 // CloudInitConfig holds configuration for cloud-init generation
 type CloudInitConfig struct {
 	CageName         string
@@ -31,6 +37,31 @@ func GenerateUserData(cageName, pubKey string) string {
 	})
 }
 
+// isolationRouteCmds returns the ordered "ip route ..." commands (without any
+// runcmd "  - " or persistence-script indentation) for the given blocked and
+// allowed subnets: an "unreachable" route per blocked CIDR, and a "via
+// SLIRPGateway" route per allowed CIDR that is not the directly-connected
+// SLIRP network (the connected net must never get a gateway route). It is
+// reused to build the live runcmd block and both persistence-script bodies so
+// the three places cannot drift.
+//
+// A more-specific allowed /24 wins over a broader /16 unreachable route via
+// longest-prefix match, regardless of the order the routes are installed.
+func isolationRouteCmds(blocked, allowed []string) []string {
+	var cmds []string
+	// Allowed gateway routes first; longest-prefix match makes them win anyway.
+	for _, subnet := range allowed {
+		if subnet == SLIRPNetwork {
+			continue // directly connected; routing it via the gateway is wrong
+		}
+		cmds = append(cmds, fmt.Sprintf("ip route add %s via %s 2>/dev/null || true", subnet, SLIRPGateway))
+	}
+	for _, subnet := range blocked {
+		cmds = append(cmds, fmt.Sprintf("ip route add unreachable %s 2>/dev/null || true", subnet))
+	}
+	return cmds
+}
+
 // generateNetworkIsolationRuncmd generates runcmd lines for network isolation
 func generateNetworkIsolationRuncmd(allowedSubnets []string) string {
 	// Default blocked subnets (RFC 1918 + link-local)
@@ -41,28 +72,25 @@ func generateNetworkIsolationRuncmd(allowedSubnets []string) string {
 		"169.254.0.0/16",
 	}
 
+	routeCmds := isolationRouteCmds(blockedSubnets, allowedSubnets)
+
 	var lines []string
 	lines = append(lines, "  # Network isolation: block access to private IP ranges")
 	lines = append(lines, "  # This prevents the cage from accessing the host LAN")
+	lines = append(lines, "  # Allowed subnets are routed via the SLIRP gateway so they stay reachable")
 
-	// Add allowed subnets first (more specific routes take precedence)
-	for _, subnet := range allowedSubnets {
-		lines = append(lines, fmt.Sprintf("  # Allow %s (required for networking)", subnet))
+	// Live routes: unreachable for blocked, via SLIRP gateway for allowed.
+	for _, cmd := range routeCmds {
+		lines = append(lines, "  - "+cmd)
 	}
 
-	// Add unreachable routes for blocked subnets
-	// The more specific allowed routes will take precedence
-	for _, subnet := range blockedSubnets {
-		lines = append(lines, fmt.Sprintf("  - ip route add unreachable %s 2>/dev/null || true", subnet))
-	}
-
-	// Make the routes persistent across reboots
+	// Make the routes persistent across reboots.
 	lines = append(lines, "  # Persist network isolation routes")
 	lines = append(lines, "  - |")
 	lines = append(lines, "    cat > /etc/network/if-up.d/cage-isolation 2>/dev/null << 'EOF' || true")
 	lines = append(lines, "    #!/bin/sh")
-	for _, subnet := range blockedSubnets {
-		lines = append(lines, fmt.Sprintf("    ip route add unreachable %s 2>/dev/null || true", subnet))
+	for _, cmd := range routeCmds {
+		lines = append(lines, "    "+cmd)
 	}
 	lines = append(lines, "    EOF")
 	lines = append(lines, "  - chmod +x /etc/network/if-up.d/cage-isolation 2>/dev/null || true")
@@ -71,8 +99,8 @@ func generateNetworkIsolationRuncmd(allowedSubnets []string) string {
 	lines = append(lines, "  - |")
 	lines = append(lines, "    cat > /etc/networkd-dispatcher/routable.d/cage-isolation 2>/dev/null << 'EOF' || true")
 	lines = append(lines, "    #!/bin/sh")
-	for _, subnet := range blockedSubnets {
-		lines = append(lines, fmt.Sprintf("    ip route add unreachable %s 2>/dev/null || true", subnet))
+	for _, cmd := range routeCmds {
+		lines = append(lines, "    "+cmd)
 	}
 	lines = append(lines, "    EOF")
 	lines = append(lines, "  - chmod +x /etc/networkd-dispatcher/routable.d/cage-isolation 2>/dev/null || true")
