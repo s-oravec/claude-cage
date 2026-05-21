@@ -12,9 +12,11 @@ import (
 
 // Entry is the stored credential for a single registry host.
 type Entry struct {
-	Token      string `yaml:"token"`
-	Username   string `yaml:"username,omitempty"`
-	ObtainedAt string `yaml:"obtained_at,omitempty"`
+	Token        string `yaml:"token"`
+	RefreshToken string `yaml:"refresh_token,omitempty"`
+	Username     string `yaml:"username,omitempty"`
+	ObtainedAt   string `yaml:"obtained_at,omitempty"`
+	ExpiresAt    string `yaml:"expires_at,omitempty"` // RFC3339; empty when unknown (e.g. PAT)
 }
 
 // Auth is the root structure of auth.yaml.
@@ -99,17 +101,29 @@ func Save(a *Auth) error {
 	return os.Rename(tmp.Name(), path())
 }
 
-// AddHost stores credentials for a host, replacing any existing entry.
-// ObtainedAt is set to the current time.
+// AddHost stores a non-refreshable credential (e.g. a PAT) for a host.
 func AddHost(host, token, username string) error {
+	return AddHostFull(host, token, "", username, time.Time{})
+}
+
+// AddHostFull stores credentials for a host, replacing any existing entry.
+// refreshToken and expiresAt may be empty/zero for non-refreshable tokens.
+// ObtainedAt is set to the current time.
+func AddHostFull(host, token, refreshToken, username string, expiresAt time.Time) error {
 	a, err := Load()
 	if err != nil {
 		return err
 	}
-	a.Registries[host] = Entry{
-		Token: token, Username: username,
-		ObtainedAt: time.Now().UTC().Format(time.RFC3339),
+	e := Entry{
+		Token:        token,
+		RefreshToken: refreshToken,
+		Username:     username,
+		ObtainedAt:   time.Now().UTC().Format(time.RFC3339),
 	}
+	if !expiresAt.IsZero() {
+		e.ExpiresAt = expiresAt.UTC().Format(time.RFC3339)
+	}
+	a.Registries[host] = e
 	return Save(a)
 }
 
