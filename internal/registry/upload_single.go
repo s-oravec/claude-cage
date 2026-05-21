@@ -61,8 +61,8 @@ func (c *Client) UploadBlobSinglePUT(owner, name, digest string, size int64, bod
 		return err
 	}
 	req.Header.Set("Content-Type", "application/octet-stream")
-	if c.token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.token)
+	if tok, _ := c.provider.Token(); tok != "" {
+		req.Header.Set("Authorization", "Bearer "+tok)
 	}
 	resp2, err := c.transport(req)
 	if err != nil {
