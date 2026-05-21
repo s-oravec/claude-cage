@@ -22,17 +22,25 @@ type Group struct {
 	mu    sync.Mutex // serializes plain-mode writes
 }
 
-// NewGroup returns a Group for out. If out is not a terminal it runs in plain
-// mode (detection: out is an *os.File whose fd is a terminal).
-func NewGroup(out io.Writer) *Group {
-	if isTerminal(out) {
-		return &Group{p: mpb.New(mpb.WithOutput(out)), out: out}
+// newGroup builds a Group; tty selects the mpb live-region path vs plain lines.
+//
+// WithAutoRefresh forces the render loop on regardless of whether out is a
+// terminal. On a real TTY mpb already enables auto refresh, so this is a no-op
+// there; it only matters for tests that drive the mpb path with an in-memory
+// writer, where mpb would otherwise never flush a frame.
+func newGroup(out io.Writer, tty bool) *Group {
+	if tty {
+		return &Group{p: mpb.New(mpb.WithOutput(out), mpb.WithAutoRefresh()), out: out}
 	}
-	return NewGroupPlain(out)
+	return &Group{out: out, plain: true}
 }
 
+// NewGroup returns a Group for out. If out is not a terminal it runs in plain
+// mode (detection: out is an *os.File whose fd is a terminal).
+func NewGroup(out io.Writer) *Group { return newGroup(out, isTerminal(out)) }
+
 // NewGroupPlain forces plain mode regardless of out (used by tests).
-func NewGroupPlain(out io.Writer) *Group { return &Group{out: out, plain: true} }
+func NewGroupPlain(out io.Writer) *Group { return newGroup(out, false) }
 
 func isTerminal(out io.Writer) bool {
 	f, ok := out.(*os.File)
