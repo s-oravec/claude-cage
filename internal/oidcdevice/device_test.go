@@ -48,8 +48,41 @@ func TestPollToken_AuthPending_ThenSuccess(t *testing.T) {
 
 	tok, err := PollToken(srv.URL, "cage-cli", "dc", 10*time.Millisecond, time.Second)
 	require.NoError(t, err)
-	assert.Equal(t, "ey...", tok)
+	assert.Equal(t, "ey...", tok.AccessToken)
+	assert.Equal(t, time.Hour, tok.ExpiresIn)
 	assert.GreaterOrEqual(t, call, 2)
+}
+
+func TestRefresh_PostsRefreshGrant(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		require.NoError(t, r.ParseForm())
+		assert.Equal(t, "refresh_token", r.PostForm.Get("grant_type"))
+		assert.Equal(t, "cage-cli", r.PostForm.Get("client_id"))
+		assert.Equal(t, "old-refresh", r.PostForm.Get("refresh_token"))
+		json.NewEncoder(w).Encode(map[string]any{
+			"access_token":  "new-acc",
+			"refresh_token": "new-ref",
+			"expires_in":    300,
+		})
+	}))
+	defer srv.Close()
+
+	got, err := Refresh(srv.URL, "cage-cli", "old-refresh")
+	require.NoError(t, err)
+	assert.Equal(t, "new-acc", got.AccessToken)
+	assert.Equal(t, "new-ref", got.RefreshToken)
+	assert.Equal(t, 300*time.Second, got.ExpiresIn)
+}
+
+func TestRefresh_ErrorResponse(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(400)
+		w.Write([]byte(`{"error":"invalid_grant"}`))
+	}))
+	defer srv.Close()
+	_, err := Refresh(srv.URL, "cage-cli", "bad")
+	require.Error(t, err)
 }
 
 func TestPollToken_SlowDown_BacksOff(t *testing.T) {

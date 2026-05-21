@@ -12,6 +12,21 @@ import (
 	"time"
 )
 
+// Token is an OAuth token response (access + optional refresh + lifetime).
+type Token struct {
+	AccessToken  string
+	RefreshToken string
+	ExpiresIn    time.Duration
+}
+
+// tokenResp is the raw JSON body of a token-endpoint response.
+type tokenResp struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int    `json:"expires_in"`
+	Error        string `json:"error"`
+}
+
 // DeviceResp is the parsed device authorization response.
 type DeviceResp struct {
 	DeviceCode      string
@@ -74,11 +89,11 @@ func RequestDevice(deviceEndpoint, clientID string, scopes []string) (*DeviceRes
 // interval by 5 seconds" on slow_down. We instead double the interval, which
 // preserves the spirit of the requirement (back off) while keeping tests fast
 // and still bounding poll frequency in production (initial 5s -> 10s -> 20s).
-func PollToken(tokenEndpoint, clientID, deviceCode string, interval, timeout time.Duration) (string, error) {
+func PollToken(tokenEndpoint, clientID, deviceCode string, interval, timeout time.Duration) (Token, error) {
 	deadline := time.Now().Add(timeout)
 	for {
 		if time.Now().After(deadline) {
-			return "", fmt.Errorf("authorization timed out, try again")
+			return Token{}, fmt.Errorf("authorization timed out, try again")
 		}
 		form := url.Values{}
 		form.Set("client_id", clientID)
@@ -87,17 +102,18 @@ func PollToken(tokenEndpoint, clientID, deviceCode string, interval, timeout tim
 
 		resp, err := http.PostForm(tokenEndpoint, form)
 		if err != nil {
-			return "", err
+			return Token{}, err
 		}
-		var raw struct {
-			AccessToken string `json:"access_token"`
-			Error       string `json:"error"`
-		}
+		var raw tokenResp
 		json.NewDecoder(resp.Body).Decode(&raw)
 		resp.Body.Close()
 
 		if raw.AccessToken != "" {
-			return raw.AccessToken, nil
+			return Token{
+				AccessToken:  raw.AccessToken,
+				RefreshToken: raw.RefreshToken,
+				ExpiresIn:    time.Duration(raw.ExpiresIn) * time.Second,
+			}, nil
 		}
 		switch raw.Error {
 		case "authorization_pending":
@@ -105,12 +121,38 @@ func PollToken(tokenEndpoint, clientID, deviceCode string, interval, timeout tim
 		case "slow_down":
 			interval *= 2
 		case "access_denied":
-			return "", fmt.Errorf("authorization denied")
+			return Token{}, fmt.Errorf("authorization denied")
 		case "expired_token":
-			return "", fmt.Errorf("authorization code expired, try again")
+			return Token{}, fmt.Errorf("authorization code expired, try again")
 		default:
-			return "", fmt.Errorf("token endpoint returned HTTP %d: %s", resp.StatusCode, raw.Error)
+			return Token{}, fmt.Errorf("token endpoint returned HTTP %d: %s", resp.StatusCode, raw.Error)
 		}
 		time.Sleep(interval)
 	}
+}
+
+// Refresh exchanges a refresh_token for a new access (and refresh) token via
+// the OAuth 2.0 refresh_token grant (RFC 6749 section 6).
+func Refresh(tokenEndpoint, clientID, refreshToken string) (Token, error) {
+	form := url.Values{}
+	form.Set("client_id", clientID)
+	form.Set("grant_type", "refresh_token")
+	form.Set("refresh_token", refreshToken)
+
+	resp, err := http.PostForm(tokenEndpoint, form)
+	if err != nil {
+		return Token{}, err
+	}
+	defer resp.Body.Close()
+
+	var raw tokenResp
+	json.NewDecoder(resp.Body).Decode(&raw)
+	if raw.AccessToken == "" {
+		return Token{}, fmt.Errorf("token refresh failed: HTTP %d: %s", resp.StatusCode, raw.Error)
+	}
+	return Token{
+		AccessToken:  raw.AccessToken,
+		RefreshToken: raw.RefreshToken,
+		ExpiresIn:    time.Duration(raw.ExpiresIn) * time.Second,
+	}, nil
 }

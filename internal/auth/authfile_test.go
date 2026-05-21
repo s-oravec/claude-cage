@@ -4,10 +4,32 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestAuth_AddHostFull_RoundTrip(t *testing.T) {
+	setRootForTest(t)
+	exp := time.Date(2026, 5, 21, 12, 0, 0, 0, time.UTC)
+	require.NoError(t, AddHostFull("cage-hub.io", "acc", "ref", "stiivo", exp))
+
+	got, err := Load()
+	require.NoError(t, err)
+	e := got.Registries["cage-hub.io"]
+	assert.Equal(t, "acc", e.Token)
+	assert.Equal(t, "ref", e.RefreshToken)
+	assert.Equal(t, "2026-05-21T12:00:00Z", e.ExpiresAt)
+}
+
+func TestAuth_AddHost_NoRefreshFields(t *testing.T) {
+	setRootForTest(t)
+	require.NoError(t, AddHost("h", "t", "u"))
+	got, _ := Load()
+	assert.Empty(t, got.Registries["h"].RefreshToken)
+	assert.Empty(t, got.Registries["h"].ExpiresAt)
+}
 
 func setRootForTest(t *testing.T) string {
 	d := t.TempDir()

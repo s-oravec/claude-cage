@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,37 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestUploadBlobSinglePUT_RefreshAndRetryOn401(t *testing.T) {
+	var puts int
+	var lastBody []byte
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v1/repos/o/n/blobs/uploads", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(202)
+		w.Write([]byte(`{"upload_id":"u1","upload_url":"/api/v1/repos/o/n/blobs/uploads/u1","expires_at":"x"}`))
+	})
+	mux.HandleFunc("/api/v1/repos/o/n/blobs/uploads/u1", func(w http.ResponseWriter, r *http.Request) {
+		puts++
+		if puts == 1 {
+			assert.Equal(t, "Bearer old", r.Header.Get("Authorization"))
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		assert.Equal(t, "Bearer new", r.Header.Get("Authorization"))
+		lastBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(201)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	fp := &fakeProvider{cur: "old", next: "new"}
+	c, _ := NewClient(srv.URL[len("http://"):], Options{TokenProvider: fp, Insecure: true})
+	err := c.UploadBlobSinglePUT("o", "n", "sha256:deadbeef", 8, bytes.NewReader([]byte("blobdata")))
+	require.NoError(t, err)
+	assert.Equal(t, 2, puts)
+	assert.Equal(t, 1, fp.rCalls)
+	assert.Equal(t, "blobdata", string(lastBody))
+}
 
 func TestUploadBlobSinglePUT_TwoPhase(t *testing.T) {
 	mux := http.NewServeMux()

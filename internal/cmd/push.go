@@ -14,6 +14,7 @@ import (
 	"github.com/s-oravec/claude-cage/internal/imgstore"
 	"github.com/s-oravec/claude-cage/internal/manifest"
 	"github.com/s-oravec/claude-cage/internal/registry"
+	"github.com/s-oravec/claude-cage/internal/tokensrc"
 )
 
 // NewPushCmd returns the cobra command for `cage push`.
@@ -81,6 +82,14 @@ func runPush(out io.Writer, refStr string, asLatest bool) error {
 	info, err := rc.AuthInfo()
 	if err != nil {
 		return err
+	}
+
+	// If we logged in via the device flow we have a refresh token; attach a
+	// refreshing provider so a long push survives access-token expiry.
+	if a, _ := auth.Load(); a != nil {
+		if e, ok := a.Registries[ref.Host]; ok && e.RefreshToken != "" {
+			rc.SetTokenProvider(tokensrc.NewRefreshing(ref.Host, info.ClientID, info.TokenEndpoint))
+		}
 	}
 
 	// Push each missing layer.
