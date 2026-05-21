@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -74,4 +75,34 @@ func TestRefreshing_ForceRefresh(t *testing.T) {
 	tok, err := p.Refresh()
 	require.NoError(t, err)
 	assert.Equal(t, "forced", tok)
+}
+
+func TestRefreshing_ConcurrentTokenAccess(t *testing.T) {
+	d := t.TempDir()
+	auth.SetDir(d)
+	t.Cleanup(func() { auth.SetDir("") })
+
+	// Token valid for an hour => Token() reads and returns without refreshing,
+	// so this exercises pure concurrent access with no network dependency.
+	require.NoError(t, auth.AddHostFull("h", "valid", "ref1", "u", time.Now().Add(time.Hour)))
+
+	p := NewRefreshing("h", "cage-cli", "http://unused")
+
+	const goroutines = 50
+	var wg sync.WaitGroup
+	errs := make([]error, goroutines)
+	toks := make([]string, goroutines)
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			toks[i], errs[i] = p.Token()
+		}(i)
+	}
+	wg.Wait()
+
+	for i := 0; i < goroutines; i++ {
+		require.NoError(t, errs[i])
+		assert.Equal(t, "valid", toks[i])
+	}
 }
