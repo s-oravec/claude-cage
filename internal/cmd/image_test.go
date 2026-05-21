@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/s-oravec/claude-cage/internal/cage"
 	"github.com/s-oravec/claude-cage/internal/images"
 	"github.com/s-oravec/claude-cage/internal/imgstore"
+	"github.com/s-oravec/claude-cage/internal/manifest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -173,6 +175,49 @@ func TestImageCmd(t *testing.T) {
 			t.Error("save should have --description flag")
 		}
 	})
+}
+
+// TestImageList_HasArchColumn verifies the ARCH header is present and a custom
+// image's recorded architecture appears in its row.
+func TestImageList_HasArchColumn(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	imagesDir := filepath.Join(tmpDir, "images")
+	require.NoError(t, os.MkdirAll(imagesDir, 0755))
+	oldImagesDir := images.Dir()
+	images.SetDir(imagesDir)
+	defer images.SetDir(oldImagesDir)
+
+	imgstore.SetRoot(filepath.Join(tmpDir, "store"))
+	defer imgstore.SetRoot("")
+
+	// Seed a custom image: a single-arch manifest plus a ref pointing at it.
+	m := manifest.Manifest{
+		SchemaVersion: manifest.SchemaVersionV1,
+		MediaType:     manifest.MediaTypeManifestV1,
+		Base:          manifest.Base{Type: "distro", Name: "alpine", Digest: "sha256:base"},
+		Config:        manifest.Config{OS: "linux", Arch: "arm64"},
+	}
+	body, err := json.Marshal(&m)
+	require.NoError(t, err)
+	digest := manifest.DigestBytes(body)
+	require.NoError(t, imgstore.PutManifestBytes(digest, body))
+
+	ref, err := imgstore.ParseRef("custom:1.0")
+	require.NoError(t, err)
+	require.NoError(t, imgstore.WriteRef(ref, digest))
+
+	cmd := NewRootCmd()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{"image", "list"})
+	require.NoError(t, cmd.Execute())
+
+	out := buf.String()
+	assert.Contains(t, out, "ARCH")
+	assert.Contains(t, out, "custom:1.0")
+	assert.Contains(t, out, "arm64")
 }
 
 func TestImageRm_HasRmSubcommand(t *testing.T) {

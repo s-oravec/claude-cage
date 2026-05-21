@@ -117,7 +117,7 @@ func listAvailableImages(cmd *cobra.Command) error {
 	}
 
 	tw := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 3, ' ', 0)
-	fmt.Fprintln(tw, "NAME\tTYPE\tBASE\tSIZE\tCREATED")
+	fmt.Fprintln(tw, "NAME\tTYPE\tBASE\tARCH\tSIZE\tCREATED")
 	for _, img := range imgList {
 		created := "-"
 		if !img.CreatedAt.IsZero() {
@@ -127,10 +127,15 @@ func listAvailableImages(cmd *cobra.Command) error {
 		if img.Base != "" {
 			base = img.Base
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
+		arch := "-"
+		if img.Arch != "" {
+			arch = img.Arch
+		}
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			img.Name,
 			img.Type,
 			base,
+			arch,
 			images.FormatSize(img.Size),
 			created)
 	}

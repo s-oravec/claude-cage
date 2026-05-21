@@ -78,6 +78,7 @@ func List() ([]Image, error) {
 			Name:        display,
 			Type:        "custom",
 			Base:        m.Base.Name,
+			Arch:        m.Config.Arch,
 			Size:        size,
 			Description: m.Config.Description,
 			CreatedAt:   e.ModTime,
