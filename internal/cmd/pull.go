@@ -121,25 +121,29 @@ func pullImage(cmd *cobra.Command, name, arch string) error {
 
 	fmt.Fprintf(cmd.OutOrStdout(), "Downloading %s (%s)...\n", name, src.Description)
 
-	// Create progress bar (size will be set from HTTP response)
-	var bar *progress.Bar
-
+	// Create progress bar lazily: the size is only known once the HTTP response
+	// arrives. Using a lazily-created Group means that if no bar is ever needed
+	// (total stays unknown), no mpb container is created at all.
+	var pg *progress.Group
+	var bar *progress.LayerBar
 	progressFn := func(written, total int64) {
 		if bar == nil && total > 0 {
-			bar = progress.NewBar(total, name, cmd.OutOrStdout())
+			pg = progress.NewGroup(cmd.OutOrStdout())
+			bar = pg.AddBar(total, name, "downloading")
 		}
 		if bar != nil {
-			bar.Update(written)
+			bar.SetCurrent(written)
 		}
 	}
-
 	status := func(msg string) {
 		if bar != nil {
-			bar.Finish()
+			bar.Done("")
+		}
+		if pg != nil {
+			pg.Wait()
 		}
 		fmt.Fprintln(cmd.OutOrStdout(), msg)
 	}
-
 	return images.Setup(name, arch, progressFn, status)
 }
 
