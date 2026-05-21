@@ -105,8 +105,12 @@ err := g.Wait()
 pg.Wait()
 ```
 
-The first error cancels the context; mpb is shut down via `pg.Wait()` after the
-group returns so the terminal is left clean even on error.
+`errgroup.Group.Wait()` returns the first worker error, which aborts the batch
+at the `Wait()` boundary (already-dispatched in-flight uploads run to
+completion - the registry client takes no `context.Context`, so there is nothing
+to cancel mid-request; a plain `errgroup.Group` is used, not
+`errgroup.WithContext`). mpb is shut down via `pg.Wait()` after the group
+returns so the terminal is left clean even on error.
 
 ### 3. Registry upload progress callback (`internal/registry`)
 
@@ -187,7 +191,8 @@ change needed; covered by a concurrency-stress test.
   cumulative progress for both single and multipart; nil callback is a no-op;
   single-PUT 401 rewind re-reports from 0.
 - `internal/cmd`: push/pull with concurrency>1 over a fake registry transfers
-  all layers, surfaces the first error and cancels the rest, and respects the
-  `-j` flag; non-TTY output stays line-based and stable.
+  all layers, surfaces the first error, respects the `-j` flag (asserting both
+  the upper and lower concurrency bounds), and keeps non-TTY output line-based
+  and stable.
 - Concurrency-stress test that many goroutines sharing a `Refreshing` provider
   do not race (run with `-race`).
