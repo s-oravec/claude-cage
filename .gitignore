@@ -21,3 +21,6 @@ Thumbs.db
 
 # AI Coding
 .mcp.json
+
+# Claude Code session artifacts
+.claude/
