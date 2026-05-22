@@ -1,4 +1,4 @@
-<h1><img src="assets/claude-cage.png" height="50" alt="Claude Cage" style="vertical-align: middle;"> Claude Cage</h1>
+<h1><img src="assets/cage.png" height="50" alt="Claude Cage" style="vertical-align: middle;"> Claude Cage</h1>
 
 A lightweight QEMU/KVM-based VM sandbox CLI for running Claude Code in isolation.
 
@@ -30,8 +30,8 @@ available:
 | Shared folders (virtiofs) | ❌ | ✅ |
 | Injected env via virtiofs | ❌ | ✅ |
 | libvirt backend | session | system |
-| Metadata path (state.json, SSH keys) | `~/.claude-cage/` | `~/.claude-cage/` (invoking user) |
-| VM artifacts path (disk, ISO, images) | `~/.claude-cage/` | `/var/lib/libvirt/images/cage/` |
+| Metadata path (state.json, SSH keys) | `~/.cage/` | `~/.cage/` (invoking user) |
+| VM artifacts path (disk, ISO, images) | `~/.cage/` | `/var/lib/libvirt/images/cage/` |
 
 **User mode** is the default and what most users want: a sandboxed VM
 with SSH and SLIRP networking, no host configuration required. Run `cage
@@ -69,7 +69,7 @@ cage doctor
 
 ```bash
 git clone https://github.com/s-oravec/cage.git
-cd claude-cage
+cd cage
 make build
 make install  # installs to ~/.local/bin/
 ```
@@ -199,7 +199,7 @@ cage init [options]
 
 | Option | Description |
 |--------|-------------|
-| `--image` | Base image name (default: from `~/.claude-cage/config.yaml`) |
+| `--image` | Base image name (default: from `~/.cage/config.yaml`) |
 | `--cage` | Cage name (default: directory name) |
 | `--memory` | Memory allocation (e.g., `4G`, `8G`) |
 | `--vcpu` | Number of virtual CPUs |
@@ -773,7 +773,7 @@ cage can publish and fetch built images from a cage-hub registry, similar in spi
 
 ### cage login
 
-Authenticate with a registry host using device flow (interactive) or a personal access token (CI). Credentials are stored in `~/.claude-cage/auth.yaml` (mode 0600).
+Authenticate with a registry host using device flow (interactive) or a personal access token (CI). Credentials are stored in `~/.cage/auth.yaml` (mode 0600).
 
 ```bash
 cage login <host>           # device flow: prints URL and user code
@@ -1025,14 +1025,14 @@ env:
 
 ### Global Configuration
 
-Global config file: `~/.claude-cage/config.yaml`
+Global config file: `~/.cage/config.yaml`
 
 This file defines default settings, resource profiles, and security configuration used across all cages.
 
 ### Global Configuration Reference
 
 ```yaml
-# ~/.claude-cage/config.yaml
+# ~/.cage/config.yaml
 
 images:
   default: alpine           # Default image for new cages
@@ -1079,7 +1079,7 @@ env:
 
 When `cage start` runs, configuration is resolved in this order:
 
-1. **Global config** (`~/.claude-cage/config.yaml`) - provides defaults and profiles
+1. **Global config** (`~/.cage/config.yaml`) - provides defaults and profiles
 2. **Project config** (`.cage.yml`) - specifies image, overrides resources
 3. **Command line** - port forwarding flags
 

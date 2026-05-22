@@ -89,7 +89,7 @@ VMs are configured at first boot via cloud-init:
 - **bridge**: NAT bridge with iptables isolation, requires root, full LAN isolation
 
 ### 5. State Files over Database
-Each cage has a `state.json` in `~/.claude-cage/cages/<name>/`:
+Each cage has a `state.json` in `~/.cage/cages/<name>/`:
 - Simple, inspectable, portable
 - No database dependency
 - Easy backup and restore
@@ -97,7 +97,7 @@ Each cage has a `state.json` in `~/.claude-cage/cages/<name>/`:
 ## Directory Structure
 
 ```
-~/.claude-cage/
+~/.cage/
 ├── config.yaml          # Global configuration
 ├── images/              # Downloaded base images (*.qcow2)
 ├── keys/                # SSH keys per cage

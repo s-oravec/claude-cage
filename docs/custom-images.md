@@ -82,10 +82,10 @@ python3 --version # works
 cage image save setup --name team-backend-v1
 
 # Export for team
-cp ~/.claude-cage/images/team-backend-v1.qcow2 /shared/team/
+cp ~/.cage/images/team-backend-v1.qcow2 /shared/team/
 
 # Team members import
-cp /shared/team/team-backend-v1.qcow2 ~/.claude-cage/images/
+cp /shared/team/team-backend-v1.qcow2 ~/.cage/images/
 
 # Everyone uses the same environment
 cd ~/projects/feature-x

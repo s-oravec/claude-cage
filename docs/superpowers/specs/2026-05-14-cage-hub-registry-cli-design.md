@@ -128,7 +128,7 @@ extended to accept a registry-style ref and treat it as a ref deletion
 
 ## Config files
 
-### `~/.claude-cage/config.yaml` (existing, additive change)
+### `~/.cage/config.yaml` (existing, additive change)
 
 One new optional section:
 
@@ -144,7 +144,7 @@ skip TLS verification. Every other host is HTTPS with a fully validated
 chain. No tokens live in `config.yaml`. `cage config show` and `cage
 config edit` are unchanged.
 
-### `~/.claude-cage/auth.yaml` (new file, mode `0600`)
+### `~/.cage/auth.yaml` (new file, mode `0600`)
 
 Created on first `cage login`, cleared on `cage logout`:
 
@@ -175,7 +175,7 @@ and never touches auth files.
 ## Image storage layout (local)
 
 ```
-~/.claude-cage/
+~/.cage/
   images/                            # base distro images (unchanged)
     ubuntu-24.04.qcow2
     metadata/ubuntu-24.04.json
@@ -467,7 +467,7 @@ to validate that a layer is acceptable before attempting an upload.
 - `cage logout` on a host not in `auth.yaml`: idempotent, exit 0.
 - TLS verification failure on a non-insecure host: `TLS verification
   failed for <host>: ...; if this is a dev registry, add it to
-  registries.insecure in ~/.claude-cage/config.yaml`.
+  registries.insecure in ~/.cage/config.yaml`.
 - Disk full mid-pull: clean up tmp files, error with `free X GB and
   retry`.
 - Expired token on any registry call: `token expired, run cage login

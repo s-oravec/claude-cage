@@ -4,7 +4,7 @@ This document describes the runtime state structures used during cage lifecycle.
 
 ## Cage State
 
-The primary runtime model is `State`, persisted in `~/.claude-cage/cages/<name>/state.json`.
+The primary runtime model is `State`, persisted in `~/.cage/cages/<name>/state.json`.
 
 ```go
 // internal/cage/state.go
@@ -95,7 +95,7 @@ type RestartConfig struct {
 }
 ```
 
-Stored in `~/.claude-cage/cages/<name>/restart.json`.
+Stored in `~/.cage/cages/<name>/restart.json`.
 
 ## State File Example
 
@@ -267,11 +267,11 @@ func Exists(name string) bool
 
 | Content | Path |
 |---------|------|
-| Cage state | `~/.claude-cage/cages/<name>/state.json` |
-| Restart config | `~/.claude-cage/cages/<name>/restart.json` |
-| Disk overlay | `~/.claude-cage/cages/<name>/disk.qcow2` |
-| Cloud-init ISO | `~/.claude-cage/cages/<name>/cloud-init.iso` |
-| SSH keys | `~/.claude-cage/keys/<name>/id_ed25519[.pub]` |
+| Cage state | `~/.cage/cages/<name>/state.json` |
+| Restart config | `~/.cage/cages/<name>/restart.json` |
+| Disk overlay | `~/.cage/cages/<name>/disk.qcow2` |
+| Cloud-init ISO | `~/.cage/cages/<name>/cloud-init.iso` |
+| SSH keys | `~/.cage/keys/<name>/id_ed25519[.pub]` |
 | virtiofs socket | `/tmp/cage-virtiofs/<name>/virtiofs.sock` |
 
 ## See Also

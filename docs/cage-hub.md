@@ -8,7 +8,7 @@ cage-hub is a registry for cage images, similar in spirit to Docker Hub for cage
 cage login cage-hub.io
 ```
 
-Opens a device flow: cage prints a URL and a user code, you open the URL in a browser, enter the code, and approve. The resulting token is stored in `~/.claude-cage/auth.yaml` (mode 0600).
+Opens a device flow: cage prints a URL and a user code, you open the URL in a browser, enter the code, and approve. The resulting token is stored in `~/.cage/auth.yaml` (mode 0600).
 
 For CI / non-interactive use, generate a personal access token from the cage-hub web UI under `/settings/tokens` and pipe it in:
 
@@ -125,7 +125,7 @@ cage push cage-hub.io/stiivo/devbox:v1   # server auto-composes the index
 
 ### Base-image cache
 
-The base-image cache is flat: each base lives at `~/.claude-cage/images/<name>.qcow2`, with the architecture recorded in the image metadata. Only one architecture of a given base is on disk at a time. Pulling or building a different architecture of the same base re-downloads it (replacing the cached copy). Caches created before multi-arch support are treated as the host architecture.
+The base-image cache is flat: each base lives at `~/.cage/images/<name>.qcow2`, with the architecture recorded in the image metadata. Only one architecture of a given base is on disk at a time. Pulling or building a different architecture of the same base re-downloads it (replacing the cached copy). Caches created before multi-arch support are treated as the host architecture.
 
 ### Inspecting a tag's architectures
 
@@ -147,7 +147,7 @@ cage push cage-hub.io/stiivo/devbox:stable
 
 ## Insecure / dev registries
 
-For local development against `localhost:5000` or `cage-hub.local`, add the host to the insecure allowlist in `~/.claude-cage/config.yaml`:
+For local development against `localhost:5000` or `cage-hub.local`, add the host to the insecure allowlist in `~/.cage/config.yaml`:
 
 ```yaml
 registries:

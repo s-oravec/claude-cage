@@ -120,7 +120,7 @@ Guest VM ─── NAT Bridge ─── iptables ─── Internet
 ### SSH Keys
 
 - Ed25519 keys generated per cage
-- Private key stored in `~/.claude-cage/keys/<cage>/`
+- Private key stored in `~/.cage/keys/<cage>/`
 - Public key injected via cloud-init
 - No passphrase (convenience for automation)
 

@@ -5,7 +5,7 @@ This document describes the package structure and responsibilities of each modul
 ## Package Structure
 
 ```
-claude-cage/
+cage/
 ├── cmd/cage/           # Application entry point
 │   └── main.go
 ├── internal/           # Private packages

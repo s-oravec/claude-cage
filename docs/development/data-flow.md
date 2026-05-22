@@ -21,7 +21,7 @@ cage start (in project directory)
         ▼
 ┌───────────────────────────────────────────────────────────────┐
 │ 2. Load Configuration                                          │
-│    - Load ~/.claude-cage/config.yaml (global)                 │
+│    - Load ~/.cage/config.yaml (global)                 │
 │    - Load .cage.yml (project)                          │
 │    - Resolve config (merge profile + overrides)               │
 │    - Resolve image alias (alpine → alpine-3.21)               │
@@ -30,7 +30,7 @@ cage start (in project directory)
         ▼
 ┌───────────────────────────────────────────────────────────────┐
 │ 3. Check If Cage Exists                                        │
-│    Does ~/.claude-cage/cages/<name>/ exist?                   │
+│    Does ~/.cage/cages/<name>/ exist?                   │
 │    ├── NO  → Create cage (see below)                          │
 │    └── YES → Validate image, reconfigure if stopped           │
 └───────────────────────────────────────────────────────────────┘
@@ -131,7 +131,7 @@ cage start (with .cage.yml)
         ▼
 ┌───────────────────────────────────────────────────────────────┐
 │ 1. Load Global Config                                          │
-│    ~/.claude-cage/config.yaml                                  │
+│    ~/.cage/config.yaml                                  │
 │    ┌─────────────────────────────────────┐                    │
 │    │ images:                              │                    │
 │    │   default: alpine                    │                    │
@@ -207,8 +207,8 @@ cage remove myvm
         ▼
 ┌───────────────────────────────────────────────────────────────┐
 │ 5. Delete Files                                                │
-│    - Remove ~/.claude-cage/cages/<name>/                      │
-│    - Remove ~/.claude-cage/keys/<name>/                       │
+│    - Remove ~/.cage/cages/<name>/                      │
+│    - Remove ~/.cage/keys/<name>/                       │
 │    - Remove virtiofs socket directory                         │
 └───────────────────────────────────────────────────────────────┘
 ```

@@ -28,7 +28,7 @@ available.
 
 **libvirt backend:** `qemu:///session`. QEMU runs as your regular user; no
 privileged operations are involved. Everything lives under
-`~/.claude-cage/` (state, SSH keys, base images, disk overlays).
+`~/.cage/` (state, SSH keys, base images, disk overlays).
 
 ## Root mode
 
@@ -50,7 +50,7 @@ user with apparmor confinement.
 State is split across two locations:
 
 - **Metadata** (state.json, SSH keys, known_hosts) lives in the
-  invoking user's `~/.claude-cage/` — cage reads `$SUDO_USER` so files
+  invoking user's `~/.cage/` — cage reads `$SUDO_USER` so files
   end up in your real home, not `/root/`. After creation cage chowns
   them back to your user so you can read SSH private keys (mode 600)
   and manage the cage from your normal shell.

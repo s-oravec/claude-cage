@@ -22,7 +22,7 @@ This guide helps developers set up their environment for contributing to Claude 
 
 ```bash
 git clone https://github.com/s-oravec/cage.git
-cd claude-cage
+cd cage
 ```
 
 ### 2. Install Dependencies
@@ -74,7 +74,7 @@ All checks should pass (virtiofsd is optional but recommended).
 ## Project Structure
 
 ```
-claude-cage/
+cage/
 ├── cmd/cage/           # Entry point
 │   └── main.go
 ├── internal/           # Implementation packages

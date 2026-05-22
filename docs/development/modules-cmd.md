@@ -53,7 +53,7 @@ Initializes project configuration.
 3. Create `.cage.yml` with image, shares, and options
 
 **Flags:**
-- `--image` - Base image (default: from `~/.claude-cage/config.yaml`)
+- `--image` - Base image (default: from `~/.cage/config.yaml`)
 - `--cage` - Cage name (default: directory name)
 - `--memory` - Memory allocation (e.g., `4G`)
 - `--vcpu` - Number of virtual CPUs

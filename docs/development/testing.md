@@ -135,7 +135,7 @@ func TestSaveState(t *testing.T) {
     old := cage.SetCagesDir(tmpDir)
     defer cage.SetCagesDir(old)
 
-    // Now tests use tmpDir instead of ~/.claude-cage/cages/
+    // Now tests use tmpDir instead of ~/.cage/cages/
     state := &cage.State{Name: "test", Status: "running"}
     err := cage.SaveState(state)
     assert.NoError(t, err)

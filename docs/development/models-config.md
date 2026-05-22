@@ -6,7 +6,7 @@ This document describes the configuration data structures and YAML schema.
 
 | File | Purpose | Priority |
 |------|---------|----------|
-| `~/.claude-cage/config.yaml` | Global configuration | Base |
+| `~/.cage/config.yaml` | Global configuration | Base |
 | `./.cage.yml` | Project-specific overrides | Higher |
 
 ## Config Structure
@@ -165,7 +165,7 @@ These are written to `/etc/profile.d/cage-env.sh` in the VM via cloud-init.
 ## Full Configuration Example
 
 ```yaml
-# ~/.claude-cage/config.yaml
+# ~/.cage/config.yaml
 
 images:
   default: ubuntu

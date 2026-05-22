@@ -4,7 +4,7 @@
 
 **Goal:** Add `cage login` / `logout` / `push` / `pull` / `tag` commands that talk to a cage-hub registry; refactor the local image store and `cage build` to a content-addressed, layered representation so push/pull can deduplicate.
 
-**Architecture:** New packages under `internal/`: `manifest` (JSON schema + canonical encoding + digest), `imgstore` (content-addressed layers/manifests/refs on disk), `auth` (`~/.claude-cage/auth.yaml` 0600), `oidcdevice` (Keycloak device flow), `registry` (HTTP client for `/api/v1/...`). New cobra commands in `internal/cmd/`. `cage build` save path changes from `qemu-img convert` (flatten) to `qemu-img rebase -u -b ""` (strip backing) + store in content-addressed layers/. `cage pull` learns to detect registry refs (contains `/`) and routes to the new code path. `cage start` learns to materialize a layer chain when its image is a registry ref. All existing flows for distro base images stay unchanged.
+**Architecture:** New packages under `internal/`: `manifest` (JSON schema + canonical encoding + digest), `imgstore` (content-addressed layers/manifests/refs on disk), `auth` (`~/.cage/auth.yaml` 0600), `oidcdevice` (Keycloak device flow), `registry` (HTTP client for `/api/v1/...`). New cobra commands in `internal/cmd/`. `cage build` save path changes from `qemu-img convert` (flatten) to `qemu-img rebase -u -b ""` (strip backing) + store in content-addressed layers/. `cage pull` learns to detect registry refs (contains `/`) and routes to the new code path. `cage start` learns to materialize a layer chain when its image is a registry ref. All existing flows for distro base images stay unchanged.
 
 **Tech Stack:** Go 1.21, cobra v1.10, yaml.v3, stretchr/testify, net/http (stdlib), crypto/sha256 (stdlib). No new third-party deps - OIDC device flow is small enough to inline.
 
@@ -486,7 +486,7 @@ var rootOverride string
 // SetRoot overrides the storage root (testing only). Empty restores default.
 func SetRoot(s string) { rootOverride = s }
 
-// Root is the base directory under ~/.claude-cage where layered store lives.
+// Root is the base directory under ~/.cage where layered store lives.
 func Root() string {
 	if rootOverride != "" {
 		return rootOverride

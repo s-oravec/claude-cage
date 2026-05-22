@@ -140,8 +140,8 @@ sudo cloud-init clean --logs && sudo cloud-init init
 To inspect what cage generated for a cage (before the VM ever booted):
 
 ```bash
-ls ~/.claude-cage/cages/<name>/cloudinit/
-cat ~/.claude-cage/cages/<name>/cloudinit/user-data
+ls ~/.cage/cages/<name>/cloudinit/
+cat ~/.cage/cages/<name>/cloudinit/user-data
 # Or in root mode:
 sudo cat /var/lib/libvirt/images/cage/cages/<name>/cloudinit/user-data
 ```
