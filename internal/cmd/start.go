@@ -319,6 +319,9 @@ func createCageFromConfig(cmd *cobra.Command, name string, resolved *config.Reso
 		}
 	} else if networkMode == cage.NetworkAuto {
 		fmt.Fprintln(cmd.OutOrStdout(), "  Network isolation disabled (cage can reach the LAN)...")
+		if len(resolved.AllowedSubnets) > 0 {
+			fmt.Fprintln(cmd.OutOrStdout(), "  Warning: network.allowed_subnets is ignored when network.isolation is false")
+		}
 	}
 
 	// Inject runtime env via virtiofs only when the config actually has env
