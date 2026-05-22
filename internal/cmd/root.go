@@ -15,9 +15,9 @@ func NewRootCmd() *cobra.Command {
 
 	rootCmd := &cobra.Command{
 		Use:   "cage",
-		Short: "Claude Cage - Secure VM sandbox for Claude Code",
-		Long: `Claude Cage creates isolated QEMU/KVM virtual machines
-for running Claude Code in a secure sandbox with full Docker support.`,
+		Short: "Cage - QEMU/KVM sandbox CLI for running VMs",
+		Long: `Cage creates isolated QEMU/KVM virtual machines for running
+workloads in a secure sandbox with full Docker support.`,
 		SilenceUsage: true,
 		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
 			return logging.Configure(verbosity, logLevel)
