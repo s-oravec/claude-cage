@@ -1,6 +1,6 @@
 # Architecture Overview
 
-Claude Cage follows a layered architecture with clear separation of concerns. The application is built in Go and uses external tools (QEMU, libvirt, virtiofsd) for virtualization.
+Cage follows a layered architecture with clear separation of concerns. The application is built in Go and uses external tools (QEMU, libvirt, virtiofsd) for virtualization.
 
 ## High-Level Architecture
 

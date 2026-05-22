@@ -1,10 +1,10 @@
 # Scenario: Full Yolo Agentic Development
 
-Claude Code runs in yolo mode inside an isolated cage VM with full Docker access.
+An untrusted workload (for example an AI coding agent) runs in yolo mode inside an isolated cage VM with full Docker access.
 
 ## Problem
 
-I want to use Claude Code in yolo mode (automatic command approval) but:
+I want to run a workload in yolo mode (automatic command approval, no guardrails) but:
 - It must not have access to VPN (corporate network, tailscale, wireguard)
 - It must not see the home network (192.168.x.x)
 - It must not have access to sensitive files (~/.ssh, ~/.aws, ~/.config)
@@ -23,10 +23,11 @@ cage start --port 3000:3000 --port 5432:5432
 # 3. SSH into cage
 cage ssh
 
-# 4. Run Claude Code in yolo mode
-claude --dangerously-skip-permissions
+# 4. Run your workload in yolo mode (example: an AI coding agent
+#    with all permission prompts disabled)
+your-workload --yolo
 
-# Claude can now:
+# The workload can now:
 # - run any commands
 # - use Docker/docker-compose
 # - install packages
@@ -47,7 +48,7 @@ claude --dangerously-skip-permissions
 │  │                         CAGE VM (QEMU/KVM)                         │  │
 │  │                                                                    │  │
 │  │  ┌─────────────────────────────────────────────────────────────┐  │  │
-│  │  │                   Claude Code (yolo mode)                    │  │  │
+│  │  │                  Untrusted workload (yolo mode)              │  │  │
 │  │  │                                                              │  │  │
 │  │  │   ✓ Full shell access                                       │  │  │
 │  │  │   ✓ Full Docker access (native daemon)                      │  │  │
@@ -93,7 +94,7 @@ claude --dangerously-skip-permissions
 | Ephemeral environment | Changes only persist in /workspace | qcow2 copy-on-write |
 | DNS enforcement | DNS query control | DNAT to 1.1.1.1/8.8.8.8 |
 
-## What Claude Code CAN do (inside cage)
+## What the workload CAN do (inside cage)
 
 - Run any shell commands
 - Use Docker (build, run, compose, exec, logs...)
@@ -104,7 +105,7 @@ claude --dangerously-skip-permissions
 - Access public internet (GitHub, npm, PyPI)
 - Modify anything in /workspace
 
-## What Claude Code CANNOT do
+## What the workload CANNOT do
 
 - Access VPN networks (corporate network)
 - Access Tailscale/WireGuard networks
@@ -140,11 +141,11 @@ cage ssh
 cd /workspace
 docker compose up -d
 
-# Run Claude Code in yolo mode
-claude --dangerously-skip-permissions
+# Run your workload in yolo mode (example: an AI coding agent)
+your-workload --yolo
 
 # === WORK ===
-# Claude can:
+# The workload can:
 # - edit code
 # - run tests
 # - restart containers
@@ -153,7 +154,7 @@ claude --dangerously-skip-permissions
 # - all automatically
 
 # === EVENING - End work ===
-exit                    # exit Claude
+exit                    # exit the workload
 docker compose down     # stop containers
 exit                    # leave cage
 cage stop               # stop VM
@@ -202,7 +203,7 @@ cage stop dev --force
 # Before risky experiment
 cage snapshot create dev --name before-experiment
 
-# Claude does experiment...
+# The workload runs the experiment...
 # Something went wrong!
 
 # Restore state
@@ -215,14 +216,14 @@ cage start dev
 
 ## Fail-safe
 
-If Claude Code does something suspicious:
+If the workload does something suspicious:
 
 ```bash
 # Immediate stop (from host)
 cage stop dev --force
 
 # VM is immediately destroyed
-# - Claude loses all state
+# - the workload loses all state
 # - No residue
 # - /workspace on host remains (you can check changes)
 

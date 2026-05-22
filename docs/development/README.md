@@ -1,10 +1,10 @@
 # Developer Documentation
 
-This documentation covers the architecture, design, and implementation details of Claude Cage.
+This documentation covers the architecture, design, and implementation details of Cage.
 
 ## Overview
 
-Claude Cage is a CLI tool that creates isolated QEMU/KVM virtual machines for running Claude Code in a secure sandbox. It provides network isolation, file sharing, and snapshot management while being easy to use for developers.
+Cage is a CLI tool that creates isolated QEMU/KVM virtual machines for running arbitrary workloads in a secure sandbox. It provides network isolation, file sharing, and snapshot management while being easy to use for developers.
 
 ## Table of Contents
 

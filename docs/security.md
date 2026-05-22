@@ -1,6 +1,6 @@
 # Network Isolation
 
-Claude Cage provides network isolation to prevent the VM from accessing your local network (LAN) while still allowing internet access. This protects against potential prompt injection attacks that might try to access local services.
+Cage provides network isolation to prevent the VM from accessing your local network (LAN) while still allowing internet access. This protects against a compromised or untrusted workload (for example an AI coding agent hit by a prompt injection attack) that might try to access local services.
 
 ## How It Works
 

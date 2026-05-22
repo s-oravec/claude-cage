@@ -1,4 +1,4 @@
-# Claude Cage Makefile
+# Cage Makefile
 #
 # Build and test targets for the cage CLI tool.
 #

@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide helps developers set up their environment for contributing to Claude Cage.
+This guide helps developers set up their environment for contributing to Cage.
 
 ## Prerequisites
 

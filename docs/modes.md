@@ -1,6 +1,6 @@
 # Operating Modes
 
-Claude Cage runs in one of two modes. The mode is chosen by whether the
+Cage runs in one of two modes. The mode is chosen by whether the
 `cage` process is started as a regular user or as root (`sudo cage`), and
 together with the project cagefile determines which features are
 available.

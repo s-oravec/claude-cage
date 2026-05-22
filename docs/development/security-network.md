@@ -1,6 +1,6 @@
 # Network Isolation
 
-This document details the network isolation mechanisms in Claude Cage.
+This document details the network isolation mechanisms in Cage.
 
 ## Network Modes Overview
 

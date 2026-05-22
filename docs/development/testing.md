@@ -1,6 +1,6 @@
 # Testing Guide
 
-This document describes how to run and write tests for Claude Cage.
+This document describes how to run and write tests for Cage.
 
 ## Test Categories
 

@@ -1,10 +1,10 @@
-<h1><img src="assets/cage.png" height="50" alt="Claude Cage" style="vertical-align: middle;"> Claude Cage</h1>
+<h1><img src="assets/cage.png" height="50" alt="Cage" style="vertical-align: middle;"> Cage</h1>
 
-A lightweight QEMU/KVM-based VM sandbox CLI for running Claude Code in isolation.
+A lightweight QEMU/KVM-based VM sandbox CLI for running arbitrary workloads in isolation.
 
 ## Features
 
-- **VM Isolation**: Run Claude Code in a secure, isolated VM environment
+- **VM Isolation**: Run any workload (a CLI, an AI coding agent, untrusted code) in a secure, isolated VM environment
 - **QEMU/KVM Backend**: Uses libvirt for VM management
 - **Copy-on-Write Disks**: Changes don't affect base images
 - **File Sharing**: Share directories with the VM using virtio-fs (root mode)
@@ -15,7 +15,7 @@ A lightweight QEMU/KVM-based VM sandbox CLI for running Claude Code in isolation
 
 ## Operating Modes
 
-Claude Cage runs in one of two modes, distinguished by whether the cage
+Cage runs in one of two modes, distinguished by whether the cage
 process has root privileges. The mode determines which features are
 available:
 
@@ -1143,7 +1143,3 @@ For detailed architecture, modules, and security documentation, see [Developer D
 ## License
 
 MIT
-
----
-
-Made with [Claude](https://claude.ai)

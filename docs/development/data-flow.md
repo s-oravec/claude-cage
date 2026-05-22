@@ -1,6 +1,6 @@
 # Data Flow
 
-This document describes how data flows through Claude Cage during key operations.
+This document describes how data flows through Cage during key operations.
 
 ## Cage Start Flow (with Auto-Creation)
 

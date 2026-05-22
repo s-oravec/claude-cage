@@ -1,6 +1,6 @@
 # Security Model
 
-Claude Cage is designed to isolate potentially untrusted code execution from the host system and local network. This document describes the security architecture and threat mitigation strategies.
+Cage is designed to isolate potentially untrusted code execution from the host system and local network. This document describes the security architecture and threat mitigation strategies.
 
 ## Threat Model
 
@@ -29,7 +29,7 @@ Claude Cage is designed to isolate potentially untrusted code execution from the
 │  │  │                    Guest VM                           │  │  │
 │  │  │  ┌────────────────────────────────────────────────┐  │  │  │
 │  │  │  │              User Process                       │  │  │  │
-│  │  │  │              (Claude Code)                      │  │  │  │
+│  │  │  │           (untrusted workload)                  │  │  │  │
 │  │  │  └────────────────────────────────────────────────┘  │  │  │
 │  │  └──────────────────────────────────────────────────────┘  │  │
 │  └────────────────────────────────────────────────────────────┘  │

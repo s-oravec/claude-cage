@@ -29,7 +29,7 @@ Commands are registered in `root.go`:
 func NewRootCmd() *cobra.Command {
     rootCmd := &cobra.Command{
         Use:   "cage",
-        Short: "Claude Cage - Secure VM sandbox for Claude Code",
+        Short: "Cage - QEMU/KVM sandbox CLI for running VMs",
     }
 
     rootCmd.AddCommand(NewCreateCmd())
