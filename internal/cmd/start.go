@@ -304,13 +304,21 @@ func createCageFromConfig(cmd *cobra.Command, name string, resolved *config.Reso
 	// Create cloud-init ISO with UseRuntimeEnv=true and network isolation
 	fmt.Fprintln(cmd.OutOrStdout(), "  Creating cloud-init...")
 
-	// Enable network isolation by default for SLIRP networking
-	// The SLIRP network (10.0.2.0/24) is allowed, but other private ranges are blocked
-	networkIsolation := networkMode == cage.NetworkAuto
-	allowedSubnets := []string{"10.0.2.0/24"} // QEMU SLIRP default network
+	// Network isolation applies only to the auto/SLIRP path (bridge/root mode is
+	// isolated host-side, see below). Default on; .cage.yml `network.isolation:
+	// false` opts out. `network.allowed_subnets` add reachable routes (via the
+	// SLIRP gateway) while isolation otherwise stays on.
+	networkIsolation := networkMode == cage.NetworkAuto && resolved.NetworkIsolation
+	allowedSubnets := append([]string{cloudinit.SLIRPNetwork}, resolved.AllowedSubnets...)
 
 	if networkIsolation {
-		fmt.Fprintln(cmd.OutOrStdout(), "  Enabling network isolation (blocking LAN access)...")
+		if len(resolved.AllowedSubnets) > 0 {
+			fmt.Fprintf(cmd.OutOrStdout(), "  Enabling network isolation (LAN blocked except %s)...\n", strings.Join(resolved.AllowedSubnets, ", "))
+		} else {
+			fmt.Fprintln(cmd.OutOrStdout(), "  Enabling network isolation (blocking LAN access)...")
+		}
+	} else if networkMode == cage.NetworkAuto {
+		fmt.Fprintln(cmd.OutOrStdout(), "  Network isolation disabled (cage can reach the LAN)...")
 	}
 
 	// Inject runtime env via virtiofs only when the config actually has env
