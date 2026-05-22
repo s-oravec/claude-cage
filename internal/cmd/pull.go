@@ -7,12 +7,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/s-oravec/claude-cage/internal/config"
-	"github.com/s-oravec/claude-cage/internal/images"
-	"github.com/s-oravec/claude-cage/internal/imgstore"
-	"github.com/s-oravec/claude-cage/internal/manifest"
-	"github.com/s-oravec/claude-cage/internal/progress"
-	"github.com/s-oravec/claude-cage/internal/registry"
+	"github.com/s-oravec/cage/internal/config"
+	"github.com/s-oravec/cage/internal/images"
+	"github.com/s-oravec/cage/internal/imgstore"
+	"github.com/s-oravec/cage/internal/manifest"
+	"github.com/s-oravec/cage/internal/progress"
+	"github.com/s-oravec/cage/internal/registry"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 )

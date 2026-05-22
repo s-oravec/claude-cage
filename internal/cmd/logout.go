@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/s-oravec/claude-cage/internal/auth"
+	"github.com/s-oravec/cage/internal/auth"
 )
 
 // NewLogoutCmd returns the cobra command for `cage logout`.

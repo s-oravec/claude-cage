@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"text/template"
 
-	"github.com/s-oravec/claude-cage/internal/mode"
+	"github.com/s-oravec/cage/internal/mode"
 )
 
 // virsh runs a virsh command against the libvirt URI for the current mode.

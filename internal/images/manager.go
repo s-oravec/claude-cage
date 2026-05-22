@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/s-oravec/claude-cage/internal/config"
+	"github.com/s-oravec/cage/internal/config"
 )
 
 // imagesDir can be overridden in tests

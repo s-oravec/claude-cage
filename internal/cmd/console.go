@@ -5,8 +5,8 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/s-oravec/claude-cage/internal/cage"
-	"github.com/s-oravec/claude-cage/internal/mode"
+	"github.com/s-oravec/cage/internal/cage"
+	"github.com/s-oravec/cage/internal/mode"
 	"github.com/spf13/cobra"
 )
 

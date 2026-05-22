@@ -3,8 +3,8 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/s-oravec/claude-cage/internal/cage"
-	"github.com/s-oravec/claude-cage/internal/snapshot"
+	"github.com/s-oravec/cage/internal/cage"
+	"github.com/s-oravec/cage/internal/snapshot"
 	"github.com/spf13/cobra"
 )
 

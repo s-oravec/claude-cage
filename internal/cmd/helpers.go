@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/s-oravec/claude-cage/internal/cage"
-	"github.com/s-oravec/claude-cage/internal/config"
+	"github.com/s-oravec/cage/internal/cage"
+	"github.com/s-oravec/cage/internal/config"
 )
 
 // resolveCageName returns cage name from args or project config.

@@ -3,9 +3,9 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/s-oravec/claude-cage/internal/cage"
-	"github.com/s-oravec/claude-cage/internal/images"
-	"github.com/s-oravec/claude-cage/internal/imgstore"
+	"github.com/s-oravec/cage/internal/cage"
+	"github.com/s-oravec/cage/internal/images"
+	"github.com/s-oravec/cage/internal/imgstore"
 )
 
 // completeCageNames returns cage names suitable for shell completion of a

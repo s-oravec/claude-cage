@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/s-oravec/claude-cage/internal/config"
-	"github.com/s-oravec/claude-cage/internal/imgstore"
-	"github.com/s-oravec/claude-cage/internal/manifest"
+	"github.com/s-oravec/cage/internal/config"
+	"github.com/s-oravec/cage/internal/imgstore"
+	"github.com/s-oravec/cage/internal/manifest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

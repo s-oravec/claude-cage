@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/s-oravec/claude-cage/internal/config"
+	"github.com/s-oravec/cage/internal/config"
 	"gopkg.in/yaml.v3"
 )
 

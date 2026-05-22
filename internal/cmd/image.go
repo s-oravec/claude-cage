@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"text/tabwriter"
 
-	"github.com/s-oravec/claude-cage/internal/cage"
-	"github.com/s-oravec/claude-cage/internal/images"
-	"github.com/s-oravec/claude-cage/internal/imgstore"
+	"github.com/s-oravec/cage/internal/cage"
+	"github.com/s-oravec/cage/internal/images"
+	"github.com/s-oravec/cage/internal/imgstore"
 	"github.com/spf13/cobra"
 )
 

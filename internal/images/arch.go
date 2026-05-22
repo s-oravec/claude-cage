@@ -3,7 +3,7 @@ package images
 import (
 	"runtime"
 
-	"github.com/s-oravec/claude-cage/internal/manifest"
+	"github.com/s-oravec/cage/internal/manifest"
 )
 
 // HostArchitecture returns the Go GOARCH of the current host (e.g. "amd64", "arm64").

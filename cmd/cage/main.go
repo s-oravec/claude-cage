@@ -3,8 +3,8 @@ package main
 import (
 	"os"
 
-	"github.com/s-oravec/claude-cage/internal/cmd"
-	"github.com/s-oravec/claude-cage/internal/tty"
+	"github.com/s-oravec/cage/internal/cmd"
+	"github.com/s-oravec/cage/internal/tty"
 )
 
 func main() {

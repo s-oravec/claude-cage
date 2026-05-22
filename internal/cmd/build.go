@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/s-oravec/claude-cage/internal/build"
-	"github.com/s-oravec/claude-cage/internal/images"
+	"github.com/s-oravec/cage/internal/build"
+	"github.com/s-oravec/cage/internal/images"
 	"github.com/spf13/cobra"
 )
 

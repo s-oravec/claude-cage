@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/s-oravec/claude-cage/internal/images"
+	"github.com/s-oravec/cage/internal/images"
 )
 
 // resolvePlatform turns the --platform flag value into a validated arch.

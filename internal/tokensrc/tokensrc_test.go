@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/s-oravec/claude-cage/internal/auth"
+	"github.com/s-oravec/cage/internal/auth"
 )
 
 func TestStatic_NeverRefreshes(t *testing.T) {

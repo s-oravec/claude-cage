@@ -3,7 +3,7 @@ package cmd
 import (
 	"io"
 
-	"github.com/s-oravec/claude-cage/internal/progress"
+	"github.com/s-oravec/cage/internal/progress"
 )
 
 // progressReadCloser counts bytes read from a layer download and reports the

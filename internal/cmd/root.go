@@ -3,7 +3,7 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/s-oravec/claude-cage/internal/logging"
+	"github.com/s-oravec/cage/internal/logging"
 )
 
 // NewRootCmd creates the root command

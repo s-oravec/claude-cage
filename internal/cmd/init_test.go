@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
-	"github.com/s-oravec/claude-cage/internal/config"
+	"github.com/s-oravec/cage/internal/config"
 )
 
 func TestInitCommand_CreatesConfigFile(t *testing.T) {

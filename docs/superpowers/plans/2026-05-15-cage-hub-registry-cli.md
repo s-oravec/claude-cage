@@ -478,7 +478,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/s-oravec/claude-cage/internal/config"
+	"github.com/s-oravec/cage/internal/config"
 )
 
 var rootOverride string
@@ -1139,8 +1139,8 @@ Add to `internal/images/operations.go`:
 
 ```go
 import (
-	"github.com/s-oravec/claude-cage/internal/imgstore"
-	"github.com/s-oravec/claude-cage/internal/manifest"
+	"github.com/s-oravec/cage/internal/imgstore"
+	"github.com/s-oravec/cage/internal/manifest"
 )
 
 type SaveLayeredInput struct {
@@ -1334,7 +1334,7 @@ func readCagefileText(path string) string {
 }
 ```
 
-Add imports at the top of the file: `runtime`, `sort`, and `"github.com/s-oravec/claude-cage/internal/manifest"`.
+Add imports at the top of the file: `runtime`, `sort`, and `"github.com/s-oravec/cage/internal/manifest"`.
 
 - [ ] **Step 3: Compile**
 
@@ -1655,7 +1655,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/s-oravec/claude-cage/internal/config"
+	"github.com/s-oravec/cage/internal/config"
 	"gopkg.in/yaml.v3"
 )
 
@@ -3011,10 +3011,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/s-oravec/claude-cage/internal/auth"
-	"github.com/s-oravec/claude-cage/internal/config"
-	"github.com/s-oravec/claude-cage/internal/oidcdevice"
-	"github.com/s-oravec/claude-cage/internal/registry"
+	"github.com/s-oravec/cage/internal/auth"
+	"github.com/s-oravec/cage/internal/config"
+	"github.com/s-oravec/cage/internal/oidcdevice"
+	"github.com/s-oravec/cage/internal/registry"
 )
 
 func NewLoginCmd() *cobra.Command {
@@ -3165,7 +3165,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/spf13/cobra"
-	"github.com/s-oravec/claude-cage/internal/auth"
+	"github.com/s-oravec/cage/internal/auth"
 )
 
 func NewLogoutCmd() *cobra.Command {
@@ -3231,7 +3231,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/s-oravec/claude-cage/internal/imgstore"
+	"github.com/s-oravec/cage/internal/imgstore"
 )
 
 func NewTagCmd() *cobra.Command {
@@ -3300,11 +3300,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/s-oravec/claude-cage/internal/auth"
-	"github.com/s-oravec/claude-cage/internal/config"
-	"github.com/s-oravec/claude-cage/internal/imgstore"
-	"github.com/s-oravec/claude-cage/internal/manifest"
-	"github.com/s-oravec/claude-cage/internal/registry"
+	"github.com/s-oravec/cage/internal/auth"
+	"github.com/s-oravec/cage/internal/config"
+	"github.com/s-oravec/cage/internal/imgstore"
+	"github.com/s-oravec/cage/internal/manifest"
+	"github.com/s-oravec/cage/internal/registry"
 )
 
 func NewPushCmd() *cobra.Command {

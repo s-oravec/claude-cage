@@ -8,10 +8,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/s-oravec/claude-cage/internal/cage"
-	"github.com/s-oravec/claude-cage/internal/config"
-	"github.com/s-oravec/claude-cage/internal/network"
-	"github.com/s-oravec/claude-cage/internal/ssh"
+	"github.com/s-oravec/cage/internal/cage"
+	"github.com/s-oravec/cage/internal/config"
+	"github.com/s-oravec/cage/internal/network"
+	"github.com/s-oravec/cage/internal/ssh"
 	"github.com/spf13/cobra"
 )
 

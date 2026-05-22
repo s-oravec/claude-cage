@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/s-oravec/claude-cage/internal/auth"
-	"github.com/s-oravec/claude-cage/internal/oidcdevice"
+	"github.com/s-oravec/cage/internal/auth"
+	"github.com/s-oravec/cage/internal/oidcdevice"
 )
 
 // skew is how long before expiry we proactively refresh.

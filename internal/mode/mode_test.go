@@ -3,7 +3,7 @@ package mode
 import (
 	"testing"
 
-	"github.com/s-oravec/claude-cage/internal/config"
+	"github.com/s-oravec/cage/internal/config"
 	"github.com/stretchr/testify/assert"
 )
 

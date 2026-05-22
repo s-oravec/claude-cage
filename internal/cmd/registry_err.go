@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/s-oravec/claude-cage/internal/registry"
+	"github.com/s-oravec/cage/internal/registry"
 )
 
 // printAPIErrorHint inspects err for *registry.APIError and writes a friendly

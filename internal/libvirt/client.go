@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/s-oravec/claude-cage/internal/mode"
+	"github.com/s-oravec/cage/internal/mode"
 )
 
 // Client wraps libvirt operations using virsh CLI

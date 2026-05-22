@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/s-oravec/claude-cage/internal/manifest"
-	"github.com/s-oravec/claude-cage/internal/registry"
+	"github.com/s-oravec/cage/internal/manifest"
+	"github.com/s-oravec/cage/internal/registry"
 )
 
 // makeDigest builds a valid "sha256:<64hex>" digest from a single hex nibble c.

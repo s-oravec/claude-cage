@@ -38,21 +38,21 @@ linters-settings:
       # Cobra flag marking (panics on error in practice)
       - (*github.com/spf13/cobra.Command).MarkFlagRequired
       # Project-specific cleanup functions
-      - github.com/s-oravec/claude-cage/internal/cage.DeleteState
-      - github.com/s-oravec/claude-cage/internal/cage.SaveState
-      - github.com/s-oravec/claude-cage/internal/ssh.DeleteKeys
-      - github.com/s-oravec/claude-cage/internal/ssh.RemoveKnownHost
-      - github.com/s-oravec/claude-cage/internal/network.StopForwarderByPID
-      - github.com/s-oravec/claude-cage/internal/network.CleanupFirewall
-      - github.com/s-oravec/claude-cage/internal/network.DestroyNetwork
-      - github.com/s-oravec/claude-cage/internal/virtiofs.StopByPID
-      - github.com/s-oravec/claude-cage/internal/virtiofs.CleanupSocket
-      - (*github.com/s-oravec/claude-cage/internal/virtiofs.Daemon).Stop
-      - (*github.com/s-oravec/claude-cage/internal/network.IsolatedNetwork).Cleanup
-      - (*github.com/s-oravec/claude-cage/internal/network.Forwarder).Stop
-      - (*github.com/s-oravec/claude-cage/internal/libvirt.Client).DestroyDomain
-      - (*github.com/s-oravec/claude-cage/internal/libvirt.Client).UndefineDomain
-      - github.com/s-oravec/claude-cage/internal/images.DeleteMetadata
+      - github.com/s-oravec/cage/internal/cage.DeleteState
+      - github.com/s-oravec/cage/internal/cage.SaveState
+      - github.com/s-oravec/cage/internal/ssh.DeleteKeys
+      - github.com/s-oravec/cage/internal/ssh.RemoveKnownHost
+      - github.com/s-oravec/cage/internal/network.StopForwarderByPID
+      - github.com/s-oravec/cage/internal/network.CleanupFirewall
+      - github.com/s-oravec/cage/internal/network.DestroyNetwork
+      - github.com/s-oravec/cage/internal/virtiofs.StopByPID
+      - github.com/s-oravec/cage/internal/virtiofs.CleanupSocket
+      - (*github.com/s-oravec/cage/internal/virtiofs.Daemon).Stop
+      - (*github.com/s-oravec/cage/internal/network.IsolatedNetwork).Cleanup
+      - (*github.com/s-oravec/cage/internal/network.Forwarder).Stop
+      - (*github.com/s-oravec/cage/internal/libvirt.Client).DestroyDomain
+      - (*github.com/s-oravec/cage/internal/libvirt.Client).UndefineDomain
+      - github.com/s-oravec/cage/internal/images.DeleteMetadata
 
 issues:
   max-issues-per-linter: 0

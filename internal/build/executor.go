@@ -11,16 +11,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/s-oravec/claude-cage/internal/cage"
-	"github.com/s-oravec/claude-cage/internal/cloudinit"
-	"github.com/s-oravec/claude-cage/internal/config"
-	"github.com/s-oravec/claude-cage/internal/images"
-	"github.com/s-oravec/claude-cage/internal/libvirt"
-	"github.com/s-oravec/claude-cage/internal/logging"
-	"github.com/s-oravec/claude-cage/internal/manifest"
-	"github.com/s-oravec/claude-cage/internal/network"
-	"github.com/s-oravec/claude-cage/internal/runtime"
-	"github.com/s-oravec/claude-cage/internal/ssh"
+	"github.com/s-oravec/cage/internal/cage"
+	"github.com/s-oravec/cage/internal/cloudinit"
+	"github.com/s-oravec/cage/internal/config"
+	"github.com/s-oravec/cage/internal/images"
+	"github.com/s-oravec/cage/internal/libvirt"
+	"github.com/s-oravec/cage/internal/logging"
+	"github.com/s-oravec/cage/internal/manifest"
+	"github.com/s-oravec/cage/internal/network"
+	"github.com/s-oravec/cage/internal/runtime"
+	"github.com/s-oravec/cage/internal/ssh"
 )
 
 // BuildConfig contains configuration for the build

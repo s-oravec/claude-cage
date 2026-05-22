@@ -5,7 +5,7 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/s-oravec/claude-cage/internal/config"
+	"github.com/s-oravec/cage/internal/config"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )

@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
-	"github.com/s-oravec/claude-cage/internal/config"
+	"github.com/s-oravec/cage/internal/config"
 )
 
 // NewInitCmd creates the init command
@@ -127,7 +127,7 @@ func runInit(cmd *cobra.Command, image, cage, memory string, vcpu, disk int, ssh
 
 	// Add header comment
 	header := `# Cage configuration for this project
-# See: https://github.com/s-oravec/claude-cage
+# See: https://github.com/s-oravec/cage
 #
 # User mode (this file, default): no shares, no env injection. Run with 'cage start'.
 # Root mode: add 'shares:' or 'env:' below. Then run 'sudo cage start' (required

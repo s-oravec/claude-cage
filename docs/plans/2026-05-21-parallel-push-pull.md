@@ -494,7 +494,7 @@ errgroup pool driving a `progress.Group`:
 import (
 	"context"
 	"golang.org/x/sync/errgroup"
-	"github.com/s-oravec/claude-cage/internal/progress"
+	"github.com/s-oravec/cage/internal/progress"
 )
 
 if concurrency < 1 {

@@ -1,4 +1,4 @@
-module github.com/s-oravec/claude-cage
+module github.com/s-oravec/cage
 
 go 1.25.0
 

@@ -21,7 +21,7 @@
 .PHONY: build test test-quick test-verbose coverage coverage-html coverage-check e2e e2e-short e2e-user e2e-ubuntu install install-system clean
 
 VERSION := 0.1.0
-LDFLAGS := -ldflags "-X github.com/s-oravec/claude-cage/internal/cmd.Version=$(VERSION)"
+LDFLAGS := -ldflags "-X github.com/s-oravec/cage/internal/cmd.Version=$(VERSION)"
 COVERAGE_FILE := coverage.out
 COVERAGE_HTML := coverage.html
 COVERAGE_THRESHOLD := 40

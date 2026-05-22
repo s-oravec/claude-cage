@@ -68,7 +68,7 @@ cage doctor
 ### From Source
 
 ```bash
-git clone https://github.com/s-oravec/claude-cage.git
+git clone https://github.com/s-oravec/cage.git
 cd claude-cage
 make build
 make install  # installs to ~/.local/bin/
@@ -84,7 +84,7 @@ make install-system  # installs to /usr/local/bin/ (asks for sudo)
 ### Using Go
 
 ```bash
-go install github.com/s-oravec/claude-cage/cmd/cage@latest
+go install github.com/s-oravec/cage/cmd/cage@latest
 ```
 
 ## Quick Start

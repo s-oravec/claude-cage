@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/s-oravec/claude-cage/internal/config"
-	"github.com/s-oravec/claude-cage/internal/libvirt"
-	"github.com/s-oravec/claude-cage/internal/runtime"
+	"github.com/s-oravec/cage/internal/config"
+	"github.com/s-oravec/cage/internal/libvirt"
+	"github.com/s-oravec/cage/internal/runtime"
 )
 
 // Reconfigure updates cage configuration (shares, network).

@@ -3,7 +3,7 @@ package cmd
 import (
 	"testing"
 
-	"github.com/s-oravec/claude-cage/internal/images"
+	"github.com/s-oravec/cage/internal/images"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

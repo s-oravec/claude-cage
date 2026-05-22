@@ -21,7 +21,7 @@ This guide helps developers set up their environment for contributing to Claude 
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/s-oravec/claude-cage.git
+git clone https://github.com/s-oravec/cage.git
 cd claude-cage
 ```
 

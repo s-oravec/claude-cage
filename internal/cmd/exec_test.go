@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/s-oravec/claude-cage/internal/cage"
+	"github.com/s-oravec/cage/internal/cage"
 )
 
 func TestExecCmd(t *testing.T) {

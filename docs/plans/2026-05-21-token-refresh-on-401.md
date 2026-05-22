@@ -347,7 +347,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/s-oravec/claude-cage/internal/auth"
+	"github.com/s-oravec/cage/internal/auth"
 )
 
 func TestStatic_NeverRefreshes(t *testing.T) {
@@ -434,8 +434,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/s-oravec/claude-cage/internal/auth"
-	"github.com/s-oravec/claude-cage/internal/oidcdevice"
+	"github.com/s-oravec/cage/internal/auth"
+	"github.com/s-oravec/cage/internal/oidcdevice"
 )
 
 // skew is how long before expiry we proactively refresh.
@@ -875,7 +875,7 @@ After `rc.AuthInfo()` succeeds and when the stored entry has a refresh token, at
 	}
 ```
 
-Add imports: `github.com/s-oravec/claude-cage/internal/tokensrc` (auth is already imported).
+Add imports: `github.com/s-oravec/cage/internal/tokensrc` (auth is already imported).
 
 PAT pushes keep the static fallback built from `Options.Token` - no behavior change.
 

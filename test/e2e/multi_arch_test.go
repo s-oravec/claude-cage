@@ -34,8 +34,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/s-oravec/claude-cage/internal/manifest"
-	"github.com/s-oravec/claude-cage/internal/registry"
+	"github.com/s-oravec/cage/internal/manifest"
+	"github.com/s-oravec/cage/internal/registry"
 	"github.com/stretchr/testify/require"
 )
 

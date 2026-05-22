@@ -9,10 +9,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/s-oravec/claude-cage/internal/auth"
-	"github.com/s-oravec/claude-cage/internal/config"
-	"github.com/s-oravec/claude-cage/internal/oidcdevice"
-	"github.com/s-oravec/claude-cage/internal/registry"
+	"github.com/s-oravec/cage/internal/auth"
+	"github.com/s-oravec/cage/internal/config"
+	"github.com/s-oravec/cage/internal/oidcdevice"
+	"github.com/s-oravec/cage/internal/registry"
 )
 
 // NewLoginCmd returns the cobra command for `cage login`.

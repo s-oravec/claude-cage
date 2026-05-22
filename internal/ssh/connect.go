@@ -7,9 +7,9 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/s-oravec/claude-cage/internal/cage"
-	"github.com/s-oravec/claude-cage/internal/logging"
-	"github.com/s-oravec/claude-cage/internal/sshagent"
+	"github.com/s-oravec/cage/internal/cage"
+	"github.com/s-oravec/cage/internal/logging"
+	"github.com/s-oravec/cage/internal/sshagent"
 )
 
 var (

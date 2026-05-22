@@ -14,7 +14,7 @@ package mode
 import (
 	"os"
 
-	"github.com/s-oravec/claude-cage/internal/config"
+	"github.com/s-oravec/cage/internal/config"
 )
 
 // Mode is cage's operating mode.

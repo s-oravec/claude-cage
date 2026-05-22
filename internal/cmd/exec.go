@@ -6,9 +6,9 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/s-oravec/claude-cage/internal/cage"
-	"github.com/s-oravec/claude-cage/internal/logging"
-	"github.com/s-oravec/claude-cage/internal/ssh"
+	"github.com/s-oravec/cage/internal/cage"
+	"github.com/s-oravec/cage/internal/logging"
+	"github.com/s-oravec/cage/internal/ssh"
 	"github.com/spf13/cobra"
 )
 

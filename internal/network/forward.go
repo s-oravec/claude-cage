@@ -7,8 +7,8 @@ import (
 	"os/exec"
 	"syscall"
 
-	"github.com/s-oravec/claude-cage/internal/logging"
-	"github.com/s-oravec/claude-cage/internal/ssh"
+	"github.com/s-oravec/cage/internal/logging"
+	"github.com/s-oravec/cage/internal/ssh"
 )
 
 var (
