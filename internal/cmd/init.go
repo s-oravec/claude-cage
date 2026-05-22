@@ -133,7 +133,15 @@ func runInit(cmd *cobra.Command, image, cage, memory string, vcpu, disk int, ssh
 # for virtiofs). See docs/modes.md for details.
 
 `
-	content := header + string(data)
+	// Commented-out network example: discoverable without changing defaults.
+	// On the default auto/SLIRP path the cage is isolated from the LAN/private
+	// ranges. Uncomment under 'network:' to reach specific subnets while staying
+	// isolated, or to disable isolation entirely (less secure).
+	networkExample := `# network:
+#   isolation: true                    # block LAN/private ranges (default true)
+#   allowed_subnets: [192.168.1.0/24]  # extra subnets the cage may reach while isolated
+`
+	content := header + string(data) + networkExample
 
 	// Write file
 	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {

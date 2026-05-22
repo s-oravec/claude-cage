@@ -12,7 +12,10 @@ available.
 **What it gives you:**
 - Fully isolated VM with serial console and SSH
 - SLIRP user-mode networking (NAT to the host, no LAN access)
-- VM-side egress blocking installed via cloud-init iptables rules
+- VM-side LAN/egress blocking is route-based (`ip route unreachable` for
+  private ranges, installed via cloud-init) and configurable in `.cage.yml`
+  via `network.isolation` (default true) and `network.allowed_subnets`
+  (CIDRs routed via the SLIRP gateway while isolation stays on)
 - Snapshots, image pull, lifecycle (start/stop/remove)
 - Zero host configuration: works out of the box on any KVM-capable Linux
   with the user in the `kvm` and `libvirt` groups

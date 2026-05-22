@@ -988,6 +988,9 @@ network:
   ports:                # optional, additional port forwards
     - "8080:80"
     - "3000:3000"
+  isolation: true       # optional, block LAN/private ranges (default true)
+  allowed_subnets:      # optional, extra subnets reachable while isolated
+    - 192.168.1.0/24
 
 # File sharing
 shares:
@@ -1015,6 +1018,8 @@ env:
 | `disk` | No | Disk size in GB |
 | `network.ssh` | No | SSH port: `auto` or specific port number |
 | `network.ports` | No | Port forwards in `host:guest` format |
+| `network.isolation` | No | Block LAN/private ranges on the auto/SLIRP path (default `true`). Set `false` to let the cage reach the host LAN/private ranges (less secure). |
+| `network.allowed_subnets` | No | CIDRs that stay reachable while isolation is on (routed via the SLIRP gateway `10.0.2.2`). Invalid CIDRs are rejected at `cage start`. Auto/SLIRP path only. |
 | `shares` | No | Directory shares (host/guest/mode) |
 | `env` | No | Environment variables |
 
