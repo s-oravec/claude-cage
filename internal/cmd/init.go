@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -133,15 +134,17 @@ func runInit(cmd *cobra.Command, image, cage, memory string, vcpu, disk int, ssh
 # for virtiofs). See docs/modes.md for details.
 
 `
-	// Commented-out network example: discoverable without changing defaults.
-	// On the default auto/SLIRP path the cage is isolated from the LAN/private
-	// ranges. Uncomment under 'network:' to reach specific subnets while staying
-	// isolated, or to disable isolation entirely (less secure).
-	networkExample := `# network:
-#   isolation: true                    # block LAN/private ranges (default true)
-#   allowed_subnets: [192.168.1.0/24]  # extra subnets the cage may reach while isolated
-`
-	content := header + string(data) + networkExample
+	// Insert commented network options INSIDE the marshaled 'network:' block so
+	// they can be uncommented in place (no duplicate 'network:' key). On the
+	// default auto/SLIRP path the cage is isolated from the LAN/private ranges;
+	// these let you reach specific subnets while staying isolated, or disable
+	// isolation entirely (less secure).
+	networkOptions := "    # isolation: true                    # block LAN/private ranges (default true)\n" +
+		"    # allowed_subnets: [192.168.1.0/24]  # extra subnets the cage may reach while isolated\n"
+	yamlBody := strings.Replace(string(data), "network:\n    ssh: auto\n",
+		"network:\n    ssh: auto\n"+networkOptions, 1)
+
+	content := header + yamlBody
 
 	// Write file
 	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
