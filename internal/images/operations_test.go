@@ -23,7 +23,7 @@ func TestList(t *testing.T) {
 	imagesDir = tmpDir
 	defer func() { imagesDir = oldDir }()
 
-	// Isolate imgstore root so the real ~/.claude-cage/refs/ does not bleed in.
+	// Isolate imgstore root so the real ~/.cage/refs/ does not bleed in.
 	storeRoot := t.TempDir()
 	imgstore.SetRoot(storeRoot)
 	defer imgstore.SetRoot("")

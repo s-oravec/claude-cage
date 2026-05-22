@@ -61,7 +61,7 @@ func TestWriteEnvFile(t *testing.T) {
 	env := map[string]string{
 		"FOO":         "bar",
 		"HELLO":       "world",
-		"CLAUDE_HOME": "/home/claude",
+		"APP_HOME": "/home/app",
 	}
 
 	err := WriteEnvFile(envPath, env)
@@ -78,7 +78,7 @@ func TestWriteEnvFile(t *testing.T) {
 	assert.Contains(t, contentStr, "# This file is auto-generated - do not edit")
 
 	// Check exports (should be sorted alphabetically)
-	assert.Contains(t, contentStr, "export CLAUDE_HOME='/home/claude'")
+	assert.Contains(t, contentStr, "export APP_HOME='/home/app'")
 	assert.Contains(t, contentStr, "export FOO='bar'")
 	assert.Contains(t, contentStr, "export HELLO='world'")
 
@@ -91,7 +91,7 @@ func TestWriteEnvFile(t *testing.T) {
 		}
 	}
 	assert.Len(t, exports, 3)
-	assert.True(t, strings.HasPrefix(exports[0], "export CLAUDE_HOME="))
+	assert.True(t, strings.HasPrefix(exports[0], "export APP_HOME="))
 	assert.True(t, strings.HasPrefix(exports[1], "export FOO="))
 	assert.True(t, strings.HasPrefix(exports[2], "export HELLO="))
 
@@ -141,7 +141,7 @@ func TestWriteEnvFile_EscapesQuotes(t *testing.T) {
 
 	env := map[string]string{
 		"SIMPLE":      "it's working",
-		"DOUBLE":      "it's Claude's cage",
+		"DOUBLE":      "it's a user's cage",
 		"TRIPLE":      "'''",
 		"EMPTY_QUOTE": "'",
 	}
@@ -156,7 +156,7 @@ func TestWriteEnvFile_EscapesQuotes(t *testing.T) {
 
 	// Single quote in value: it's -> it'\''s
 	assert.Contains(t, contentStr, "export SIMPLE='it'\\''s working'")
-	assert.Contains(t, contentStr, "export DOUBLE='it'\\''s Claude'\\''s cage'")
+	assert.Contains(t, contentStr, "export DOUBLE='it'\\''s a user'\\''s cage'")
 	assert.Contains(t, contentStr, "export TRIPLE=''\\'''\\'''\\'''")
 	assert.Contains(t, contentStr, "export EMPTY_QUOTE=''\\'''")
 }

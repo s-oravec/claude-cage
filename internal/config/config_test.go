@@ -68,12 +68,12 @@ func TestDefaultConfig(t *testing.T) {
 func TestConfigDir(t *testing.T) {
 	dir := Dir()
 	home, _ := os.UserHomeDir()
-	assert.Equal(t, filepath.Join(home, ".claude-cage"), dir)
+	assert.Equal(t, filepath.Join(home, ".cage"), dir)
 }
 
 func TestConfigPath(t *testing.T) {
 	path := Path()
-	assert.Contains(t, path, ".claude-cage")
+	assert.Contains(t, path, ".cage")
 	assert.Contains(t, path, "config.yaml")
 }
 

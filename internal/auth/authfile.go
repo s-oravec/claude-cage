@@ -38,7 +38,7 @@ func dir() string {
 
 func path() string { return filepath.Join(dir(), "auth.yaml") }
 
-// Load reads ~/.claude-cage/auth.yaml. Missing file returns empty Auth (no error).
+// Load reads ~/.cage/auth.yaml. Missing file returns empty Auth (no error).
 // If the file has loose permissions, prints a warning and chmods to 0600.
 func Load() (*Auth, error) {
 	p := path()

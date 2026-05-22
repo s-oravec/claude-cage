@@ -36,7 +36,7 @@ cage runs under your regular user with libvirt session mode. Use --root to
 add a default share that maps the current directory to /workspace (this
 requires running the cage with 'sudo cage start' — see docs/modes.md).
 
-If --image is not specified, uses the default image from ~/.claude-cage/config.yaml.
+If --image is not specified, uses the default image from ~/.cage/config.yaml.
 
 Example:
   cage init                              # user-mode cagefile (no shares)
@@ -68,7 +68,7 @@ func runInit(cmd *cobra.Command, image, cage, memory string, vcpu, disk int, ssh
 		if err == nil && cfg.Images.Default != "" {
 			image = cfg.Images.Default
 		} else {
-			return fmt.Errorf("--image is required (or set images.default in ~/.claude-cage/config.yaml)")
+			return fmt.Errorf("--image is required (or set images.default in ~/.cage/config.yaml)")
 		}
 	}
 

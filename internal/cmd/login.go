@@ -27,7 +27,7 @@ func NewLoginCmd() *cobra.Command {
 
 Without --token-stdin, runs the OAuth 2.0 device authorization flow:
 prints a URL + user code; the user opens the URL, enters the code,
-and cage stores the resulting token in ~/.claude-cage/auth.yaml.
+and cage stores the resulting token in ~/.cage/auth.yaml.
 
 With --token-stdin, reads a Personal Access Token (PAT, format
 cgh_<base64url>) from stdin - useful for CI:

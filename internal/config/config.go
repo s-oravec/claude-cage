@@ -98,17 +98,17 @@ func Dir() string {
 	}
 	if u := os.Getenv("SUDO_USER"); u != "" {
 		if usr, err := user.Lookup(u); err == nil {
-			return filepath.Join(usr.HomeDir, ".claude-cage")
+			return filepath.Join(usr.HomeDir, ".cage")
 		}
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".claude-cage")
+	return filepath.Join(home, ".cage")
 }
 
 // VMArtifactsDir returns the directory for libvirt-readable VM artifacts:
 // disk overlays, cloud-init ISOs, virtiofs-mount sources.
 //
-//   - User mode: same as Dir() (~/.claude-cage). libvirt session runs
+//   - User mode: same as Dir() (~/.cage). libvirt session runs
 //     QEMU as the user, no apparmor or perm issues.
 //   - Root mode: /var/lib/libvirt/images/cage. Lives under the default
 //     libvirt virt-aa-helper apparmor allow-list, so disk files and

@@ -32,7 +32,7 @@ func TestImageCmd(t *testing.T) {
 	cage.SetCagesDir(filepath.Join(tmpDir, "cages"))
 	defer cage.SetCagesDir(oldCagesDir)
 
-	// Isolate imgstore root so the user's real ~/.claude-cage/refs/ tree
+	// Isolate imgstore root so the user's real ~/.cage/refs/ tree
 	// does not leak custom images into this test.
 	imgstore.SetRoot(filepath.Join(tmpDir, "store"))
 	defer imgstore.SetRoot("")

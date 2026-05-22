@@ -15,7 +15,7 @@ func NewLogoutCmd() *cobra.Command {
 		Use:   "logout [host]",
 		Short: "Remove stored credentials for a registry",
 		Long: `Remove credentials for a cage-hub registry stored in
-~/.claude-cage/auth.yaml. This is a local-only operation; the token
+~/.cage/auth.yaml. This is a local-only operation; the token
 itself remains valid on the server until it expires or you revoke it
 via the cage-hub web UI (/settings/tokens) or DELETE /api/v1/me/pats/:id.
 

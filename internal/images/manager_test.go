@@ -11,7 +11,7 @@ import (
 
 func TestImagesDir(t *testing.T) {
 	dir := Dir()
-	assert.Contains(t, dir, ".claude-cage")
+	assert.Contains(t, dir, ".cage")
 	assert.Contains(t, dir, "images")
 }
 

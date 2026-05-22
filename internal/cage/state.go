@@ -183,7 +183,7 @@ func RequireMode(name, currentMode string) error {
 //
 // Refuses names that contain path separators or traversal segments. Without
 // this, e.g. `cage remove ..` would resolve to RemoveAll on the parent
-// (~/.claude-cage) and silently nuke config.yaml, auth.yaml, images/, keys/.
+// (~/.cage) and silently nuke config.yaml, auth.yaml, images/, keys/.
 func DeleteState(name string) error {
 	if err := ValidName(name); err != nil {
 		return err

@@ -12,7 +12,7 @@ var rootOverride string
 // SetRoot overrides the storage root (testing only). Empty restores default.
 func SetRoot(s string) { rootOverride = s }
 
-// Root is the base directory under ~/.claude-cage where layered store lives.
+// Root is the base directory under ~/.cage where layered store lives.
 func Root() string {
 	if rootOverride != "" {
 		return rootOverride

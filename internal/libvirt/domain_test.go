@@ -33,8 +33,8 @@ func TestGenerateDomainXML_BridgeNetwork(t *testing.T) {
 		Name:         "test",
 		MemoryMB:     4096,
 		VCPU:         4,
-		DiskPath:     "/home/user/.claude-cage/cages/test/disk.qcow2",
-		CloudInitISO: "/home/user/.claude-cage/cages/test/cloud-init.iso",
+		DiskPath:     "/home/user/.cage/cages/test/disk.qcow2",
+		CloudInitISO: "/home/user/.cage/cages/test/cloud-init.iso",
 		NetworkName:  "cage-test",
 	}
 
@@ -277,7 +277,7 @@ func TestGenerateDomainXML_RuntimeMount(t *testing.T) {
 		DiskPath:     "/tmp/disk.qcow2",
 		CloudInitISO: "/tmp/cloud-init.iso",
 		NetworkName:  "default",
-		RuntimeDir:   "/home/user/.claude-cage/cages/test/runtime",
+		RuntimeDir:   "/home/user/.cage/cages/test/runtime",
 	}
 
 	xml, err := GenerateDomainXML(cfg)
@@ -307,7 +307,7 @@ func TestGenerateDomainXML_RuntimeMountWithVirtiofs(t *testing.T) {
 		CloudInitISO:   "/tmp/cloud-init.iso",
 		NetworkName:    "default",
 		VirtiofsSocket: "/run/cage/test/virtiofs.sock",
-		RuntimeDir:     "/home/user/.claude-cage/cages/test/runtime",
+		RuntimeDir:     "/home/user/.cage/cages/test/runtime",
 	}
 
 	xml, err := GenerateDomainXML(cfg)

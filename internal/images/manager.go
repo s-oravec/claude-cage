@@ -18,7 +18,7 @@ var imagesDir string
 
 // Dir returns the base-images cache directory.
 //
-// Lives next to the VM artifacts: in user mode that's ~/.claude-cage/images/,
+// Lives next to the VM artifacts: in user mode that's ~/.cage/images/,
 // in root mode /var/lib/libvirt/images/cage/images/. Disk overlays back to
 // files here, so qemu (running as libvirt-qemu under sudo) needs the
 // directory to be on the default virt-aa-helper apparmor allow-list.

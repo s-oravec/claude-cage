@@ -11,7 +11,7 @@ import (
 
 func TestKeysDir(t *testing.T) {
 	dir := KeysDir()
-	assert.Contains(t, dir, ".claude-cage")
+	assert.Contains(t, dir, ".cage")
 	assert.Contains(t, dir, "keys")
 }
 
@@ -112,7 +112,7 @@ func TestPubKeyPath(t *testing.T) {
 
 func TestKnownHostsPath(t *testing.T) {
 	path := KnownHostsPath()
-	assert.Contains(t, path, ".claude-cage")
+	assert.Contains(t, path, ".cage")
 	assert.Contains(t, path, "known_hosts")
 }
 

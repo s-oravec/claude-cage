@@ -37,6 +37,6 @@ func TestConfigPathCmd_Output(t *testing.T) {
 	err := cmd.Execute()
 
 	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), ".claude-cage")
+	assert.Contains(t, buf.String(), ".cage")
 	assert.Contains(t, buf.String(), "config.yaml")
 }
